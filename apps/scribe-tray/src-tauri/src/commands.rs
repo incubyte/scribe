@@ -8,6 +8,7 @@ use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_opener::OpenerExt;
 
 use crate::live_feed::{LiveFeed, RecorderSnapshot};
+use crate::model_setup::{self, ModelDownloadView};
 use crate::recording::{self, RecordingController};
 
 #[derive(Serialize)]
@@ -77,4 +78,16 @@ pub fn open_session<R: Runtime>(app: AppHandle<R>, id: String) -> Result<(), Str
     app.opener()
         .open_path(path.to_string_lossy(), None::<&str>)
         .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn model_download_status<R: Runtime>(app: AppHandle<R>) -> ModelDownloadView {
+    model_setup::status(&app)
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn retry_model_download<R: Runtime>(app: AppHandle<R>) {
+    model_setup::retry(&app);
 }

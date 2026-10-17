@@ -120,3 +120,38 @@
 .session__meta {
   color: var(--text-muted);
 }
+
+.model-download {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  background: var(--surface-raised);
+}
+
+.model-download__title {
+  margin: 0 0 var(--space-2);
+  font-weight: 600;
+}
+
+.model-download__bar,
+.model-download__failure {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.model-download__failure .model-download__title {
+  flex: 1;
+  margin: 0;
+}
+
+.model-download__bar progress {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.model-download__percent {
+  min-width: 4ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}

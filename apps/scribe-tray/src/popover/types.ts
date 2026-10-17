@@ -23,3 +23,8 @@ export interface SessionSummary {
   readonly duration_seconds: number | null;
   readonly status: SessionStatus;
 }
+
+export type ModelDownload =
+  | { readonly state: "ready" }
+  | { readonly state: "downloading"; readonly percent: number }
+  | { readonly state: "failed"; readonly reason_kind: string };

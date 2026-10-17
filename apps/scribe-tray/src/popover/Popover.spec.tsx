@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { Popover } from "./Popover";
-import type { RecorderSnapshot, SessionSummary } from "./types";
+import type { ModelDownload, RecorderSnapshot, SessionSummary } from "./types";
 
 const NOW = Date.parse("2026-10-17T09:10:00+00:00");
 
@@ -27,6 +27,8 @@ const FIVE_SESSIONS = [
   session(13, 600),
 ];
 
+const READY: ModelDownload = { state: "ready" };
+
 const idle: RecorderSnapshot = { state: "idle", started_at: null, lines: [] };
 const locked: RecorderSnapshot = { state: "locked", started_at: null, lines: [] };
 const recordingForSixtyFiveSeconds: RecorderSnapshot = {
@@ -35,10 +37,17 @@ const recordingForSixtyFiveSeconds: RecorderSnapshot = {
   lines: [{ speaker: "Them", start_ms: 0, text: "Good morning" }],
 };
 
-function backend(snapshot: RecorderSnapshot, recent: readonly SessionSummary[] = FIVE_SESSIONS) {
+function backend(
+  snapshot: RecorderSnapshot,
+  recent: readonly SessionSummary[] = FIVE_SESSIONS,
+  modelDownload: ModelDownload = READY,
+) {
   const handler = vi.fn((command: string) => {
     if (command === "recorder_snapshot") {
       return snapshot;
+    }
+    if (command === "model_download_status") {
+      return modelDownload;
     }
     return command === "recent_sessions" ? recent : undefined;
   });
@@ -212,6 +221,53 @@ describe("the popover while recording", () => {
     const { violations } = await axe(container);
 
     expect(violations).toEqual([]);
+  });
+});
+
+describe("the popover while the speech model downloads", () => {
+  it("shows the download progress and keeps Start disabled", async () => {
+    backend(locked, FIVE_SESSIONS, { state: "downloading", percent: 42 });
+    render(<Popover />);
+
+    expect(await screen.findByRole("progressbar", { name: "Speech model download" })).toHaveAttribute(
+      "value",
+      "42",
+    );
+    expect(screen.getByRole("button", { name: "Start recording" })).toBeDisabled();
+  });
+
+  it("follows the progress as the download advances", async () => {
+    backend(locked, FIVE_SESSIONS, { state: "downloading", percent: 42 });
+    render(<Popover />);
+    await screen.findByRole("progressbar", { name: "Speech model download" });
+
+    await act(() => emit("model-download://progressed", { state: "downloading", percent: 43 }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("progressbar", { name: "Speech model download" })).toHaveAttribute(
+        "value",
+        "43",
+      ),
+    );
+  });
+
+  it("offers Retry after a failure and asks the app to download again", async () => {
+    const handler = backend(locked, FIVE_SESSIONS, { state: "failed", reason_kind: "network" });
+    render(<Popover />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Retry" }));
+
+    expect(handler).toHaveBeenCalledWith("retry_model_download", {});
+  });
+
+  it("removes the panel once the model is ready", async () => {
+    backend(locked, FIVE_SESSIONS, { state: "downloading", percent: 99 });
+    render(<Popover />);
+    await screen.findByRole("progressbar", { name: "Speech model download" });
+
+    await act(() => emit("model-download://completed", { state: "ready" }));
+
+    await waitFor(() => expect(screen.queryByRole("progressbar")).not.toBeInTheDocument());
   });
 });
 

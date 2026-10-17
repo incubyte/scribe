@@ -13,12 +13,10 @@ use tauri::{AppHandle, Manager, Runtime};
 
 use crate::lanes;
 use crate::live_feed::LiveFeed;
+use crate::model_setup;
 use crate::notifications;
 use crate::privacy;
-use crate::tray;
 use crate::tray_listener::TrayRecordingListener;
-
-const PREPARING_MODEL: &str = "Preparing speech model…";
 
 pub struct RecordingController {
     recorder: Mutex<Recorder>,
@@ -120,7 +118,7 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) -> Result<(), StoreError> {
     });
     app.manage(store);
     app.manage(RecordingController::new(recorder, listener));
-    prepare_speech_model(app);
+    model_setup::install(app);
     stop_before_sleep(app);
     Ok(())
 }
@@ -130,19 +128,6 @@ fn mark_abandoned_sessions(store: &MarkdownTranscriptStore) {
         Ok(marked) => tracing::info!(marked, "marked sessions left recording as incomplete"),
         Err(error) => tracing::error!(%error, "could not check for sessions left recording"),
     }
-}
-
-fn prepare_speech_model<R: Runtime>(app: &AppHandle<R>) {
-    let app = app.clone();
-    thread::spawn(move || {
-        let controller = app.state::<RecordingController>();
-        match lanes::ensure_speech_model(&|| tray::show_tooltip(&app, PREPARING_MODEL)) {
-            Ok(()) => controller.mark_model_ready(),
-            Err(error) => tracing::error!(%error, "the speech model is not available"),
-        }
-        tray::show_idle_tooltip(&app);
-        tray::show_recorder_state(&app, controller.state());
-    });
 }
 
 #[cfg(target_os = "macos")]

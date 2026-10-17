@@ -8,6 +8,7 @@ members = [
     "crates/audio-resample",
     "crates/scribe-core",
     "crates/store-markdown",
+    "crates/stt-parakeet",
     "crates/stt-speechanalyzer",
 ]
 
@@ -30,6 +31,7 @@ store-markdown = { path = "crates/store-markdown" }
 audio-resample = { path = "crates/audio-resample" }
 audio-mic = { path = "crates/audio-mic" }
 audio-macos = { path = "crates/audio-macos" }
+stt-parakeet = { path = "crates/stt-parakeet" }
 stt-speechanalyzer = { path = "crates/stt-speechanalyzer" }
 
 [workspace.lints.rust]

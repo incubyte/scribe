@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 import { hidePopover, openSession, startRecording, stopRecording } from "./commands";
 import { LiveTranscript } from "./LiveTranscript";
+import { ModelDownloadPanel } from "./ModelDownloadPanel";
 import { RecentSessions } from "./RecentSessions";
 import { StatusBar } from "./StatusBar";
+import { useModelDownload } from "./useModelDownload";
 import { useRecordingFeed } from "./useRecordingFeed";
 
 function useEscapeToHide() {
@@ -19,6 +21,7 @@ function useEscapeToHide() {
 
 export function Popover() {
   const { feed, recent } = useRecordingFeed();
+  const { download, retry } = useModelDownload();
   useEscapeToHide();
 
   return (
@@ -30,6 +33,7 @@ export function Popover() {
         onStart={() => void startRecording()}
         onStop={() => void stopRecording()}
       />
+      <ModelDownloadPanel download={download} onRetry={retry} />
       {feed.phase === "recording" ? (
         <LiveTranscript lines={feed.lines} partials={feed.partials} />
       ) : null}

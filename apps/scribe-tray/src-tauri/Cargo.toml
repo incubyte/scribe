@@ -32,6 +32,9 @@ audio-mic.workspace = true
 tracing.workspace = true
 thiserror.workspace = true
 
+[target.'cfg(windows)'.dependencies]
+stt-parakeet.workspace = true
+
 [target.'cfg(target_os = "macos")'.dependencies]
 stt-speechanalyzer.workspace = true
 audio-macos.workspace = true

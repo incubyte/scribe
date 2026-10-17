@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { RecorderSnapshot, SessionSummary } from "./types";
+import type { ModelDownload, RecorderSnapshot, SessionSummary } from "./types";
 
 const RECENT_SESSION_COUNT = 5;
 
@@ -15,3 +15,7 @@ export const stopRecording = () => invoke("stop_recording");
 export const openSession = (id: string) => invoke("open_session", { id });
 
 export const hidePopover = () => invoke("hide_popover");
+
+export const fetchModelDownload = () => invoke<ModelDownload>("model_download_status");
+
+export const retryModelDownload = () => invoke("retry_model_download");

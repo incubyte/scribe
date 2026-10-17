@@ -5,6 +5,7 @@ pub mod live_feed;
 mod mcp_clipboard;
 pub mod mcp_config;
 pub mod menu_action;
+mod model_setup;
 mod notifications;
 mod popover;
 mod power;
@@ -25,6 +26,8 @@ pub fn run() -> tauri::Result<()> {
             commands::start_recording,
             commands::stop_recording,
             commands::open_session,
+            commands::model_download_status,
+            commands::retry_model_download,
             popover::hide_popover,
         ])
         .setup(|app| {

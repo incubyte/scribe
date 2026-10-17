@@ -60,10 +60,6 @@ mod unsupported {
         Err(no_engine())
     }
 
-    pub fn ensure_speech_model(_on_installing: &dyn Fn()) -> Result<(), TranscribeError> {
-        Err(no_engine())
-    }
-
     fn no_engine() -> TranscribeError {
         TranscribeError::EngineUnavailable(
             "no speech engine is available on this system yet".to_owned(),
@@ -72,4 +68,4 @@ mod unsupported {
 }
 
 #[cfg(not(target_os = "macos"))]
-pub use unsupported::{ENGINE, LANGUAGE, build_lanes, ensure_speech_model};
+pub use unsupported::{ENGINE, LANGUAGE, build_lanes};
