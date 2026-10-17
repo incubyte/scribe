@@ -14,6 +14,13 @@ impl Speaker {
             Speaker::Them => "Them",
         }
     }
+
+    #[must_use]
+    pub fn from_label(label: &str) -> Option<Speaker> {
+        [Speaker::Me, Speaker::Them]
+            .into_iter()
+            .find(|speaker| speaker.label() == label)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

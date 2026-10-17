@@ -1,0 +1,36 @@
+[package]
+name = "scribe-mcp"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+name = "scribe_mcp"
+path = "src/lib.rs"
+
+[[bin]]
+name = "scribe-mcp"
+path = "src/main.rs"
+
+[dependencies]
+rmcp = { version = "3.5", features = ["server", "macros", "transport-io"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+futures = "0.3"
+anyhow = "1"
+tracing.workspace = true
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "ansi"] }
+serde.workspace = true
+chrono.workspace = true
+scribe-core.workspace = true
+store-markdown.workspace = true
+
+[dev-dependencies]
+rmcp = { version = "3.5", features = ["client"] }
+serde_json.workspace = true
+tempfile.workspace = true
+tokio = { version = "1", features = ["io-util", "time"] }
+
+[lints]
+workspace = true

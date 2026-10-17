@@ -4,7 +4,9 @@ use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, FixedOffset};
 use scribe_core::ports::{StoreError, TranscriptStore};
-use scribe_core::recording::{Segment, SessionHeader, SessionId, SessionStatus, SessionSummary};
+use scribe_core::recording::{
+    Segment, SessionDocument, SessionHeader, SessionId, SessionStatus, SessionSummary,
+};
 
 use crate::format::{parse_header, render_header, render_segment, split_front_matter};
 use crate::private_file;
@@ -90,6 +92,17 @@ impl TranscriptStore for MarkdownTranscriptStore {
             paths.iter().map(PathBuf::as_path),
             limit,
         ))
+    }
+
+    fn list_all(&self) -> Result<Vec<SessionSummary>, StoreError> {
+        let paths = self.transcript_paths()?;
+        Ok(reader::list_all_summaries(
+            paths.iter().map(PathBuf::as_path),
+        ))
+    }
+
+    fn read(&self, id: &SessionId) -> Result<SessionDocument, StoreError> {
+        reader::read_document(&self.path_for(id), id)
     }
 
     fn mark_abandoned_incomplete(&self) -> Result<usize, StoreError> {

@@ -7,6 +7,21 @@ const OTHER_SIDE_SILENT_TITLE: &str = "Scribe can't hear the other side of the c
 const OTHER_SIDE_SILENT_BODY: &str =
     "Allow Scribe in System Settings > Privacy & Security > Screen & System Audio Recording.";
 
+const MCP_CONFIG_COPIED_TITLE: &str = "MCP config copied";
+const MCP_CONFIG_COPIED_BODY: &str =
+    "Paste it into your AI app's MCP settings to let it read your transcripts.";
+const MCP_CONFIG_NOT_COPIED_TITLE: &str = "Could not copy the MCP config";
+const MCP_CONFIG_NOT_COPIED_BODY: &str =
+    "Scribe's bundled MCP server was not found. Reinstall Scribe and try again.";
+
+pub fn notify_mcp_config_copied<R: Runtime>(app: &AppHandle<R>) {
+    show_plain(app, MCP_CONFIG_COPIED_TITLE, MCP_CONFIG_COPIED_BODY);
+}
+
+pub fn notify_mcp_config_not_copied<R: Runtime>(app: &AppHandle<R>) {
+    show_plain(app, MCP_CONFIG_NOT_COPIED_TITLE, MCP_CONFIG_NOT_COPIED_BODY);
+}
+
 pub fn notify_microphone_denied<R: Runtime>(app: &AppHandle<R>) {
     show_plain(app, MICROPHONE_DENIED_TITLE, MICROPHONE_DENIED_BODY);
 }

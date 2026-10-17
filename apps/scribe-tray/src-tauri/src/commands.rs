@@ -71,6 +71,9 @@ pub fn stop_recording<R: Runtime>(app: AppHandle<R>) {
 pub fn open_session<R: Runtime>(app: AppHandle<R>, id: String) -> Result<(), String> {
     let id = SessionId::parse(&id).map_err(|error| error.to_string())?;
     let path = app.state::<Arc<MarkdownTranscriptStore>>().path_for(&id);
+    if !path.is_file() {
+        return Err(format!("Transcript not found: {id}"));
+    }
     app.opener()
         .open_path(path.to_string_lossy(), None::<&str>)
         .map_err(|error| error.to_string())

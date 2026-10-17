@@ -38,3 +38,11 @@ fn toggle_recording_id_maps_to_starting_or_stopping_a_recording() {
         Some(MenuAction::ToggleRecording)
     );
 }
+
+#[test]
+fn copy_mcp_config_id_maps_to_copying_the_mcp_config() {
+    assert_eq!(
+        MenuAction::from_id("copy-mcp-config"),
+        Some(MenuAction::CopyMcpConfig)
+    );
+}

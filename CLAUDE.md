@@ -4,6 +4,7 @@ Architecture: see `docs/ARCHITECTURE.md` (hexagonal; ports in `scribe-core`, ada
 
 ## Commands
 
+- Stage the bundled MCP server (run once before clippy, test or build, and after changing `apps/scribe-mcp`): `apps/scribe-tray/scripts/stage-sidecar.sh`
 - Format: `cargo fmt --all`
 - Lint (Rust): `cargo clippy --workspace --all-targets -- -D warnings`
 - Test (Rust): `cargo test --workspace`

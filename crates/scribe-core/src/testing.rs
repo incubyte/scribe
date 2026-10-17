@@ -10,8 +10,9 @@ use crate::ports::{
     TranscriptStore,
 };
 use crate::recording::{
-    AudioChunk, RecordingEvent, SAMPLE_RATE_HZ, Segment, SessionClock, SessionHeader, SessionId,
-    SessionStatus, SessionSummary, TranscriptEvent, Utterance,
+    AudioChunk, RecordingEvent, SAMPLE_RATE_HZ, Segment, SessionClock, SessionDocument,
+    SessionHeader, SessionId, SessionStatus, SessionSummary, TranscriptEvent, Utterance,
+    offset_as_clock,
 };
 
 const CHUNK_SAMPLES: u32 = SAMPLE_RATE_HZ / 10;
@@ -118,6 +119,28 @@ struct StoredSession {
     segments: Vec<Segment>,
 }
 
+impl StoredSession {
+    fn document(&self) -> SessionDocument {
+        let lines: Vec<String> = self
+            .segments
+            .iter()
+            .map(|segment| {
+                format!(
+                    "[{}] **{}:** {}\n",
+                    offset_as_clock(segment.start),
+                    segment.speaker.label(),
+                    segment.text
+                )
+            })
+            .collect();
+        SessionDocument {
+            header: self.header.clone(),
+            segments: self.segments.clone(),
+            raw: lines.concat(),
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct InMemoryTranscriptStore {
     sessions: Mutex<BTreeMap<SessionId, StoredSession>>,
@@ -217,6 +240,19 @@ impl TranscriptStore for InMemoryTranscriptStore {
         summaries.sort_by(|a, b| b.started_at.cmp(&a.started_at));
         summaries.truncate(limit);
         Ok(summaries)
+    }
+
+    fn list_all(&self) -> Result<Vec<SessionSummary>, StoreError> {
+        self.list(usize::MAX)
+    }
+
+    fn read(&self, id: &SessionId) -> Result<SessionDocument, StoreError> {
+        self.with_sessions(|sessions| {
+            let session = sessions
+                .get(id)
+                .ok_or_else(|| StoreError::NotFound { id: id.clone() })?;
+            Ok(session.document())
+        })
     }
 }
 

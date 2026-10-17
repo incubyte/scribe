@@ -8,8 +8,10 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, Tray
 use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_opener::OpenerExt;
 
+use crate::mcp_clipboard;
 use crate::menu_action::{
-    MENU_OPEN_FOLDER, MENU_PRIVACY, MENU_QUIT, MENU_TOGGLE_RECORDING, MenuAction,
+    MENU_COPY_MCP_CONFIG, MENU_OPEN_FOLDER, MENU_PRIVACY, MENU_QUIT, MENU_TOGGLE_RECORDING,
+    MenuAction,
 };
 use crate::popover;
 use crate::privacy;
@@ -55,26 +57,43 @@ fn is_left_click_release(event: &TrayIconEvent) -> bool {
 }
 
 fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
-    let toggle = MenuItem::with_id(
+    let toggle = recording_toggle_item(app)?;
+    let open_folder = enabled_item(app, MENU_OPEN_FOLDER, "Open transcripts folder")?;
+    let copy_mcp_config = enabled_item(app, MENU_COPY_MCP_CONFIG, "Copy MCP config")?;
+    let privacy = enabled_item(app, MENU_PRIVACY, "Privacy")?;
+    let quit = enabled_item(app, MENU_QUIT, "Quit Scribe")?;
+    let separator = PredefinedMenuItem::separator(app)?;
+    let menu = Menu::with_items(
+        app,
+        &[
+            &toggle,
+            &separator,
+            &open_folder,
+            &copy_mcp_config,
+            &privacy,
+            &quit,
+        ],
+    )?;
+    app.manage(RecordingMenuItem(toggle));
+    Ok(menu)
+}
+
+fn recording_toggle_item<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<MenuItem<R>> {
+    MenuItem::with_id(
         app,
         MENU_TOGGLE_RECORDING,
         START_RECORDING,
         false,
         None::<&str>,
-    )?;
-    let open_folder = MenuItem::with_id(
-        app,
-        MENU_OPEN_FOLDER,
-        "Open transcripts folder",
-        true,
-        None::<&str>,
-    )?;
-    let privacy = MenuItem::with_id(app, MENU_PRIVACY, "Privacy", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, MENU_QUIT, "Quit Scribe", true, None::<&str>)?;
-    let separator = PredefinedMenuItem::separator(app)?;
-    let menu = Menu::with_items(app, &[&toggle, &separator, &open_folder, &privacy, &quit])?;
-    app.manage(RecordingMenuItem(toggle));
-    Ok(menu)
+    )
+}
+
+fn enabled_item<R: Runtime>(
+    app: &AppHandle<R>,
+    id: &str,
+    label: &str,
+) -> tauri::Result<MenuItem<R>> {
+    MenuItem::with_id(app, id, label, true, None::<&str>)
 }
 
 pub fn show_recorder_state<R: Runtime>(app: &AppHandle<R>, state: RecorderState) {
@@ -147,6 +166,7 @@ fn dispatch<R: Runtime>(app: &AppHandle<R>, id: &str) {
     match MenuAction::from_id(id) {
         Some(MenuAction::ToggleRecording) => toggle_recording(app),
         Some(MenuAction::OpenTranscriptsFolder) => open_transcripts_folder(app),
+        Some(MenuAction::CopyMcpConfig) => mcp_clipboard::copy_config(app),
         Some(MenuAction::ShowPrivacy) => show_privacy(app),
         Some(MenuAction::Quit) => quit(app),
         None => {}

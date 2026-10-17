@@ -7,7 +7,7 @@
     "frontendDist": "../dist",
     "devUrl": "http://localhost:1420",
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeBuildCommand": "bash scripts/stage-sidecar.sh && npm run build"
   },
   "app": {
     "windows": [
@@ -35,6 +35,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "externalBin": [
+      "binaries/scribe-mcp"
+    ],
     "icon": [
       "icons/icon.png"
     ],

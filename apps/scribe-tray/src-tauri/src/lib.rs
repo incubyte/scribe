@@ -2,6 +2,8 @@ pub mod blur_guard;
 mod commands;
 mod lanes;
 pub mod live_feed;
+mod mcp_clipboard;
+pub mod mcp_config;
 pub mod menu_action;
 mod notifications;
 mod popover;
@@ -15,11 +17,7 @@ mod tray_listener;
 use tauri::{AppHandle, Builder, Manager, Runtime};
 
 pub fn run() -> tauri::Result<()> {
-    Builder::default()
-        .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_store::Builder::default().build())
-        .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_positioner::init())
+    with_plugins(Builder::default())
         .invoke_handler(tauri::generate_handler![
             privacy::acknowledge_privacy,
             commands::recorder_snapshot,
@@ -35,6 +33,15 @@ pub fn run() -> tauri::Result<()> {
             start_scribe(app.handle())
         })
         .run(tauri::generate_context!())
+}
+
+fn with_plugins<R: Runtime>(builder: Builder<R>) -> Builder<R> {
+    builder
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_store::Builder::default().build())
+        .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_positioner::init())
 }
 
 fn start_scribe<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::error::Error>> {

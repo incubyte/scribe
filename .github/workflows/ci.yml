@@ -25,6 +25,9 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all -- --check
+      - name: Stage the MCP server the tray bundles as a sidecar
+        shell: bash
+        run: apps/scribe-tray/scripts/stage-sidecar.sh
       - run: cargo clippy --workspace --all-targets -- -D warnings
       - run: cargo test --workspace
       - name: Only the Parakeet adapter may depend on an HTTP client
@@ -33,6 +36,14 @@ jobs:
           dependents=$(cargo tree -e normal -i reqwest --depth 1 --prefix none 2>/dev/null | tail -n +2 | grep -v '^stt-parakeet ' || true)
           if [ -n "$dependents" ]; then
             echo "An HTTP client is reachable from: $dependents"
+            exit 1
+          fi
+      - name: The MCP server stays free of audio and speech dependencies
+        shell: bash
+        run: |
+          forbidden=$(cargo tree -p scribe-mcp -e normal --prefix none | grep -E '^(cidre|cpal|wasapi|swift-rs|parakeet-rs|audio-|stt-) ' || true)
+          if [ -n "$forbidden" ]; then
+            echo "scribe-mcp depends on: $forbidden"
             exit 1
           fi
       - uses: actions/setup-node@v4
@@ -59,6 +70,8 @@ jobs:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - name: Stage the MCP server the tray bundles as a sidecar
+        run: apps/scribe-tray/scripts/stage-sidecar.sh
       - run: cargo install cargo-mutants --locked
       - name: Mutate the pull request diff
         run: |

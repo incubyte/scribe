@@ -3,6 +3,8 @@ use std::str::FromStr;
 
 use chrono::{DateTime, FixedOffset};
 
+use super::segment::Segment;
+
 const STAMP_FORMAT: &str = "%Y-%m-%d-%H%M%S";
 const TITLE_FORMAT: &str = "Call %Y-%m-%d %H:%M";
 const STAMP_PART_LENGTHS: [usize; 4] = [4, 2, 2, 6];
@@ -190,6 +192,13 @@ impl SessionHeader {
         let lasted = self.ended_at? - self.started_at;
         u64::try_from(lasted.num_seconds()).ok()
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionDocument {
+    pub header: SessionHeader,
+    pub segments: Vec<Segment>,
+    pub raw: String,
 }
 
 #[must_use]
