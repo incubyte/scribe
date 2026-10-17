@@ -1,0 +1,5 @@
+target/
+node_modules/
+dist/
+apps/scribe-tray/src-tauri/gen/
+.DS_Store

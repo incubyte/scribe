@@ -1,0 +1,27 @@
+[package]
+name = "scribe-tray"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+name = "scribe_tray"
+path = "src/lib.rs"
+
+[[bin]]
+name = "scribe-tray"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = "2.7"
+
+[dependencies]
+tauri = { version = "2.12", features = ["tray-icon"] }
+tauri-plugin-opener = "2.7"
+store-markdown = { path = "../../../crates/store-markdown" }
+tracing.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true
