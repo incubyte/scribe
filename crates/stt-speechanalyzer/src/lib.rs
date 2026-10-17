@@ -1,0 +1,66 @@
+#![cfg(target_os = "macos")]
+
+mod bridge;
+mod reply;
+
+use scribe_core::ports::{TranscribeError, Transcriber};
+use scribe_core::recording::{AudioChunk, TranscriptEvent};
+
+use crate::reply::Reply;
+
+pub const ENGINE_NAME: &str = "speechanalyzer";
+pub const ENGLISH: &str = "en-US";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AssetStatus {
+    Installed,
+    Missing,
+    Unsupported,
+}
+
+pub fn english_asset_status() -> Result<AssetStatus, TranscribeError> {
+    let status = Reply::parse(&bridge::asset_status(ENGLISH))?.status()?;
+    Ok(match status.as_str() {
+        "installed" => AssetStatus::Installed,
+        "supported" | "downloading" => AssetStatus::Missing,
+        _ => AssetStatus::Unsupported,
+    })
+}
+
+pub fn install_english_asset() -> Result<(), TranscribeError> {
+    Reply::parse(&bridge::install_asset(ENGLISH)).map(|_| ())
+}
+
+pub struct SpeechAnalyzerTranscriber {
+    session: bridge::SessionToken,
+    finished: bool,
+}
+
+impl SpeechAnalyzerTranscriber {
+    pub fn start(locale: &str) -> Result<SpeechAnalyzerTranscriber, TranscribeError> {
+        let session = Reply::parse(&bridge::start(locale))?.session()?;
+        Ok(SpeechAnalyzerTranscriber {
+            session,
+            finished: false,
+        })
+    }
+}
+
+impl Transcriber for SpeechAnalyzerTranscriber {
+    fn push(&mut self, chunk: &AudioChunk) -> Result<Vec<TranscriptEvent>, TranscribeError> {
+        Ok(Reply::parse(&bridge::push(self.session, &chunk.samples))?.events())
+    }
+
+    fn finish(&mut self) -> Result<Vec<TranscriptEvent>, TranscribeError> {
+        self.finished = true;
+        Ok(Reply::parse(&bridge::finish(self.session))?.events())
+    }
+}
+
+impl Drop for SpeechAnalyzerTranscriber {
+    fn drop(&mut self) {
+        if !self.finished {
+            let _ = bridge::finish(self.session);
+        }
+    }
+}

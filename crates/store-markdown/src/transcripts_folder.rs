@@ -1,7 +1,7 @@
 use std::fs::DirBuilder;
 use std::path::{Path, PathBuf};
 
-use crate::StoreError;
+use scribe_core::ports::StoreError;
 
 const FOLDER_NAME: &str = "Scribe";
 

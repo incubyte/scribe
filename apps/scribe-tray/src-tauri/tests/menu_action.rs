@@ -30,3 +30,11 @@ fn privacy_id_maps_to_showing_the_privacy_statement() {
         Some(MenuAction::ShowPrivacy)
     );
 }
+
+#[test]
+fn toggle_recording_id_maps_to_starting_or_stopping_a_recording() {
+    assert_eq!(
+        MenuAction::from_id("toggle-recording"),
+        Some(MenuAction::ToggleRecording)
+    );
+}

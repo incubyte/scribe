@@ -2,6 +2,9 @@ use serde_json::json;
 use tauri::{AppHandle, Manager, Runtime, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_store::StoreExt;
 
+use crate::recording::RecordingController;
+use crate::tray;
+
 const SETTINGS_FILE: &str = "settings.json";
 const ACKNOWLEDGED_KEY: &str = "privacy_acknowledged";
 const WINDOW_LABEL: &str = "privacy";
@@ -47,8 +50,15 @@ pub fn show_statement_until_acknowledged<R: Runtime>(app: &AppHandle<R>) -> taur
 #[allow(clippy::needless_pass_by_value)]
 pub fn acknowledge_privacy<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     acknowledge(&app).map_err(|error| error.to_string())?;
+    unlock_recording(&app);
     if let Some(window) = app.get_webview_window(WINDOW_LABEL) {
         window.close().map_err(|error| error.to_string())?;
     }
     Ok(())
+}
+
+fn unlock_recording<R: Runtime>(app: &AppHandle<R>) {
+    let controller = app.state::<RecordingController>();
+    controller.mark_privacy_acknowledged();
+    tray::show_recorder_state(app, controller.state());
 }

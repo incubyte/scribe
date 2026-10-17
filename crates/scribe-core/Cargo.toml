@@ -5,8 +5,16 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
+[features]
+testing = []
+
 [dependencies]
 thiserror.workspace = true
+tracing.workspace = true
+chrono.workspace = true
+
+[dev-dependencies]
+scribe-core = { workspace = true, features = ["testing"] }
 
 [lints]
 workspace = true

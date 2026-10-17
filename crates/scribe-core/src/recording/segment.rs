@@ -1,0 +1,38 @@
+use std::time::Duration;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum Speaker {
+    Me,
+    Them,
+}
+
+impl Speaker {
+    #[must_use]
+    pub fn label(self) -> &'static str {
+        match self {
+            Speaker::Me => "Me",
+            Speaker::Them => "Them",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Utterance {
+    pub start: Duration,
+    pub end: Duration,
+    pub text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TranscriptEvent {
+    Partial(String),
+    Final(Utterance),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Segment {
+    pub speaker: Speaker,
+    pub start: Duration,
+    pub end: Duration,
+    pub text: String,
+}

@@ -1,0 +1,21 @@
+[package]
+name = "stt-speechanalyzer"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+scribe-core.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+swift-rs = "1.0.9"
+
+[target.'cfg(target_os = "macos")'.build-dependencies]
+swift-rs = { version = "1.0.9", features = ["build"] }
+
+[target.'cfg(target_os = "macos")'.dev-dependencies]
+hound = "3.5"
+
+[lints]
+workspace = true

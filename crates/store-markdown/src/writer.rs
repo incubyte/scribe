@@ -1,0 +1,154 @@
+use std::fs;
+use std::io::{self, ErrorKind};
+use std::path::{Path, PathBuf};
+
+use chrono::{DateTime, FixedOffset};
+use scribe_core::ports::{StoreError, TranscriptStore};
+use scribe_core::recording::{Segment, SessionHeader, SessionId, SessionStatus};
+
+use crate::format::{parse_header, render_header, render_segment, split_front_matter};
+use crate::private_file;
+use crate::transcripts_folder::TranscriptsFolder;
+
+const TRANSCRIPT_EXTENSION: &str = "md";
+
+pub struct MarkdownTranscriptStore {
+    folder: TranscriptsFolder,
+}
+
+impl MarkdownTranscriptStore {
+    #[must_use]
+    pub fn new(folder: TranscriptsFolder) -> MarkdownTranscriptStore {
+        MarkdownTranscriptStore { folder }
+    }
+
+    fn path_for(&self, id: &SessionId) -> PathBuf {
+        self.folder
+            .path()
+            .join(format!("{id}.{TRANSCRIPT_EXTENSION}"))
+    }
+
+    fn try_create(
+        &self,
+        header: &SessionHeader,
+        id: SessionId,
+    ) -> Result<Option<SessionId>, StoreError> {
+        let path = self.path_for(&id);
+        let header = header.clone().with_id(id.clone());
+        match private_file::create_new(&path, &render_header(&header)) {
+            Ok(()) => Ok(Some(id)),
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => Ok(None),
+            Err(source) => Err(StoreError::Io { path, source }),
+        }
+    }
+
+    fn transcript_paths(&self) -> Result<Vec<PathBuf>, StoreError> {
+        let entries = match fs::read_dir(self.folder.path()) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(source) => return Err(io_error(self.folder.path(), source)),
+        };
+        Ok(entries
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .filter(|path| is_transcript(path))
+            .collect())
+    }
+}
+
+impl TranscriptStore for MarkdownTranscriptStore {
+    fn create(&self, header: &SessionHeader) -> Result<SessionId, StoreError> {
+        self.folder.ensure_exists()?;
+        for candidate in header.id.collision_candidates() {
+            if let Some(id) = self.try_create(header, candidate)? {
+                return Ok(id);
+            }
+        }
+        Err(StoreError::NoFreeSessionId)
+    }
+
+    fn append(&self, id: &SessionId, segment: &Segment) -> Result<(), StoreError> {
+        let path = self.path_for(id);
+        private_file::append(&path, &render_segment(segment)).map_err(|source| {
+            match source.kind() {
+                ErrorKind::NotFound => StoreError::NotFound { id: id.clone() },
+                _ => io_error(&path, source),
+            }
+        })
+    }
+
+    fn finalise(&self, id: &SessionId, ended_at: DateTime<FixedOffset>) -> Result<(), StoreError> {
+        rewrite_header(&self.path_for(id), |header| header.finalised(ended_at))
+    }
+
+    fn mark_abandoned_incomplete(&self) -> Result<usize, StoreError> {
+        let marked = self
+            .transcript_paths()?
+            .iter()
+            .filter(|path| mark_if_abandoned(path))
+            .count();
+        Ok(marked)
+    }
+}
+
+fn mark_if_abandoned(path: &Path) -> bool {
+    abandon_if_recording(path).unwrap_or_else(|error| {
+        tracing::warn!(file = %file_name(path), %error, "skipped a transcript file on launch");
+        false
+    })
+}
+
+fn abandon_if_recording(path: &Path) -> Result<bool, StoreError> {
+    let (raw, header) = read_transcript(path)?;
+    if header.status != SessionStatus::Recording {
+        return Ok(false);
+    }
+    replace_header(path, &raw, &header.abandoned())?;
+    Ok(true)
+}
+
+fn rewrite_header(
+    path: &Path,
+    change: impl FnOnce(SessionHeader) -> SessionHeader,
+) -> Result<(), StoreError> {
+    let (raw, header) = read_transcript(path)?;
+    replace_header(path, &raw, &change(header))
+}
+
+fn read_transcript(path: &Path) -> Result<(String, SessionHeader), StoreError> {
+    let raw = fs::read_to_string(path).map_err(|source| io_error(path, source))?;
+    let header = parse_header(&raw).map_err(|_| malformed(path))?;
+    Ok((raw, header))
+}
+
+fn replace_header(path: &Path, raw: &str, header: &SessionHeader) -> Result<(), StoreError> {
+    let (_, body) = split_front_matter(raw).map_err(|_| malformed(path))?;
+    let rewritten = render_header(header) + body;
+    private_file::replace_atomically(path, &rewritten).map_err(|source| io_error(path, source))
+}
+
+fn is_transcript(path: &Path) -> bool {
+    path.is_file()
+        && path
+            .extension()
+            .is_some_and(|extension| extension == TRANSCRIPT_EXTENSION)
+}
+
+fn file_name(path: &Path) -> String {
+    path.file_name()
+        .map(|name| name.to_string_lossy().into_owned())
+        .unwrap_or_default()
+}
+
+fn malformed(path: &Path) -> StoreError {
+    StoreError::Malformed {
+        file_name: file_name(path),
+    }
+}
+
+fn io_error(path: &Path, source: io::Error) -> StoreError {
+    StoreError::Io {
+        path: path.to_path_buf(),
+        source,
+    }
+}

@@ -2,8 +2,11 @@
 resolver = "3"
 members = [
     "apps/scribe-tray/src-tauri",
+    "crates/audio-mic",
+    "crates/audio-resample",
     "crates/scribe-core",
     "crates/store-markdown",
+    "crates/stt-speechanalyzer",
 ]
 
 [workspace.package]
@@ -16,9 +19,17 @@ thiserror = "2"
 tracing = "0.1"
 dirs = "6"
 tempfile = "3"
+chrono = { version = "0.4", default-features = false, features = ["std"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+scribe-core = { path = "crates/scribe-core" }
+store-markdown = { path = "crates/store-markdown" }
+audio-resample = { path = "crates/audio-resample" }
+audio-mic = { path = "crates/audio-mic" }
+stt-speechanalyzer = { path = "crates/stt-speechanalyzer" }
 
 [workspace.lints.rust]
-unsafe_code = "forbid"
+unsafe_code = "deny"
 
 [workspace.lints.clippy]
 pedantic = { level = "warn", priority = -1 }
