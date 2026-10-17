@@ -4,7 +4,8 @@ use tauri::tray::{TrayIcon, TrayIconBuilder};
 use tauri::{AppHandle, Runtime};
 use tauri_plugin_opener::OpenerExt;
 
-use crate::menu_action::{MENU_OPEN_FOLDER, MENU_QUIT, MenuAction};
+use crate::menu_action::{MENU_OPEN_FOLDER, MENU_PRIVACY, MENU_QUIT, MenuAction};
+use crate::privacy;
 
 const TRAY_ID: &str = "main";
 const TOOLTIP: &str = "Scribe";
@@ -30,15 +31,23 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         true,
         None::<&str>,
     )?;
+    let privacy = MenuItem::with_id(app, MENU_PRIVACY, "Privacy", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, MENU_QUIT, "Quit Scribe", true, None::<&str>)?;
-    Menu::with_items(app, &[&open_folder, &quit])
+    Menu::with_items(app, &[&open_folder, &privacy, &quit])
 }
 
 fn dispatch<R: Runtime>(app: &AppHandle<R>, id: &str) {
     match MenuAction::from_id(id) {
         Some(MenuAction::OpenTranscriptsFolder) => open_transcripts_folder(app),
+        Some(MenuAction::ShowPrivacy) => show_privacy(app),
         Some(MenuAction::Quit) => app.exit(0),
         None => {}
+    }
+}
+
+fn show_privacy<R: Runtime>(app: &AppHandle<R>) {
+    if let Err(error) = privacy::show_statement(app) {
+        tracing::error!(%error, "could not show the privacy statement");
     }
 }
 

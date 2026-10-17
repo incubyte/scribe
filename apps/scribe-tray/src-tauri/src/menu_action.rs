@@ -1,14 +1,17 @@
 pub const MENU_OPEN_FOLDER: &str = "open-transcripts-folder";
+pub const MENU_PRIVACY: &str = "privacy";
 pub const MENU_QUIT: &str = "quit";
 
-const ACTIONS_BY_ID: [(&str, MenuAction); 2] = [
+const ACTIONS_BY_ID: [(&str, MenuAction); 3] = [
     (MENU_OPEN_FOLDER, MenuAction::OpenTranscriptsFolder),
+    (MENU_PRIVACY, MenuAction::ShowPrivacy),
     (MENU_QUIT, MenuAction::Quit),
 ];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MenuAction {
     OpenTranscriptsFolder,
+    ShowPrivacy,
     Quit,
 }
 

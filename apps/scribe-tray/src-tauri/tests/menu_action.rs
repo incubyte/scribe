@@ -22,3 +22,11 @@ fn unknown_id_maps_to_no_action() {
 fn empty_id_maps_to_no_action() {
     assert_eq!(MenuAction::from_id(""), None);
 }
+
+#[test]
+fn privacy_id_maps_to_showing_the_privacy_statement() {
+    assert_eq!(
+        MenuAction::from_id("privacy"),
+        Some(MenuAction::ShowPrivacy)
+    );
+}

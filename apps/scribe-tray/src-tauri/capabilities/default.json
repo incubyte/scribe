@@ -1,8 +1,11 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Lets Scribe open its transcripts folder",
+  "description": "Lets Scribe open its transcripts folder and run the privacy statement window",
+  "windows": ["privacy"],
   "permissions": [
+    "store:default",
+    "core:window:allow-close",
     {
       "identifier": "opener:allow-open-path",
       "allow": [{ "path": "$DOCUMENT/Scribe/**" }, { "path": "$DOCUMENT/Scribe" }]
