@@ -4,7 +4,8 @@ use std::sync::mpsc::Receiver;
 use chrono::{DateTime, FixedOffset};
 
 use crate::recording::{
-    AudioChunk, RecordingEvent, Segment, SessionClock, SessionHeader, SessionId, TranscriptEvent,
+    AudioChunk, RecordingEvent, Segment, SessionClock, SessionHeader, SessionId, SessionSummary,
+    TranscriptEvent,
 };
 
 pub trait AudioSource: Send {
@@ -22,6 +23,7 @@ pub trait TranscriptStore: Send + Sync {
     fn append(&self, id: &SessionId, segment: &Segment) -> Result<(), StoreError>;
     fn finalise(&self, id: &SessionId, ended_at: DateTime<FixedOffset>) -> Result<(), StoreError>;
     fn mark_abandoned_incomplete(&self) -> Result<usize, StoreError>;
+    fn list(&self, limit: usize) -> Result<Vec<SessionSummary>, StoreError>;
 }
 
 pub trait RecordingListener: Send + Sync {

@@ -11,7 +11,7 @@ use crate::ports::{
 };
 use crate::recording::{
     AudioChunk, RecordingEvent, SAMPLE_RATE_HZ, Segment, SessionClock, SessionHeader, SessionId,
-    SessionStatus, TranscriptEvent, Utterance,
+    SessionStatus, SessionSummary, TranscriptEvent, Utterance,
 };
 
 const CHUNK_SAMPLES: u32 = SAMPLE_RATE_HZ / 10;
@@ -205,6 +205,18 @@ impl TranscriptStore for InMemoryTranscriptStore {
                 .map(|session| session.header = session.header.clone().abandoned())
                 .count())
         })
+    }
+
+    fn list(&self, limit: usize) -> Result<Vec<SessionSummary>, StoreError> {
+        let mut summaries: Vec<SessionSummary> = self.with_sessions(|sessions| {
+            sessions
+                .values()
+                .map(|session| session.header.summary())
+                .collect()
+        });
+        summaries.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+        summaries.truncate(limit);
+        Ok(summaries)
     }
 }
 

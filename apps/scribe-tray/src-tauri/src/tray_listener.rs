@@ -2,11 +2,13 @@ use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use chrono::Local;
 use scribe_core::ports::RecordingListener;
 use scribe_core::recording::{RecorderState, RecordingEvent, Segment, SessionId, Speaker};
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
+use crate::live_feed::{LiveFeed, LiveLine};
 use crate::notifications;
 use crate::recording::RecordingController;
 use crate::tray;
@@ -52,13 +54,6 @@ struct PartialPayload {
     text: String,
 }
 
-#[derive(Clone, Serialize)]
-struct SegmentPayload {
-    speaker: &'static str,
-    start_ms: u128,
-    text: String,
-}
-
 struct TrayUpdater<R: Runtime> {
     app: AppHandle<R>,
     recording_since: Option<Instant>,
@@ -79,7 +74,7 @@ impl<R: Runtime> TrayUpdater<R> {
         match event {
             RecordingEvent::RecordingStarted { id } => self.started(&id),
             RecordingEvent::PartialSegmentUpdated { speaker, text } => self.partial(speaker, text),
-            RecordingEvent::SegmentFinalised(segment) => self.segment(segment),
+            RecordingEvent::SegmentFinalised(segment) => self.segment(&segment),
             RecordingEvent::RecordingStopped { id } => self.stopped(&id),
             RecordingEvent::CaptureSilenced { speaker } => self.capture_silenced(speaker),
             RecordingEvent::OutputDeviceChanged => {
@@ -97,6 +92,9 @@ impl<R: Runtime> TrayUpdater<R> {
 
     fn started(&mut self, id: &SessionId) {
         self.recording_since = Some(Instant::now());
+        self.app
+            .state::<LiveFeed>()
+            .started(Local::now().fixed_offset());
         tray::show_recorder_state(&self.app, RecorderState::Recording);
         self.emit(STARTED_EVENT, SessionPayload { id: id.to_string() });
     }
@@ -109,17 +107,14 @@ impl<R: Runtime> TrayUpdater<R> {
         self.emit(PARTIAL_EVENT, payload);
     }
 
-    fn segment(&self, segment: Segment) {
-        let payload = SegmentPayload {
-            speaker: segment.speaker.label(),
-            start_ms: segment.start.as_millis(),
-            text: segment.text,
-        };
-        self.emit(SEGMENT_EVENT, payload);
+    fn segment(&self, segment: &Segment) {
+        self.app.state::<LiveFeed>().finalised(segment);
+        self.emit(SEGMENT_EVENT, LiveLine::from(segment));
     }
 
     fn stopped(&mut self, id: &SessionId) {
         self.recording_since = None;
+        self.app.state::<LiveFeed>().stopped();
         let controller = self.app.state::<RecordingController>();
         controller.stop();
         tray::show_recorder_state(&self.app, controller.state());

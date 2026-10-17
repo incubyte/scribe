@@ -17,6 +17,7 @@ export default tseslint.config(
       curly: "error",
       "no-var": "error",
       "prefer-const": "error",
+      "jsx-a11y/no-noninteractive-tabindex": ["error", { roles: ["region"] }],
     },
   },
 );

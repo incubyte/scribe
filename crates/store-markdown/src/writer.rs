@@ -1,13 +1,15 @@
 use std::fs;
-use std::io::{self, ErrorKind};
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 use chrono::{DateTime, FixedOffset};
 use scribe_core::ports::{StoreError, TranscriptStore};
-use scribe_core::recording::{Segment, SessionHeader, SessionId, SessionStatus};
+use scribe_core::recording::{Segment, SessionHeader, SessionId, SessionStatus, SessionSummary};
 
 use crate::format::{parse_header, render_header, render_segment, split_front_matter};
 use crate::private_file;
+use crate::reader;
+use crate::store_error::{file_name, io_error, malformed};
 use crate::transcripts_folder::TranscriptsFolder;
 
 const TRANSCRIPT_EXTENSION: &str = "md";
@@ -22,7 +24,8 @@ impl MarkdownTranscriptStore {
         MarkdownTranscriptStore { folder }
     }
 
-    fn path_for(&self, id: &SessionId) -> PathBuf {
+    #[must_use]
+    pub fn path_for(&self, id: &SessionId) -> PathBuf {
         self.folder
             .path()
             .join(format!("{id}.{TRANSCRIPT_EXTENSION}"))
@@ -81,6 +84,14 @@ impl TranscriptStore for MarkdownTranscriptStore {
         rewrite_header(&self.path_for(id), |header| header.finalised(ended_at))
     }
 
+    fn list(&self, limit: usize) -> Result<Vec<SessionSummary>, StoreError> {
+        let paths = self.transcript_paths()?;
+        Ok(reader::list_summaries(
+            paths.iter().map(PathBuf::as_path),
+            limit,
+        ))
+    }
+
     fn mark_abandoned_incomplete(&self) -> Result<usize, StoreError> {
         let marked = self
             .transcript_paths()?
@@ -132,23 +143,4 @@ fn is_transcript(path: &Path) -> bool {
         && path
             .extension()
             .is_some_and(|extension| extension == TRANSCRIPT_EXTENSION)
-}
-
-fn file_name(path: &Path) -> String {
-    path.file_name()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_default()
-}
-
-fn malformed(path: &Path) -> StoreError {
-    StoreError::Malformed {
-        file_name: file_name(path),
-    }
-}
-
-fn io_error(path: &Path, source: io::Error) -> StoreError {
-    StoreError::Io {
-        path: path.to_path_buf(),
-        source,
-    }
 }

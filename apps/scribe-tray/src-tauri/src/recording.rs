@@ -12,6 +12,8 @@ use store_markdown::{MarkdownTranscriptStore, TranscriptsFolder};
 use tauri::{AppHandle, Manager, Runtime};
 
 use crate::lanes;
+use crate::live_feed::LiveFeed;
+use crate::notifications;
 use crate::privacy;
 use crate::tray;
 use crate::tray_listener::TrayRecordingListener;
@@ -89,15 +91,34 @@ impl RecordingController {
     }
 }
 
+pub fn start_in_background<R: Runtime>(app: AppHandle<R>) {
+    thread::spawn(move || {
+        if let Err(error) = app.state::<RecordingController>().start() {
+            report_start_failure(&app, &error);
+        }
+    });
+}
+
+fn report_start_failure<R: Runtime>(app: &AppHandle<R>, error: &StartError) {
+    tracing::warn!(%error, "could not start recording");
+    if error.is_microphone_denied() {
+        notifications::notify_microphone_denied(app);
+    }
+}
+
 pub fn install<R: Runtime>(app: &AppHandle<R>) -> Result<(), StoreError> {
-    let store = MarkdownTranscriptStore::new(TranscriptsFolder::default_location()?);
+    let store = Arc::new(MarkdownTranscriptStore::new(
+        TranscriptsFolder::default_location()?,
+    ));
     mark_abandoned_sessions(&store);
+    app.manage(LiveFeed::default());
     let listener: Arc<dyn RecordingListener> = Arc::new(TrayRecordingListener::spawn(app.clone()));
-    let mut recorder = Recorder::new(Arc::new(store), Arc::clone(&listener));
+    let mut recorder = Recorder::new(store.clone(), Arc::clone(&listener));
     recorder.set_readiness(Readiness {
         privacy_acknowledged: privacy::is_acknowledged(app),
         model_ready: false,
     });
+    app.manage(store);
     app.manage(RecordingController::new(recorder, listener));
     prepare_speech_model(app);
     stop_before_sleep(app);

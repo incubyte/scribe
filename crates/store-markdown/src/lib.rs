@@ -1,5 +1,7 @@
 mod format;
 mod private_file;
+mod reader;
+mod store_error;
 mod transcripts_folder;
 mod writer;
 

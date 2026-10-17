@@ -165,6 +165,33 @@ impl SessionHeader {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SessionSummary {
+    pub id: SessionId,
+    pub title: String,
+    pub started_at: DateTime<FixedOffset>,
+    pub duration_seconds: Option<u64>,
+    pub status: SessionStatus,
+}
+
+impl SessionHeader {
+    #[must_use]
+    pub fn summary(&self) -> SessionSummary {
+        SessionSummary {
+            id: self.id.clone(),
+            title: self.title.clone(),
+            started_at: self.started_at,
+            duration_seconds: self.duration_seconds(),
+            status: self.status,
+        }
+    }
+
+    fn duration_seconds(&self) -> Option<u64> {
+        let lasted = self.ended_at? - self.started_at;
+        u64::try_from(lasted.num_seconds()).ok()
+    }
+}
+
 #[must_use]
 pub fn default_title(started_at: DateTime<FixedOffset>) -> String {
     started_at.format(TITLE_FORMAT).to_string()

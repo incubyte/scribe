@@ -10,7 +10,19 @@
     "beforeBuildCommand": "npm run build"
   },
   "app": {
-    "windows": [],
+    "windows": [
+      {
+        "label": "popover",
+        "url": "index.html#popover",
+        "visible": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "resizable": false,
+        "skipTaskbar": true,
+        "width": 360,
+        "height": 440
+      }
+    ],
     "security": {
       "csp": {
         "default-src": "'self'",
@@ -23,7 +35,9 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": ["icons/icon.png"],
+    "icon": [
+      "icons/icon.png"
+    ],
     "macOS": {
       "minimumSystemVersion": "26.0"
     }

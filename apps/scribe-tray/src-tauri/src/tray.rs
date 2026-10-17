@@ -1,20 +1,19 @@
-use std::thread;
 use std::time::Duration;
 
 use scribe_core::recording::RecorderState;
 use store_markdown::{StoreError, TranscriptsFolder};
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
-use tauri::tray::{TrayIcon, TrayIconBuilder};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_opener::OpenerExt;
 
 use crate::menu_action::{
     MENU_OPEN_FOLDER, MENU_PRIVACY, MENU_QUIT, MENU_TOGGLE_RECORDING, MenuAction,
 };
-use crate::notifications;
+use crate::popover;
 use crate::privacy;
-use crate::recording::{RecordingController, StartError};
+use crate::recording::{self, RecordingController};
 use crate::recording_label::{START_RECORDING, stop_recording_label};
 
 const TRAY_ID: &str = "main";
@@ -30,10 +29,29 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<TrayIcon<R>> {
         .icon(IDLE_ICON)
         .icon_as_template(true)
         .tooltip(IDLE_TOOLTIP)
-        .show_menu_on_left_click(true)
+        .show_menu_on_left_click(false)
         .menu(&build_menu(app)?)
         .on_menu_event(|app, event| dispatch(app, event.id.as_ref()))
+        .on_tray_icon_event(|tray, event| on_tray_icon_event(tray.app_handle(), &event))
         .build(app)
+}
+
+fn on_tray_icon_event<R: Runtime>(app: &AppHandle<R>, event: &TrayIconEvent) {
+    tauri_plugin_positioner::on_tray_event(app, event);
+    if is_left_click_release(event) {
+        popover::toggle(app);
+    }
+}
+
+fn is_left_click_release(event: &TrayIconEvent) -> bool {
+    matches!(
+        event,
+        TrayIconEvent::Click {
+            button: MouseButton::Left,
+            button_state: MouseButtonState::Up,
+            ..
+        }
+    )
 }
 
 fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
@@ -139,22 +157,7 @@ fn toggle_recording<R: Runtime>(app: &AppHandle<R>) {
     let controller = app.state::<RecordingController>();
     match controller.state() {
         RecorderState::Recording => controller.stop(),
-        RecorderState::Idle | RecorderState::Locked => start_in_background(app.clone()),
-    }
-}
-
-fn start_in_background<R: Runtime>(app: AppHandle<R>) {
-    thread::spawn(move || {
-        if let Err(error) = app.state::<RecordingController>().start() {
-            report_start_failure(&app, &error);
-        }
-    });
-}
-
-fn report_start_failure<R: Runtime>(app: &AppHandle<R>, error: &StartError) {
-    tracing::warn!(%error, "could not start recording");
-    if error.is_microphone_denied() {
-        notifications::notify_microphone_denied(app);
+        RecorderState::Idle | RecorderState::Locked => recording::start_in_background(app.clone()),
     }
 }
 

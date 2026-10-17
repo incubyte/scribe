@@ -20,6 +20,7 @@ pub use recorder::{Lane, Recorder, RecorderError};
 pub use segment::{Segment, Speaker, TranscriptEvent, Utterance};
 pub use sequencer::{MAX_HOLD, SegmentSequencer};
 pub use session::{
-    InvalidSessionId, SessionHeader, SessionId, SessionStatus, UnknownSessionStatus, default_title,
+    InvalidSessionId, SessionHeader, SessionId, SessionStatus, SessionSummary,
+    UnknownSessionStatus, default_title,
 };
 pub use silence_watchdog::{SilenceWatchdog, WatchdogVerdict};
