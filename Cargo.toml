@@ -2,6 +2,7 @@
 resolver = "3"
 members = [
     "apps/scribe-tray/src-tauri",
+    "crates/audio-macos",
     "crates/audio-mic",
     "crates/audio-resample",
     "crates/scribe-core",
@@ -26,6 +27,7 @@ scribe-core = { path = "crates/scribe-core" }
 store-markdown = { path = "crates/store-markdown" }
 audio-resample = { path = "crates/audio-resample" }
 audio-mic = { path = "crates/audio-mic" }
+audio-macos = { path = "crates/audio-macos" }
 stt-speechanalyzer = { path = "crates/stt-speechanalyzer" }
 
 [workspace.lints.rust]

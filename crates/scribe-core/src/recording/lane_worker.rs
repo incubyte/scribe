@@ -2,12 +2,17 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::time::Duration;
 
 use crate::ports::{TranscribeError, Transcriber};
-use crate::recording::{AudioChunk, Segment, Speaker, TranscriptEvent, Utterance};
+use crate::recording::{
+    AudioChunk, Segment, SilenceWatchdog, Speaker, TranscriptEvent, Utterance, WatchdogVerdict,
+};
+
+const SILENCE_WARNING_AFTER: Duration = Duration::from_secs(5);
 
 pub(crate) enum LaneMessage {
     Final(Segment),
     Watermark(Speaker, Duration),
     Partial(Speaker, String),
+    Silenced(Speaker),
     Ended(Speaker),
 }
 
@@ -21,6 +26,8 @@ pub(crate) fn run_lane(worker: LaneWorker, chunks: &Receiver<AudioChunk>) {
     let mut lane = LaneRun {
         worker,
         audio_origin: None,
+        watchdog: SilenceWatchdog::new(SILENCE_WARNING_AFTER),
+        has_heard_sound: false,
     };
     if let Err(error) = lane.transcribe_until_closed(chunks) {
         tracing::warn!(speaker = lane.worker.speaker.label(), %error, "transcriber failed; ending this lane");
@@ -31,6 +38,8 @@ pub(crate) fn run_lane(worker: LaneWorker, chunks: &Receiver<AudioChunk>) {
 struct LaneRun {
     worker: LaneWorker,
     audio_origin: Option<Duration>,
+    watchdog: SilenceWatchdog,
+    has_heard_sound: bool,
 }
 
 impl LaneRun {
@@ -40,6 +49,7 @@ impl LaneRun {
     ) -> Result<(), TranscribeError> {
         for chunk in chunks {
             self.audio_origin.get_or_insert(chunk.captured_at);
+            self.watch_for_silence(&chunk);
             let events = self.worker.transcriber.push(&chunk)?;
             self.forward(events);
             self.send(LaneMessage::Watermark(self.worker.speaker, chunk.ends_at()));
@@ -47,6 +57,14 @@ impl LaneRun {
         let events = self.worker.transcriber.finish()?;
         self.forward(events);
         Ok(())
+    }
+
+    fn watch_for_silence(&mut self, chunk: &AudioChunk) {
+        self.has_heard_sound |= !chunk.is_exact_silence();
+        let verdict = self.watchdog.observe(chunk);
+        if matches!(verdict, WatchdogVerdict::SilencedFor(_)) && !self.has_heard_sound {
+            self.send(LaneMessage::Silenced(self.worker.speaker));
+        }
     }
 
     fn forward(&self, events: Vec<TranscriptEvent>) {

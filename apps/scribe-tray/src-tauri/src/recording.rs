@@ -2,7 +2,9 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread;
 
 use chrono::Local;
-use scribe_core::ports::{CaptureError, StoreError, TranscribeError, TranscriptStore};
+use scribe_core::ports::{
+    CaptureError, RecordingListener, StoreError, TranscribeError, TranscriptStore,
+};
 use scribe_core::recording::{
     Readiness, Recorder, RecorderError, RecorderState, SessionHeader, SessionId,
 };
@@ -18,6 +20,7 @@ const PREPARING_MODEL: &str = "Preparing speech model…";
 
 pub struct RecordingController {
     recorder: Mutex<Recorder>,
+    listener: Arc<dyn RecordingListener>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -40,16 +43,17 @@ impl StartError {
 
 impl RecordingController {
     #[must_use]
-    pub fn new(recorder: Recorder) -> RecordingController {
+    pub fn new(recorder: Recorder, listener: Arc<dyn RecordingListener>) -> RecordingController {
         RecordingController {
             recorder: Mutex::new(recorder),
+            listener,
         }
     }
 
     pub fn start(&self) -> Result<SessionId, StartError> {
         let mut recorder = self.recorder();
         recorder.ensure_idle()?;
-        let lanes = lanes::build_lanes()?;
+        let lanes = lanes::build_lanes(&self.listener)?;
         let header =
             SessionHeader::recording(Local::now().fixed_offset(), lanes::ENGINE, lanes::LANGUAGE);
         Ok(recorder.start(lanes, header)?)
@@ -88,13 +92,13 @@ impl RecordingController {
 pub fn install<R: Runtime>(app: &AppHandle<R>) -> Result<(), StoreError> {
     let store = MarkdownTranscriptStore::new(TranscriptsFolder::default_location()?);
     mark_abandoned_sessions(&store);
-    let listener = TrayRecordingListener::spawn(app.clone());
-    let mut recorder = Recorder::new(Arc::new(store), Arc::new(listener));
+    let listener: Arc<dyn RecordingListener> = Arc::new(TrayRecordingListener::spawn(app.clone()));
+    let mut recorder = Recorder::new(Arc::new(store), Arc::clone(&listener));
     recorder.set_readiness(Readiness {
         privacy_acknowledged: privacy::is_acknowledged(app),
         model_ready: false,
     });
-    app.manage(RecordingController::new(recorder));
+    app.manage(RecordingController::new(recorder, listener));
     prepare_speech_model(app);
     stop_before_sleep(app);
     Ok(())

@@ -7,6 +7,7 @@ use scribe_core::recording::{RecorderState, RecordingEvent, Segment, SessionId, 
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, Runtime};
 
+use crate::notifications;
 use crate::recording::RecordingController;
 use crate::tray;
 
@@ -80,6 +81,17 @@ impl<R: Runtime> TrayUpdater<R> {
             RecordingEvent::PartialSegmentUpdated { speaker, text } => self.partial(speaker, text),
             RecordingEvent::SegmentFinalised(segment) => self.segment(segment),
             RecordingEvent::RecordingStopped { id } => self.stopped(&id),
+            RecordingEvent::CaptureSilenced { speaker } => self.capture_silenced(speaker),
+            RecordingEvent::OutputDeviceChanged => {
+                tracing::info!("the output device changed; the other side is being captured again");
+            }
+        }
+    }
+
+    fn capture_silenced(&self, speaker: Speaker) {
+        match speaker {
+            Speaker::Them => notifications::notify_cannot_hear_other_side(&self.app),
+            Speaker::Me => tracing::warn!("the microphone delivers only silence"),
         }
     }
 

@@ -41,6 +41,9 @@ impl SessionWriter {
             LaneMessage::Partial(speaker, text) => self
                 .listener
                 .on_event(RecordingEvent::PartialSegmentUpdated { speaker, text }),
+            LaneMessage::Silenced(speaker) => self
+                .listener
+                .on_event(RecordingEvent::CaptureSilenced { speaker }),
             LaneMessage::Ended(speaker) => self.end_lane(speaker),
         }
         let ready = self.sequencer.release_ready();

@@ -3,15 +3,84 @@ use tauri_plugin_notification::NotificationExt;
 
 const MICROPHONE_DENIED_TITLE: &str = "Scribe can't use the microphone";
 const MICROPHONE_DENIED_BODY: &str = "Allow Scribe in System Settings > Privacy & Security > Microphone, then start recording again.";
+const OTHER_SIDE_SILENT_TITLE: &str = "Scribe can't hear the other side of the call";
+const OTHER_SIDE_SILENT_BODY: &str =
+    "Allow Scribe in System Settings > Privacy & Security > Screen & System Audio Recording.";
 
 pub fn notify_microphone_denied<R: Runtime>(app: &AppHandle<R>) {
-    let shown = app
-        .notification()
-        .builder()
-        .title(MICROPHONE_DENIED_TITLE)
-        .body(MICROPHONE_DENIED_BODY)
-        .show();
+    show_plain(app, MICROPHONE_DENIED_TITLE, MICROPHONE_DENIED_BODY);
+}
+
+#[cfg(target_os = "macos")]
+pub use system_settings::notify_cannot_hear_other_side;
+
+#[cfg(not(target_os = "macos"))]
+pub fn notify_cannot_hear_other_side<R: Runtime>(app: &AppHandle<R>) {
+    show_plain(app, OTHER_SIDE_SILENT_TITLE, OTHER_SIDE_SILENT_BODY);
+}
+
+fn show_plain<R: Runtime>(app: &AppHandle<R>, title: &str, body: &str) {
+    let shown = app.notification().builder().title(title).body(body).show();
     if let Err(error) = shown {
-        tracing::warn!(%error, "could not show the microphone permission notification");
+        tracing::warn!(%error, title, "could not show a notification");
+    }
+}
+
+#[cfg(target_os = "macos")]
+mod system_settings {
+    use std::thread;
+
+    use mac_notification_sys::{MainButton, Notification, NotificationResponse};
+    use tauri::{AppHandle, Runtime};
+    use tauri_plugin_opener::OpenerExt;
+
+    use super::{OTHER_SIDE_SILENT_BODY, OTHER_SIDE_SILENT_TITLE};
+
+    const OPEN_SYSTEM_SETTINGS: &str = "Open System Settings";
+    const SYSTEM_AUDIO_SETTINGS_URL: &str =
+        "x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture";
+    const DEV_NOTIFICATION_SENDER: &str = "com.apple.Terminal";
+
+    pub fn notify_cannot_hear_other_side<R: Runtime>(app: &AppHandle<R>) {
+        let app = app.clone();
+        thread::spawn(move || {
+            if user_chose_to_open_settings(&app) {
+                open_system_audio_settings(&app);
+            }
+        });
+    }
+
+    fn user_chose_to_open_settings<R: Runtime>(app: &AppHandle<R>) -> bool {
+        let _ = mac_notification_sys::set_application(&notification_sender(app));
+        let response = Notification::new()
+            .title(OTHER_SIDE_SILENT_TITLE)
+            .message(OTHER_SIDE_SILENT_BODY)
+            .main_button(MainButton::SingleAction(OPEN_SYSTEM_SETTINGS))
+            .send();
+        match response {
+            Ok(NotificationResponse::ActionButton(_) | NotificationResponse::Click) => true,
+            Ok(_) => false,
+            Err(error) => {
+                tracing::warn!(%error, "could not show the system audio permission notification");
+                false
+            }
+        }
+    }
+
+    fn notification_sender<R: Runtime>(app: &AppHandle<R>) -> String {
+        if tauri::is_dev() {
+            DEV_NOTIFICATION_SENDER.to_owned()
+        } else {
+            app.config().identifier.clone()
+        }
+    }
+
+    fn open_system_audio_settings<R: Runtime>(app: &AppHandle<R>) {
+        if let Err(error) = app
+            .opener()
+            .open_url(SYSTEM_AUDIO_SETTINGS_URL, None::<&str>)
+        {
+            tracing::warn!(%error, "could not open the system audio privacy settings");
+        }
     }
 }

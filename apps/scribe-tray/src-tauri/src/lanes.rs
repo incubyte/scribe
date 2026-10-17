@@ -1,20 +1,30 @@
 #[cfg(target_os = "macos")]
 mod macos {
+    use std::sync::Arc;
+
+    use audio_macos::SystemOutputSource;
     use audio_mic::MicSource;
-    use scribe_core::ports::TranscribeError;
+    use scribe_core::ports::{RecordingListener, TranscribeError};
     use scribe_core::recording::{Lane, Speaker};
     use stt_speechanalyzer::{AssetStatus, SpeechAnalyzerTranscriber};
 
     pub const ENGINE: &str = stt_speechanalyzer::ENGINE_NAME;
     pub const LANGUAGE: &str = stt_speechanalyzer::ENGLISH;
 
-    pub fn build_lanes() -> Result<Vec<Lane>, TranscribeError> {
+    pub fn build_lanes(
+        listener: &Arc<dyn RecordingListener>,
+    ) -> Result<Vec<Lane>, TranscribeError> {
         let mic = Lane {
             speaker: Speaker::Me,
             source: Box::new(MicSource::new()),
             transcriber: Box::new(SpeechAnalyzerTranscriber::start(LANGUAGE)?),
         };
-        Ok(vec![mic])
+        let system_output = Lane {
+            speaker: Speaker::Them,
+            source: Box::new(SystemOutputSource::new(Arc::clone(listener))),
+            transcriber: Box::new(SpeechAnalyzerTranscriber::start(LANGUAGE)?),
+        };
+        Ok(vec![mic, system_output])
     }
 
     pub fn ensure_speech_model(on_installing: &dyn Fn()) -> Result<(), TranscribeError> {
@@ -36,13 +46,17 @@ pub use macos::{ENGINE, LANGUAGE, build_lanes, ensure_speech_model};
 
 #[cfg(not(target_os = "macos"))]
 mod unsupported {
-    use scribe_core::ports::TranscribeError;
+    use std::sync::Arc;
+
+    use scribe_core::ports::{RecordingListener, TranscribeError};
     use scribe_core::recording::Lane;
 
     pub const ENGINE: &str = "none";
     pub const LANGUAGE: &str = "none";
 
-    pub fn build_lanes() -> Result<Vec<Lane>, TranscribeError> {
+    pub fn build_lanes(
+        _listener: &Arc<dyn RecordingListener>,
+    ) -> Result<Vec<Lane>, TranscribeError> {
         Err(no_engine())
     }
 

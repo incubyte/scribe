@@ -4,5 +4,7 @@
 <dict>
   <key>NSMicrophoneUsageDescription</key>
   <string>Scribe transcribes your side of a call on this Mac. Audio is never saved and nothing is sent to any server.</string>
+  <key>NSAudioCaptureUsageDescription</key>
+  <string>Scribe transcribes the other side of a call from the sound this Mac plays. Audio is never saved and nothing is sent to any server.</string>
 </dict>
 </plist>

@@ -259,6 +259,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1254ebf6529f3763c491acfb5ab6e960809e3c75a38584cc664f8c5667fb7107"
 
 [[package]]
+name = "audio-macos"
+version = "0.1.0"
+dependencies = [
+ "audio-resample",
+ "cidre",
+ "ringbuf",
+ "scribe-core",
+ "tracing",
+]
+
+[[package]]
 name = "audio-mic"
 version = "0.1.0"
 dependencies = [
@@ -573,6 +584,22 @@ dependencies = [
  "serde",
  "windows-link 0.2.1",
 ]
+
+[[package]]
+name = "cidre"
+version = "0.29.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8fde4542e9dfd21498f5366a5ad60963879fd1885743a18980f6dbb27f525895"
+dependencies = [
+ "cc",
+ "cidre-macros",
+]
+
+[[package]]
+name = "cidre-macros"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a85776177a885b3cd2cda74d634cabe7fa05fecfde8ded8779c0b34110a44dcb"
 
 [[package]]
 name = "combine"
@@ -3376,9 +3403,11 @@ dependencies = [
 name = "scribe-tray"
 version = "0.1.0"
 dependencies = [
+ "audio-macos",
  "audio-mic",
  "block2",
  "chrono",
+ "mac-notification-sys",
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",

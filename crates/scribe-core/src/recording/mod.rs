@@ -8,6 +8,7 @@ mod recorder;
 mod segment;
 mod sequencer;
 mod session;
+mod silence_watchdog;
 mod writer;
 
 pub use audio::{AudioChunk, SAMPLE_RATE_HZ};
@@ -17,7 +18,8 @@ pub use offset::offset_as_clock;
 pub use readiness::{Readiness, RecorderState, recorder_state};
 pub use recorder::{Lane, Recorder, RecorderError};
 pub use segment::{Segment, Speaker, TranscriptEvent, Utterance};
-pub use sequencer::SegmentSequencer;
+pub use sequencer::{MAX_HOLD, SegmentSequencer};
 pub use session::{
     InvalidSessionId, SessionHeader, SessionId, SessionStatus, UnknownSessionStatus, default_title,
 };
+pub use silence_watchdog::{SilenceWatchdog, WatchdogVerdict};

@@ -167,16 +167,7 @@ impl Pump {
         samples.is_empty()
             || delivery
                 .chunks
-                .send(stamped(samples, delivery.clock.elapsed()))
+                .send(AudioChunk::ending_at(samples, delivery.clock.elapsed()))
                 .is_ok()
     }
-}
-
-fn stamped(samples: Vec<f32>, now: Duration) -> AudioChunk {
-    let mut chunk = AudioChunk {
-        samples,
-        captured_at: Duration::ZERO,
-    };
-    chunk.captured_at = now.saturating_sub(chunk.duration());
-    chunk
 }

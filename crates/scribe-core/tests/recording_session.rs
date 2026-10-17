@@ -1,10 +1,11 @@
 use std::sync::Arc;
-use std::time::Duration;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use chrono::DateTime;
 use scribe_core::ports::{CaptureError, TranscribeError};
 use scribe_core::recording::{
-    Lane, Readiness, Recorder, RecorderError, RecorderState, RecordingEvent, Segment,
+    AudioChunk, Lane, Readiness, Recorder, RecorderError, RecorderState, RecordingEvent, Segment,
     SessionHeader, SessionId, SessionStatus, Speaker, TranscriptEvent,
 };
 use scribe_core::testing::{
@@ -64,6 +65,52 @@ fn lane(speaker: Speaker, transcriber: ScriptedTranscriber) -> Lane {
         source: Box::new(source),
         transcriber: Box::new(transcriber),
     }
+}
+
+const CHUNK_MS: u64 = 100;
+const PATIENCE: Duration = Duration::from_secs(2);
+
+fn chunks_between(from_ms: u64, end_ms: u64, sample: f32) -> Vec<AudioChunk> {
+    (from_ms / CHUNK_MS..end_ms / CHUNK_MS)
+        .map(|index| AudioChunk {
+            samples: vec![sample; 1_600],
+            ..chunk_at(Duration::from_millis(index * CHUNK_MS))
+        })
+        .collect()
+}
+
+fn lane_lasting(speaker: Speaker, end_ms: u64, transcriber: ScriptedTranscriber) -> Lane {
+    lane_hearing(speaker, chunks_between(0, end_ms, 0.0), transcriber)
+}
+
+fn lane_hearing(
+    speaker: Speaker,
+    chunks: Vec<AudioChunk>,
+    transcriber: ScriptedTranscriber,
+) -> Lane {
+    Lane {
+        speaker,
+        source: Box::new(FakeAudioSource::with_chunks(chunks)),
+        transcriber: Box::new(transcriber),
+    }
+}
+
+fn stalled_lane(speaker: Speaker) -> Lane {
+    lane_hearing(speaker, Vec::new(), ScriptedTranscriber::new(vec![]))
+}
+
+fn wait_until(condition: impl Fn() -> bool) {
+    let deadline = Instant::now() + PATIENCE;
+    while !condition() && Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
+fn silence_warnings(events: Vec<RecordingEvent>) -> Vec<RecordingEvent> {
+    events
+        .into_iter()
+        .filter(|event| matches!(event, RecordingEvent::CaptureSilenced { .. }))
+        .collect()
 }
 
 fn silent_mic_lane() -> Lane {
@@ -242,4 +289,89 @@ fn stopping_when_nothing_is_recording_changes_nothing() {
 
     assert_eq!(call.recorder.state(), RecorderState::Idle);
     assert!(call.listener.events().is_empty());
+}
+
+#[test]
+fn my_lines_and_their_lines_are_saved_in_the_order_they_started() {
+    let mut call = Call::ready();
+    let mine = ScriptedTranscriber::new(vec![
+        utterance(0, 1_000, "Hi there"),
+        utterance(2_000, 2_500, "Good, thanks"),
+    ]);
+    let theirs = ScriptedTranscriber::new(vec![utterance(1_200, 1_800, "How are you")]);
+
+    let id = call.record(vec![
+        lane_lasting(Speaker::Me, 3_000, mine),
+        lane_lasting(Speaker::Them, 3_000, theirs),
+    ]);
+
+    assert_eq!(
+        call.store.segments(&id),
+        vec![
+            line(Speaker::Me, (0, 1_000), "Hi there"),
+            line(Speaker::Them, (1_200, 1_800), "How are you"),
+            line(Speaker::Me, (2_000, 2_500), "Good, thanks"),
+        ]
+    );
+}
+
+#[test]
+fn a_stalled_side_does_not_hold_back_the_other_sides_lines_beyond_the_maximum_hold() {
+    let mut call = Call::ready();
+    let theirs = ScriptedTranscriber::new(vec![utterance(500, 1_000, "Can you hear me")]);
+    let id = call
+        .start(vec![
+            stalled_lane(Speaker::Me),
+            lane_lasting(Speaker::Them, 2_600, theirs),
+        ])
+        .unwrap();
+
+    wait_until(|| !call.store.segments(&id).is_empty());
+    let saved_while_recording = call.store.segments(&id);
+    call.recorder.stop().unwrap();
+
+    assert_eq!(
+        saved_while_recording,
+        vec![line(Speaker::Them, (500, 1_000), "Can you hear me")]
+    );
+}
+
+#[test]
+fn the_other_side_delivering_only_silence_raises_one_warning_while_my_side_keeps_recording() {
+    let mut call = Call::ready();
+    let mine = ScriptedTranscriber::new(vec![utterance(0, 900, "Hello? Anyone?")]);
+
+    let id = call.record(vec![
+        lane_lasting(Speaker::Me, 300, mine),
+        lane_lasting(Speaker::Them, 8_000, ScriptedTranscriber::new(vec![])),
+    ]);
+
+    assert_eq!(
+        silence_warnings(call.listener.events()),
+        vec![RecordingEvent::CaptureSilenced {
+            speaker: Speaker::Them
+        }]
+    );
+    assert_eq!(
+        call.store.segments(&id),
+        vec![line(Speaker::Me, (0, 900), "Hello? Anyone?")]
+    );
+}
+
+#[test]
+fn the_other_side_falling_quiet_after_being_heard_raises_no_warning() {
+    let mut call = Call::ready();
+    let heard_then_quiet = [
+        chunks_between(0, 1_000, 0.2),
+        chunks_between(1_000, 8_000, 0.0),
+    ]
+    .concat();
+
+    call.record(vec![lane_hearing(
+        Speaker::Them,
+        heard_then_quiet,
+        ScriptedTranscriber::new(vec![]),
+    )]);
+
+    assert!(silence_warnings(call.listener.events()).is_empty());
 }
