@@ -1,13 +1,18 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use crate::recording::{Segment, Speaker};
+use crate::recording::{
+    ECHO_OVERLAP_TOLERANCE, ECHO_SIMILARITY_THRESHOLD, EchoFilter, Segment, Speaker,
+};
 
 pub const MAX_HOLD: Duration = Duration::from_millis(1_500);
+const RECENT_THEM_WINDOW: Duration = Duration::from_secs(3);
 
 pub struct SegmentSequencer {
     watermarks: BTreeMap<Speaker, Duration>,
     pending: Vec<Segment>,
+    recent_them: Vec<Segment>,
+    echo_filter: EchoFilter,
 }
 
 impl SegmentSequencer {
@@ -16,6 +21,8 @@ impl SegmentSequencer {
         SegmentSequencer {
             watermarks: lanes.iter().map(|lane| (*lane, Duration::ZERO)).collect(),
             pending: Vec::new(),
+            recent_them: Vec::new(),
+            echo_filter: EchoFilter::new(ECHO_OVERLAP_TOLERANCE, ECHO_SIMILARITY_THRESHOLD),
         }
     }
 
@@ -32,16 +39,52 @@ impl SegmentSequencer {
     }
 
     pub fn release_ready(&mut self) -> Vec<Segment> {
-        let ready = self
+        let mut released = Vec::new();
+        while self
             .pending
-            .iter()
-            .take_while(|segment| self.is_ready(segment))
-            .count();
-        self.pending.drain(..ready).collect()
+            .first()
+            .is_some_and(|front| self.is_ready(front))
+        {
+            released.extend(self.release_front());
+        }
+        released
     }
 
     pub fn drain(&mut self) -> Vec<Segment> {
-        std::mem::take(&mut self.pending)
+        let mut released = Vec::new();
+        while !self.pending.is_empty() {
+            released.extend(self.release_front());
+        }
+        released
+    }
+
+    fn release_front(&mut self) -> Option<Segment> {
+        let segment = self.pending.remove(0);
+        match segment.speaker {
+            Speaker::Me => self.screen_for_echo(segment),
+            Speaker::Them => Some(self.remember_recent(segment)),
+        }
+    }
+
+    fn screen_for_echo(&self, mine: Segment) -> Option<Segment> {
+        let theirs: Vec<Segment> = self
+            .recent_them
+            .iter()
+            .chain(
+                self.pending
+                    .iter()
+                    .filter(|held| held.speaker == Speaker::Them),
+            )
+            .cloned()
+            .collect();
+        (!self.echo_filter.is_echo(&mine, &theirs)).then_some(mine)
+    }
+
+    fn remember_recent(&mut self, theirs: Segment) -> Segment {
+        self.recent_them
+            .retain(|recent| recent.end.saturating_add(RECENT_THEM_WINDOW) >= theirs.start);
+        self.recent_them.push(theirs.clone());
+        theirs
     }
 
     fn is_ready(&self, segment: &Segment) -> bool {
@@ -55,10 +98,20 @@ impl SegmentSequencer {
     }
 
     fn other_lanes_have_passed(&self, segment: &Segment) -> bool {
+        let needed = self.watermark_needed_to_release(segment);
         self.watermarks
             .iter()
             .filter(|(lane, _)| **lane != segment.speaker)
-            .all(|(_, watermark)| *watermark >= segment.start)
+            .all(|(_, watermark)| *watermark >= needed)
+    }
+
+    fn watermark_needed_to_release(&self, segment: &Segment) -> Duration {
+        match segment.speaker {
+            Speaker::Me => segment
+                .end
+                .saturating_add(self.echo_filter.overlap_tolerance()),
+            Speaker::Them => segment.start,
+        }
     }
 }
 

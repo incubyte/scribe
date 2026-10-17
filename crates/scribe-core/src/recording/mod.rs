@@ -1,5 +1,6 @@
 mod audio;
 mod clock;
+mod echo_filter;
 mod events;
 mod lane_worker;
 mod offset;
@@ -13,6 +14,7 @@ mod writer;
 
 pub use audio::{AudioChunk, SAMPLE_RATE_HZ};
 pub use clock::SessionClock;
+pub use echo_filter::{ECHO_OVERLAP_TOLERANCE, ECHO_SIMILARITY_THRESHOLD, EchoFilter};
 pub use events::RecordingEvent;
 pub use offset::offset_as_clock;
 pub use readiness::{Readiness, RecorderState, recorder_state};

@@ -12,6 +12,7 @@ testing = []
 thiserror.workspace = true
 tracing.workspace = true
 chrono.workspace = true
+strsim.workspace = true
 
 [dev-dependencies]
 scribe-core = { workspace = true, features = ["testing"] }
