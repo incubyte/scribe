@@ -1,0 +1,97 @@
+name: Jira Acceptance Criteria Approval
+slug: jira-acceptance-criteria-approval
+trigger:
+  type: manual
+  config:
+    inputs:
+      - name: issueKey
+        type: string
+llm_config:
+  model: your-model-alias
+  max_turns: 80
+  max_budget_usd: 10
+  effort: high
+
+steps:
+  - name: draft-and-approve-criteria
+    type: ai_task
+    connections: [Jira]
+    config:
+      interactive: true
+      teams_channel_id: "19:your-channel-id@thread.v2"
+      teams_service_url: "https://smba.trafficmanager.net/teams/"
+      llm_config:
+        system_prompt: |
+          You are a product analyst working inside a container. Use your tools:
+          call the Jira REST API with curl through Bash, ask for approval with
+          mcp__anthara__ask_with_card, and write the approved criteria back
+          yourself. Do not answer with a description of what you would do; do
+          the work.
+      prompt: |
+        Draft acceptance criteria for one Jira story, get a person's approval
+        in Microsoft Teams, and only then write them onto the story.
+
+        STORY: {{inputs.issueKey}}
+
+        CREDENTIAL RULES
+        - JIRA_ACCESS_TOKEN is an OAuth token for api.atlassian.com only.
+        - Never print it, never put it in a URL, and never write it into a
+          comment, a card or your output.
+
+        Make every call with curl through the Bash tool, and always capture
+        the HTTP status:
+
+          curl -sS -w '\nHTTP_STATUS:%{http_code}\n' \
+            -H "Authorization: Bearer $JIRA_ACCESS_TOKEN" \
+            -H "Accept: application/json" "<url>"
+
+        STEP 1 - READ THE STORY
+        GET https://api.atlassian.com/oauth/token/accessible-resources and take
+        the first resource's id as CLOUD_ID. Then GET
+        https://api.atlassian.com/ex/jira/$CLOUD_ID/rest/api/2/issue/{{inputs.issueKey}}?fields=summary,description,comment
+        A non-2xx response fails the step with the status and body. When any
+        comment contains the line "_Acceptance criteria approved via
+        Anthara._", stop here and output the already_approved shape below.
+
+        STEP 2 - DRAFT THE CRITERIA
+        From the summary and description, write 3 to 6 acceptance criteria a
+        tester could check, each one short line in plain words.
+
+        STEP 3 - ASK FOR APPROVAL
+        Call mcp__anthara__ask_with_card exactly once in this turn:
+          card:
+            title: "Acceptance criteria approval"
+            description: "<the issue key and summary on one line, then the draft criteria as - bullets>"
+          questions:
+            - question: "Shall I add these acceptance criteria to the story?"
+              header: "Decision"
+              options:
+                - { label: "Approve", description: "Add them to the story as written" }
+                - { label: "Revise", description: "Change them first" }
+                - { label: "Reject", description: "Add nothing" }
+            - question: "What should change? Leave this empty when approving."
+              header: "Changes"
+        The card pauses the run until the person answers in Teams.
+
+        STEP 4 - ACT ON THE ANSWER
+        - Approve: post one comment holding the criteria as bullets, then the
+          line "_Acceptance criteria approved via Anthara._" on its own. Build
+          the JSON body {"body": "<comment>"} in a temp file (BODY=$(mktemp))
+          and POST it to .../issue/{{inputs.issueKey}}/comment with
+          --data-binary "@$BODY" and -H "Content-Type: application/json". A
+          non-2xx response fails the step with the status and body.
+        - Revise: apply the requested changes and go back to STEP 3. Stop
+          after 3 rounds without a decision.
+        - Reject: write nothing to Jira.
+
+        STEP 5 - CLOSE
+        Send one mcp__anthara__notify_card with title "Acceptance criteria"
+        and a one-line description of what happened. It is one-way and final:
+        never ask a question after it.
+
+        OUTPUT RULES
+        Your final output is exactly ONE single-line JSON object, one of:
+          {"issueKey": "<KEY>", "status": "approved", "rounds": <n>}
+          {"issueKey": "<KEY>", "status": "rejected", "rounds": <n>}
+          {"issueKey": "<KEY>", "status": "no_decision", "rounds": 3}
+          {"issueKey": "<KEY>", "status": "already_approved"}

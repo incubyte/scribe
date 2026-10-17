@@ -1,0 +1,1053 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PR Walkthrough — Field Notes</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg:        #F8F8F5;
+    --bg-code:   #FFFFFF;
+    --ink:       #1B1B18;
+    --ink-2:     #55554F;
+    --ink-3:     #9A9A92;
+    --hair:      #E3E3DC;
+    --hair-2:    #EDEDE7;
+    --blue:      #2465C2;
+    --mark-bg:   #F5DE8B66;
+    --mark-line: #A87E1C;
+    --ok:        #3B7A54;
+    --warn:      #B0483F;
+    --mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+    --serif: "Charter", "Iowan Old Style", Georgia, serif;
+  }
+  :root[data-theme="dark"] {
+    --bg: #151513; --bg-code: #1C1C1A; --ink: #E9E9E4; --ink-2: #A8A8A0; --ink-3: #6C6C65;
+    --hair: #2B2B28; --hair-2: #232320; --blue: #7AAEF7;
+    --mark-bg: #D6AB3629; --mark-line: #C99E33; --ok: #7CBD95; --warn: #D98B82;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151513; --bg-code: #1C1C1A; --ink: #E9E9E4; --ink-2: #A8A8A0; --ink-3: #6C6C65;
+      --hair: #2B2B28; --hair-2: #232320; --blue: #7AAEF7;
+      --mark-bg: #D6AB3629; --mark-line: #C99E33; --ok: #7CBD95; --warn: #D98B82;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 17.5px/1.75 var(--serif);
+    -webkit-font-smoothing: antialiased;
+  }
+  button { font-family: var(--sans); }
+  code { font-family: var(--mono); font-size: .8em; }
+
+  #progress { position: fixed; top: 0; left: 0; height: 2px; width: 0; background: var(--blue); z-index: 30; }
+
+  #topbar {
+    position: fixed; top: 2px; left: 0; right: 0; z-index: 20;
+    display: flex; align-items: center; gap: 14px;
+    height: 42px; padding: 0 18px;
+    background: var(--bg); border-bottom: 1px solid var(--hair);
+    font: 12px var(--sans); color: var(--ink-3);
+  }
+  .tb-title { color: var(--ink-2); font-weight: 600; }
+  .tb-pos { margin-left: auto; }
+  .tb-nav { display: flex; gap: 6px; }
+  .wbtn {
+    font: 600 12.5px var(--sans); color: var(--ink-2);
+    background: transparent; border: 1px solid var(--hair);
+    border-radius: 6px; padding: 4px 11px; cursor: pointer;
+  }
+  .wbtn:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-3); }
+  .wbtn:disabled { opacity: .35; cursor: default; }
+
+  main { padding-top: 44px; }
+  .view { display: none; }
+  .view.on { display: block; }
+  .col { max-width: 68ch; margin: 0 auto; padding: 52px 24px 120px; }
+  .col > * { transition: opacity .3s ease; }
+  .view.dim .col > *:not(.lit) { opacity: .3; }
+
+  .kicker {
+    font: 600 11px/1.6 var(--sans); letter-spacing: .12em;
+    text-transform: uppercase; color: var(--ink-3); margin: 0 0 16px;
+  }
+  h1 {
+    font-family: var(--serif); font-size: clamp(21px, 2.4vw, 26px);
+    font-weight: 650; letter-spacing: -0.02em; margin: 0 0 8px;
+  }
+  .standfirst { color: var(--ink-2); font-style: italic; margin: 0 0 12px; }
+  h2.sec {
+    font: 600 11px/1.5 var(--sans); letter-spacing: .12em;
+    text-transform: uppercase; color: var(--ink-3); margin: 52px 0 18px;
+  }
+  p { margin: 0 0 1.2em; }
+  p.loud { font-weight: 650; }
+  .lnk {
+    font: 12.5px var(--sans); color: var(--blue);
+    background: none; border: none; padding: 0; cursor: pointer; text-decoration: none;
+  }
+  .lnk:hover { text-decoration: underline; }
+  .lnk.ghost { color: var(--ink-3); }
+
+  /* ---------- cover ---------- */
+  .ednote { border-left: 2px solid var(--hair); padding: 2px 0 2px 16px; margin: 24px 0 34px; }
+  .ednote p { font-size: 16px; line-height: 1.7; color: var(--ink-2); margin: 6px 0 0; }
+  .q-label {
+    display: block; font: 600 11px var(--sans); letter-spacing: .12em;
+    text-transform: uppercase; color: var(--ink-3); margin-bottom: 5px;
+  }
+  .toc { list-style: none; margin: 0 0 26px; padding: 0; }
+  .card {
+    display: block; width: 100%; text-align: left; cursor: pointer;
+    border: 1px solid var(--hair); border-radius: 6px; background: var(--bg-code);
+    padding: 16px 18px 14px; margin: 0 0 12px; font-family: var(--serif); color: var(--ink);
+  }
+  .card:hover { border-color: var(--ink-3); }
+  .card .c-no { font: 600 11px var(--sans); letter-spacing: .12em; color: var(--ink-3); text-transform: uppercase; }
+  .card .c-title { display: block; font-size: 19px; font-weight: 650; letter-spacing: -0.01em; margin: 4px 0 3px; }
+  .card .c-dek { display: block; font-style: italic; font-size: 15.5px; color: var(--ink-2); margin: 0 0 8px; }
+  .card .c-meta { font: 12px var(--sans); color: var(--ink-3); }
+  .endlinks { margin: 0 0 30px; font: 13px var(--sans); }
+  .endlinks a { display: block; margin: 6px 0; }
+
+  .cov { border-top: 1px solid var(--hair); padding-top: 14px; margin-top: 8px; }
+  .cov-line { font: 12.5px var(--mono); color: var(--ink-2); margin: 0 0 8px; }
+  .cov-bar { display: flex; gap: 2px; height: 6px; border-radius: 3px; overflow: hidden; }
+  .cov-bar span { display: block; height: 100%; }
+  .cov-bar .s1 { background: var(--ink-3); }
+  .cov-bar .s2 { background: var(--hair); }
+  .cov-bar .s3 { background: var(--hair-2); }
+  .cov-bar .s4 { background: var(--hair-2); opacity: .55; }
+  .cov-note { font: 11.5px var(--sans); color: var(--ink-3); margin-top: 8px; }
+
+  /* ---------- code blocks ---------- */
+  .code { font: 13px/1.6 var(--mono); overflow-x: auto; }
+  .crow { display: flex; white-space: pre; }
+  .ln  { flex: none; width: 3ch; text-align: right; color: var(--ink-3); user-select: none; }
+  .gut { flex: none; width: 3ch; text-align: center; color: var(--ink-3); user-select: none; }
+  .ct  { flex: none; }
+  .crow.ctx .ct { color: var(--ink-3); }
+  .crow.add .ct { color: var(--ink); }
+  .crow.new .ct { color: var(--ink); }
+  .crow.del .ct { color: var(--ink-3); text-decoration: line-through; }
+  .crow.hunk .ct, .crow.elide .ct { color: var(--ink-3); }
+  mark.gold { background: var(--mark-bg); border-bottom: 1px dashed var(--mark-line); color: inherit; padding: 0; border-radius: 0; }
+
+  /* ---------- exhibit bars ---------- */
+  .xb { border: 1px solid var(--hair); border-radius: 6px; background: var(--bg-code); margin: 4px 0 26px; }
+  .xbar {
+    display: flex; gap: 10px; align-items: baseline; width: 100%;
+    padding: 9px 14px; background: none; border: none; cursor: pointer;
+    font: 12px var(--sans); color: var(--ink-2); text-align: left;
+  }
+  .xbar .car { display: inline-block; color: var(--ink-3); transition: transform .2s; }
+  .xb.open .car { transform: rotate(90deg); }
+  .xbar .fname { font: 12px var(--mono); color: var(--ink); }
+  .xbar .xcap { color: var(--ink-3); }
+  .xbar .xview { margin-left: auto; color: var(--blue); flex: none; }
+  .xbody { border-top: 1px solid var(--hair-2); padding: 12px 14px; }
+  .xtools { display: flex; gap: 14px; justify-content: flex-end; margin: 0 0 10px; font: 11.5px var(--sans); }
+  .fn-note { font: 13px/1.6 var(--sans); color: var(--ink-2); margin: 12px 0 0; }
+
+  /* ---------- question blocks ---------- */
+  .q-block { border-left: 2px solid var(--hair); padding: 3px 0 3px 16px; margin: 20px 0 30px; }
+  .q-block p { font-size: 16px; line-height: 1.65; margin: 0 0 9px; }
+  .q-pin { display: inline-flex; align-items: center; gap: 7px; font: 12px var(--sans); color: var(--ink-2); cursor: pointer; }
+  .q-ans { display: block; margin-top: 8px; font: italic 13.5px/1.6 var(--sans); color: var(--ink-2); }
+  .q-ans b { font-style: normal; color: var(--ink); }
+  input[type="checkbox"] { accent-color: var(--blue); margin: 0; }
+
+  /* ---------- re-enactment (side-by-side, breakout) ---------- */
+  .breakout {
+    width: min(1080px, calc(100vw - 48px));
+    position: relative; left: 50%; transform: translateX(-50%);
+    margin: 26px 0;
+  }
+  .widget { border: 1px solid var(--hair); border-radius: 6px; background: var(--bg-code); }
+  .w-head {
+    padding: 10px 16px; border-bottom: 1px solid var(--hair-2);
+    font: 600 10.5px var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3);
+  }
+  .w-grid { display: grid; grid-template-columns: 58% 1fr; }
+  .w-left { padding: 12px 16px 14px; min-width: 0; }
+  .crumbs { font: 12.5px var(--sans); color: var(--ink-3); margin-bottom: 9px; }
+  .crumb-sep { padding: 0 7px; }
+  .crumb.on { color: var(--ink); font-weight: 600; }
+  .w-filebar { display: flex; align-items: baseline; gap: 14px; margin-bottom: 9px; }
+  .file-tag { font: 11.5px var(--mono); color: var(--ink-3); }
+  .w-filebar .xtools { margin: 0 0 0 auto; }
+  .w-right {
+    border-left: 1px solid var(--hair-2); padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 11px; min-width: 0;
+  }
+  .beat-label { font: 600 10.5px var(--sans); letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); }
+  .w-narr { font: 16px/1.65 var(--serif); color: var(--ink); }
+  .w-state { font: 12.5px var(--mono); color: var(--ink-2); }
+  .w-state .delta { color: var(--mark-line); font-weight: 600; }
+  .w-ctrl { display: flex; align-items: center; gap: 12px; margin-top: auto; }
+  .dots { display: flex; gap: 7px; align-items: center; }
+  .dot { width: 7px; height: 7px; border-radius: 50%; padding: 0; border: 1px solid var(--ink-3); background: transparent; cursor: pointer; }
+  .dot.past { background: var(--ink-3); border-color: var(--ink-3); }
+  .dot.cur  { background: var(--ink); border-color: var(--ink); }
+  .w-hint { font: 11px var(--sans); color: var(--ink-3); }
+  .widget .crow.add .ct, .widget .crow.new .ct { color: var(--ink-2); }
+  .widget .crow.ctx .ct { color: var(--ink-3); }
+  .widget .crow.exec { background: var(--mark-bg); }
+  .widget .crow.exec .ct { color: var(--ink); }
+  .widget .crow.exec.hot { border-bottom: 1px dashed var(--mark-line); }
+  .widget .crow.exec.hot .ct { font-weight: 600; }
+  @media (max-width: 900px) {
+    .w-grid { grid-template-columns: 1fr; }
+    .w-right { border-left: none; border-top: 1px solid var(--hair-2); }
+  }
+
+  /* ---------- article footer ---------- */
+  .art-foot { border-top: 1px solid var(--hair); margin-top: 46px; padding-top: 16px; font: 13px var(--sans); color: var(--ink-2); }
+  .artnav { display: flex; justify-content: space-between; margin-top: 14px; gap: 14px; }
+
+  /* ---------- ledger ---------- */
+  .ac-table { width: 100%; border-collapse: collapse; font: 13px var(--sans); margin: 0 0 8px; }
+  .ac-table th {
+    font: 600 11px var(--sans); letter-spacing: .12em; text-transform: uppercase;
+    color: var(--ink-3); text-align: left; padding: 6px 10px 6px 0; border-bottom: 1px solid var(--hair);
+  }
+  .ac-table td { padding: 9px 10px 9px 0; border-bottom: 1px solid var(--hair-2); vertical-align: top; color: var(--ink-2); }
+  .ac-table td.ac-id { font-family: var(--mono); color: var(--ink); white-space: nowrap; }
+  .ac-src { font: 12px var(--sans); color: var(--ink-3); margin: -4px 0 10px; }
+  .pack-list { list-style: none; margin: 0 0 8px; padding: 0; }
+  .pack-row { display: flex; gap: 12px; align-items: baseline; padding: 9px 0; border-bottom: 1px solid var(--hair-2); font: 13px var(--sans); }
+  .pack-row .pack-cite { font: 11.5px var(--mono); color: var(--ink-3); white-space: nowrap; }
+  .pack-row .pack-text { color: var(--ink-2); }
+  .pack-row .pack-text b { color: var(--ink); }
+  .pack-row .pack-ref { margin-left: auto; font: 12px var(--mono); color: var(--ink-3); white-space: nowrap; }
+  .pack-row.uncovered .pack-cite, .pack-row.uncovered .pack-ref { color: var(--warn); font-weight: 600; }
+  .st-ok { color: var(--ok); font-weight: 600; }
+  .st-warn { color: var(--warn); font-weight: 600; }
+  .st-mark { color: var(--mark-line); font-weight: 600; }
+  .jlist { margin: 0 0 8px; padding-left: 20px; font-size: 16px; color: var(--ink-2); }
+  .jlist li { margin-bottom: 8px; }
+  .jlist .sq-src { font: 11.5px var(--sans); color: var(--ink-3); }
+
+  .legend { font: 12.5px/1.6 var(--sans); color: var(--ink-3); margin: 0 0 6px; }
+  #sq-list { list-style: none; margin: 0; padding: 0; }
+  .sq { padding: 16px 0; border-bottom: 1px solid var(--hair-2); }
+  .sq-text { font-size: 16px; line-height: 1.65; margin: 0 0 4px; color: var(--ink); }
+  .sq-src { font: 11.5px var(--sans); color: var(--ink-3); }
+  .sq-carried { font: 11px var(--sans); color: var(--mark-line); margin-left: 8px; }
+  .sq-tools { display: flex; gap: 10px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+  .v-btn {
+    font: 11px var(--sans); color: var(--ink-3);
+    border: 1px solid var(--hair); border-radius: 999px;
+    background: transparent; padding: 3px 11px; cursor: pointer;
+  }
+  .v-btn.on { color: var(--ink); border-color: var(--ink-3); }
+  .sq-note {
+    flex: 1; min-width: 200px; display: none;
+    font: 13px var(--sans); color: var(--ink);
+    background: transparent; border: none; border-bottom: 1px solid var(--hair);
+    padding: 4px 2px; outline: none;
+  }
+  .sq.noted .sq-note { display: block; }
+  .sq-note:focus { border-bottom-color: var(--blue); }
+  .sq-note::placeholder { color: var(--ink-3); }
+
+  #gate-line { font: 12.5px/1.7 var(--sans); color: var(--ink-3); margin: 22px 0 10px; }
+  #copy-btn, #export-btn { font: 600 13px var(--sans); color: var(--ink-2); background: transparent; border: 1px solid var(--hair); border-radius: 6px; padding: 7px 16px; cursor: pointer; }
+  #copy-btn:hover:not(:disabled), #export-btn:hover { color: var(--ink); border-color: var(--ink-3); }
+  #copy-btn:disabled { opacity: .4; cursor: default; }
+  .ledger-actions { display: flex; gap: 12px; flex-wrap: wrap; }
+  .colophon { margin-top: 40px; font: 12px var(--sans); color: var(--ink-3); }
+  .delta-note { font: 12px var(--sans); color: var(--mark-line); margin: 0 0 18px; }
+
+  /* ---------- appendix ---------- */
+  .grp { margin: 0 0 44px; }
+  .grp-head {
+    display: flex; align-items: baseline; gap: 10px;
+    font: 600 11px var(--sans); letter-spacing: .12em; text-transform: uppercase;
+    color: var(--ink-3); margin: 0 0 6px;
+  }
+  .grp-head .gprog { margin-left: auto; font-weight: 400; letter-spacing: 0; text-transform: none; }
+  .grp-why { font: 13.5px/1.6 var(--sans); color: var(--ink-2); margin: 0 0 12px; }
+  .frow {
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+    padding: 9px 0; border-bottom: 1px solid var(--hair-2);
+  }
+  .frow .f-name { font: 12.5px var(--mono); color: var(--ink); }
+  .frow .f-note { font: 12.5px var(--sans); color: var(--ink-2); }
+  .frow .f-meta { font: 12px var(--mono); color: var(--ink-3); margin-left: auto; white-space: nowrap; }
+  .frow.seen-row .f-name, .frow.seen-row .f-note { color: var(--ink-3); }
+  .fdiff { border: 1px solid var(--hair); border-radius: 6px; background: var(--bg-code); padding: 12px 14px; margin: 8px 0 14px; }
+  .grp-actions { margin-top: 12px; }
+  .tmpl { border: 1px solid var(--hair); border-radius: 6px; background: var(--bg-code); padding: 12px 14px; margin: 0 0 14px; }
+  .tmpl-cap { font: 600 10.5px var(--sans); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); margin: 0 0 10px; }
+
+  hr { border: none; border-top: 1px solid var(--hair); margin: 52px 0 0; }
+
+  .boot-error {
+    max-width: 60ch; margin: 60px auto; padding: 20px 24px;
+    border: 1.5px dashed var(--warn); border-radius: 8px; color: var(--ink);
+    font: 14.5px/1.65 var(--sans);
+  }
+  .boot-error code { font-family: var(--mono); }
+
+  .wbtn:focus-visible, .lnk:focus-visible, .card:focus-visible, .v-btn:focus-visible,
+  .xbar:focus-visible, .dot:focus-visible, .q-pin:focus-within, .frow:focus-within,
+  #copy-btn:focus-visible, #export-btn:focus-visible {
+    outline: 2px solid var(--blue); outline-offset: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div id="progress"></div>
+
+<header id="topbar" hidden>
+  <span class="tb-title" id="tb-title">Field Notes</span>
+  <span class="tb-pos" id="tb-pos">Cover</span>
+  <span class="tb-nav">
+    <button class="wbtn" id="tb-prev" type="button" aria-label="Previous view">&larr;</button>
+    <button class="wbtn" id="tb-next" type="button" aria-label="Next view">&rarr;</button>
+  </span>
+</header>
+
+<main id="main" hidden></main>
+
+<!-- The data sidecar: written per run by the pr-walkthrough skill next to this file. -->
+<script src="./walkthrough-data.js"></script>
+<script>
+(function () {
+  "use strict";
+  var D = window.WALKTHROUGH;
+  if (!D || !D.pr || !Array.isArray(D.articles)) {
+    document.body.insertAdjacentHTML("afterbegin",
+      '<div class="boot-error"><b>No walkthrough data found.</b><br>' +
+      'This page reads <code>walkthrough-data.js</code> from its own directory. ' +
+      'Re-run <code>/anthara:pr-walkthrough</code> to regenerate it, and keep both files together.</div>');
+    return;
+  }
+  if (D.schema_version !== 2) {
+    document.body.insertAdjacentHTML("afterbegin",
+      '<div class="boot-error"><b>Unsupported walkthrough data.</b><br>This template renders ' +
+      'schema version 2; the data reports version <code>' + esc(String(D.schema_version)) +
+      '</code>. Regenerate with <code>/anthara:pr-walkthrough</code>.</div>');
+    return;
+  }
+  document.title = "PR #" + D.pr.number + " · " + D.pr.repo + " — Field Notes";
+  document.getElementById("tb-title").textContent = "Field Notes · PR #" + D.pr.number;
+
+  /* ============ formatting ============ */
+  function esc(s) {
+    if (s === null || s === undefined) return "";
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+  function fmt(s) {
+    return esc(s)
+      .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+      .replace(/`([^`]+)`/g, "<code>$1</code>");
+  }
+  /* Re-enactment state readouts encode a change as {{ before -> after }}. */
+  function fmtState(s) {
+    return esc(s).replace(/\{\{([^}]+)\}\}/g, '<span class="delta">$1</span>');
+  }
+  function el(id) { return document.getElementById(id); }
+
+  /* ============ code rendering (one shared path; marks wrap spans at render) ============ */
+  function lineHtml(text, lineMarks) {
+    if (!lineMarks || !lineMarks.length) return esc(text);
+    var found = [];
+    lineMarks.forEach(function (m) {
+      var i = text.indexOf(m.span);
+      if (i >= 0) found.push({ start: i, end: i + m.span.length });
+    });
+    found.sort(function (a, b) { return a.start - b.start; });
+    var parts = [], cursor = 0, lastEnd = -1;
+    found.forEach(function (f) {
+      if (f.start < lastEnd) return;
+      parts.push(esc(text.slice(cursor, f.start)));
+      parts.push('<mark class="gold">' + esc(text.slice(f.start, f.end)) + "</mark>");
+      cursor = f.end; lastEnd = f.end;
+    });
+    parts.push(esc(text.slice(cursor)));
+    return parts.join("");
+  }
+  function codeBlock(lines, marks, opts) {
+    opts = opts || {};
+    var rows = lines.map(function (ln) {
+      var gd = ln.k === "add" ? "+" : ln.k === "del" ? "-" : " ";
+      var lineMarks = (marks || []).filter(function (m) { return m.line === ln.n; });
+      var attr = (opts.ids && ln.id) ? ' data-l="' + esc(ln.id) + '"' : "";
+      return '<div class="crow ' + esc(ln.k) + '"' + attr + '>' +
+        '<span class="ln">' + (ln.n ? ln.n : "") + '</span>' +
+        '<span class="gut">' + gd + '</span>' +
+        '<span class="ct">' + lineHtml(ln.t, lineMarks) + "</span></div>";
+    }).join("");
+    return '<div class="code">' + rows + "</div>";
+  }
+
+  /* ============ view registry ============ */
+  var VIEWS = ["cover"];
+  var POS = { cover: "Cover · An issue of Field Notes" };
+  D.articles.forEach(function (a) { VIEWS.push(a.id); POS[a.id] = a.kicker; });
+  VIEWS.push("ledger"); POS.ledger = "End matter · The Ledger";
+  VIEWS.push("appendix"); POS.appendix = "End matter · The Appendix";
+
+  function sectionEl(id) { return el("view-" + id); }
+
+  /* ============ persistent state (review-state) ============ */
+  var STORE_KEY = "anthara-walkthrough:" + D.pr.repo + "#" + D.pr.number;
+  var QS = D.standing_questions.map(function (q) { return q.id; });
+  var appendixPaths = [];
+  D.appendix.groups.forEach(function (g) { g.rows.forEach(function (r) { appendixPaths.push(r.path); }); });
+
+  var state = { verdicts: {}, notes: {}, seen: {}, jcalls: {}, carried: {} };
+  QS.forEach(function (q) { state.verdicts[q] = null; state.notes[q] = ""; });
+  appendixPaths.forEach(function (p) { state.seen[p] = false; });
+  D.judgment_calls.forEach(function (jc, i) { state.jcalls[i] = false; });
+
+  (function loadState() {
+    var raw = null;
+    try { raw = localStorage.getItem(STORE_KEY); } catch (e) { /* file:// storage may be unavailable */ }
+    if (!raw) return;
+    var saved;
+    try { saved = JSON.parse(raw); } catch (e) { return; }
+    var sq = saved.standing_questions || {};
+    QS.forEach(function (q) {
+      if (sq[q]) { state.verdicts[q] = sq[q].verdict || null; state.notes[q] = sq[q].note || ""; if (sq[q].carried) state.carried[q] = true; }
+    });
+    var seen = saved.appendix_seen || {};
+    appendixPaths.forEach(function (p) { if (seen[p]) state.seen[p] = true; });
+    var jc = saved.judgment_calls_closed || {};
+    D.judgment_calls.forEach(function (x, i) { if (jc[i]) state.jcalls[i] = true; });
+
+    if (saved.head_sha && saved.head_sha !== D.pr.head_sha) {
+      var changedQ = (D.delta && D.delta.changed_questions) || null;
+      var changedF = (D.delta && D.delta.changed_files) || null;
+      if (changedQ || changedF) {
+        (changedQ || []).forEach(function (q) { state.verdicts[q] = null; state.notes[q] = ""; delete state.carried[q]; });
+        QS.forEach(function (q) { if (state.verdicts[q] && (!changedQ || changedQ.indexOf(q) < 0)) state.carried[q] = true; });
+        (changedF || []).forEach(function (p) { if (p in state.seen) state.seen[p] = false; });
+      } else {
+        QS.forEach(function (q) { state.verdicts[q] = null; state.notes[q] = ""; });
+        appendixPaths.forEach(function (p) { state.seen[p] = false; });
+        D.judgment_calls.forEach(function (x, i) { state.jcalls[i] = false; });
+        state.carried = {};
+      }
+    }
+  })();
+
+  function saveState() {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify(reviewStateObject()));
+    } catch (e) { /* storage unavailable — session-only state */ }
+  }
+  function reviewStateObject() {
+    var sq = {};
+    QS.forEach(function (q) {
+      if (state.verdicts[q]) {
+        sq[q] = { verdict: state.verdicts[q], note: (state.notes[q] || "").trim() || undefined, carried: state.carried[q] || undefined };
+      }
+    });
+    return {
+      repo: D.pr.repo, pr: D.pr.number, head_sha: D.pr.head_sha,
+      standing_questions: sq,
+      appendix_seen: state.seen,
+      judgment_calls_closed: state.jcalls,
+      updated_at: new Date().toISOString()
+    };
+  }
+
+  function questionById(id) {
+    for (var i = 0; i < D.standing_questions.length; i++) if (D.standing_questions[i].id === id) return D.standing_questions[i];
+    return null;
+  }
+
+  /* ============ cover ============ */
+  function buildCover() {
+    var covPct = coveragePercents();
+    var cards = D.articles.map(function (a, i) {
+      return '<li><button class="card" type="button" data-goto="' + esc(a.id) + '">' +
+        '<span class="c-no">Article ' + (i + 1) + '</span>' +
+        '<span class="c-title">' + esc(a.title) + "</span>" +
+        '<span class="c-dek">' + esc(a.dek) + "</span>" +
+        '<span class="c-meta">' + esc((a.kicker.split("·")[1] || "").trim()) + " &middot; " +
+          a.files_covered + " files &middot; " + a.hunks_covered + " hunks</span></button></li>";
+    }).join("");
+    var h = '<div class="col">' +
+      '<p class="kicker">An issue of Field Notes &middot; ' + esc(D.issue.kicker) + "</p>" +
+      '<h1>' + esc(D.pr.title) + "</h1>" +
+      '<p class="standfirst">' + fmt(D.issue.standfirst) + "</p>" +
+      '<div class="ednote"><span class="q-label">Editor&rsquo;s note</span><p>' + fmt(D.issue.editors_note) + "</p></div>" +
+      '<h2 class="sec">In this issue</h2><ul class="toc">' + cards + "</ul>" +
+      '<div class="endlinks">' +
+      '<a class="lnk" href="#ledger" data-goto="ledger">The Ledger &mdash; acceptance criteria, standing questions, your verdicts &rarr;</a>' +
+      '<a class="lnk" href="#appendix" data-goto="appendix">The Appendix &mdash; every hunk, grouped by why it is skimmable &rarr;</a></div>' +
+      covStrip(covPct, D.coverage.note);
+    h += "</div>";
+    sectionEl("cover").innerHTML = h;
+  }
+
+  function coveragePercents() {
+    var c = D.coverage, t = c.total_hunks || 1;
+    return {
+      s1: (c.shown_in_articles / t * 100), s2: (c.pattern_verified / t * 100),
+      s3: (c.mechanical_remainder / t * 100), s4: (c.trusted / t * 100)
+    };
+  }
+  function covStrip(p, note) {
+    var c = D.coverage;
+    return '<div class="cov"><p class="cov-line">' + c.total_hunks + " hunks &mdash; " +
+      c.shown_in_articles + " shown in articles &middot; " + c.pattern_verified + " pattern-verified &middot; " +
+      c.mechanical_remainder + " mechanical &middot; " + c.trusted + ' trusted</p>' +
+      '<div class="cov-bar" aria-hidden="true">' +
+      '<span class="s1" style="width:' + p.s1.toFixed(1) + '%"></span>' +
+      '<span class="s2" style="width:' + p.s2.toFixed(1) + '%"></span>' +
+      '<span class="s3" style="width:' + p.s3.toFixed(1) + '%"></span>' +
+      '<span class="s4" style="width:' + p.s4.toFixed(1) + '%"></span></div>' +
+      (note ? '<p class="cov-note">' + fmt(note) + "</p>" : "") + "</div>";
+  }
+
+  /* ============ articles ============ */
+  function exhibitHtml(a, ex) {
+    var trimmed = codeBlock(ex.trimmed_lines, ex.marks);
+    var full = codeBlock(ex.full_lines || ex.trimmed_lines, ex.marks);
+    return '<div class="xb" data-xb="' + esc(a.id) + ":" + esc(ex.id) + '">' +
+      '<button class="xbar" type="button">' +
+      '<span class="car">&#9656;</span>' +
+      '<span class="fname">' + esc(ex.file) + "</span>" +
+      '<span class="xcap">' + esc(ex.caption || "") + "</span>" +
+      '<span class="xview">view code</span></button>' +
+      '<div class="xbody" hidden>' +
+      '<div class="xtools"><button class="lnk fulltgl" type="button">full diff</button>' +
+      (ex.permalink ? '<a class="lnk ghost" href="' + esc(ex.permalink) + '" target="_blank" rel="noopener">open on GitHub</a>' : "") +
+      "</div>" +
+      '<div class="xtrim">' + trimmed + "</div>" +
+      '<div class="xfull" hidden>' + full + "</div>" +
+      (ex.note ? '<p class="fn-note">' + fmt(ex.note) + "</p>" : "") +
+      "</div></div>";
+  }
+
+  function questionBlockHtml(q) {
+    var pinned = state.verdicts[q.id] === "ask" || state.verdicts[q.id] === "flag";
+    var num = QS.indexOf(q.id) + 1;
+    var ans = q.author_answer ? '<span class="q-ans"><b>' + esc(q.author_answer.by) + ":</b> " + fmt(q.author_answer.text) + "</span>" : "";
+    return '<aside class="q-block" data-qb="' + esc(q.id) + '">' +
+      '<span class="q-label">Standing question ' + num + "</span>" +
+      "<p>" + fmt(q.text) + "</p>" + ans +
+      '<label class="q-pin"><input type="checkbox" class="pinbox" name="pin-' + esc(q.id) + '" data-q="' + esc(q.id) + '"' + (pinned ? " checked" : "") +
+      "> Pin to the ledger</label></aside>";
+  }
+
+  function reenactmentHtml(a) {
+    var r = a.reenactment;
+    var crumbs = r.crumbs.map(function (c, i) {
+      return '<span class="crumb" data-c="' + i + '">' + esc(c) + "</span>";
+    }).join('<span class="crumb-sep">&rarr;</span>');
+    var frames = r.frames.map(function (f) {
+      return '<div class="frame" data-frame="' + esc(f.id) + '" hidden>' +
+        '<div class="ftrim">' + codeBlock(f.trimmed_lines, [], { ids: true }) + "</div>" +
+        '<div class="ffull" hidden>' + codeBlock(f.full_lines || f.trimmed_lines, [], { ids: true }) + "</div></div>";
+    }).join("");
+    var dots = r.beats.map(function (b, i) {
+      return '<button class="dot" type="button" data-beat="' + i + '" aria-label="Beat ' + (i + 1) + '"></button>';
+    }).join("");
+    return '<div class="breakout" data-reenact="' + esc(a.id) + '">' +
+      '<div class="widget">' +
+      '<div class="w-head">Re-enactment &middot; ' + esc(r.title) + "</div>" +
+      '<div class="w-grid"><div class="w-left">' +
+      '<div class="crumbs" aria-label="call path">' + crumbs + "</div>" +
+      '<div class="w-filebar"><span class="file-tag w-file"></span>' +
+      '<span class="xtools"><button class="lnk w-full" type="button">full diff</button>' +
+      '<a class="lnk ghost w-gh" href="#" target="_blank" rel="noopener">open on GitHub</a></span></div>' +
+      '<div class="w-code">' + frames + "</div></div>" +
+      '<div class="w-right">' +
+      '<span class="beat-label w-beatno"></span>' +
+      '<div class="w-narr"></div><div class="w-state"></div>' +
+      '<div class="w-ctrl"><button class="wbtn btn-back" type="button">Back</button>' +
+      '<div class="dots" aria-label="beats">' + dots + "</div>" +
+      '<button class="wbtn btn-step" type="button">Step</button></div>' +
+      '<span class="w-hint"></span></div></div></div></div>';
+  }
+
+  function buildArticle(a, idx) {
+    var body = a.sections.map(function (sec) {
+      if (sec.kind === "prose") return "<p>" + fmt(sec.text) + "</p>";
+      if (sec.kind === "exhibit") {
+        var ex = (a.exhibits || []).filter(function (e) { return e.id === sec.ref; })[0];
+        return ex ? exhibitHtml(a, ex) : "";
+      }
+      if (sec.kind === "reenactment") return a.reenactment ? reenactmentHtml(a) : "";
+      if (sec.kind === "standing_question") {
+        var q = questionById(sec.ref);
+        return q ? questionBlockHtml(q) : "";
+      }
+      return "";
+    }).join("");
+
+    var prev = idx === 0 ? { id: "cover", label: "Cover" } : { id: D.articles[idx - 1].id, label: D.articles[idx - 1].title };
+    var next = idx === D.articles.length - 1 ? { id: "ledger", label: "The Ledger" } : { id: D.articles[idx + 1].id, label: D.articles[idx + 1].title };
+
+    var h = '<div class="col">' +
+      '<p class="kicker">' + esc(a.kicker) + "</p>" +
+      '<h1>' + esc(a.title) + "</h1>" +
+      '<p class="standfirst">' + esc(a.dek) + "</p>" +
+      body +
+      '<div class="art-foot"><span>This article covered ' + a.files_covered + " files &middot; " + a.hunks_covered +
+      ' hunks &mdash; <a class="lnk" href="#appendix" data-goto="appendix">every one accounted in the appendix</a></span>' +
+      '<nav class="artnav">' +
+      '<a class="lnk" href="#' + esc(prev.id) + '" data-goto="' + esc(prev.id) + '">&larr; ' + esc(prev.label) + "</a>" +
+      '<a class="lnk" href="#' + esc(next.id) + '" data-goto="' + esc(next.id) + '">' + esc(next.label) + " &rarr;</a>" +
+      "</nav></div></div>";
+    sectionEl(a.id).innerHTML = h;
+    if (a.reenactment) wireReenactment(a);
+  }
+
+  /* ============ re-enactment behavior (per article) ============ */
+  function wireReenactment(a) {
+    var r = a.reenactment;
+    var root = sectionEl(a.id).querySelector('[data-reenact="' + a.id + '"]');
+    var view = sectionEl(a.id);
+    var frameById = {};
+    r.frames.forEach(function (f) { frameById[f.id] = f; });
+    var fullMode = {};
+    r.frames.forEach(function (f) { fullMode[f.id] = false; });
+    var beat = 0, done = false, active = false;
+
+    function q(sel) { return root.querySelector(sel); }
+    function qa(sel) { return Array.prototype.slice.call(root.querySelectorAll(sel)); }
+
+    function enter() { if (active) return; active = true; view.classList.add("dim"); root.classList.add("lit"); }
+    function exit() { if (!active) return; active = false; view.classList.remove("dim"); root.classList.remove("lit"); }
+
+    function render() {
+      var b = r.beats[beat];
+      r.frames.forEach(function (f) {
+        var fr = root.querySelector('[data-frame="' + f.id + '"]');
+        var on = f.id === b.frame;
+        fr.hidden = !on;
+        fr.querySelector(".ftrim").hidden = !(on && !fullMode[f.id]);
+        fr.querySelector(".ffull").hidden = !(on && fullMode[f.id]);
+      });
+      var fr = frameById[b.frame];
+      q(".w-file").textContent = fr ? fr.file_tag : "";
+      var gh = q(".w-gh");
+      if (fr && fr.permalink) { gh.href = fr.permalink; gh.style.display = ""; } else { gh.style.display = "none"; }
+      q(".w-full").textContent = fullMode[b.frame] ? "trimmed frame" : "full diff";
+      qa(".crow").forEach(function (row) { row.classList.remove("exec", "hot"); });
+      (b.exec || []).forEach(function (id) {
+        qa('[data-l="' + id + '"]').forEach(function (row) { row.classList.add("exec"); if (b.hot) row.classList.add("hot"); });
+      });
+      qa(".crumb").forEach(function (c, ci) { c.classList.toggle("on", ci === b.crumb); });
+      q(".w-beatno").textContent = "Beat " + (beat + 1) + " of " + r.beats.length;
+      q(".w-narr").innerHTML = fmt(b.narration);
+      q(".w-state").innerHTML = fmtState(b.state);
+      qa(".dot").forEach(function (d, di) { d.classList.toggle("cur", di === beat); d.classList.toggle("past", di < beat); });
+      q(".btn-back").disabled = (beat === 0);
+      q(".btn-step").textContent = done ? "Replay" : (beat === r.beats.length - 1 ? "End re-enactment" : "Step");
+      q(".w-hint").textContent = done ? "ended · replay to run it again" : "→ to step · esc to end";
+    }
+    function step() {
+      if (done) { done = false; beat = 0; enter(); render(); return; }
+      enter();
+      if (beat < r.beats.length - 1) { beat++; render(); }
+      else { done = true; exit(); render(); }
+    }
+    function back() { if (beat === 0) return; done = false; enter(); beat--; render(); }
+
+    q(".btn-step").addEventListener("click", function (e) { e.stopPropagation(); step(); });
+    q(".btn-back").addEventListener("click", function (e) { e.stopPropagation(); back(); });
+    qa(".dot").forEach(function (d) {
+      d.addEventListener("click", function (e) { e.stopPropagation(); done = false; enter(); beat = parseInt(d.getAttribute("data-beat"), 10); render(); });
+    });
+    q(".w-full").addEventListener("click", function (e) { e.stopPropagation(); var L = r.beats[beat].frame; fullMode[L] = !fullMode[L]; render(); });
+    q(".widget").addEventListener("click", function () { if (!done) enter(); });
+    q(".widget").addEventListener("focusin", function () { if (!done) enter(); });
+    document.addEventListener("click", function (e) { if (active && !root.contains(e.target)) exit(); });
+
+    root._reenact = { step: step, back: back, exit: exit, isActive: function () { return active; } };
+    render();
+  }
+
+  /* ============ ledger ============ */
+  function acRows() {
+    var order = { uncovered: 0, untested: 1, covered: 2 };
+    var acs = (D.acceptance_criteria || []).slice();
+    acs.sort(function (a, b) { return order[a.state] - order[b.state]; });
+    return acs.map(function (a) {
+      var cls = a.state === "covered" ? "st-ok" : a.state === "untested" ? "st-warn" : "st-warn";
+      return "<tr><td class=\"ac-id\">" + esc(a.id) + "</td><td>" + fmt(a.text) + "</td>" +
+        '<td class="' + cls + '">' + esc(a.state) + "</td><td>" + fmt(a.evidence || "") + "</td></tr>";
+    }).join("");
+  }
+  function acSourceLabel() {
+    if (!D.ac_source) return "";
+    var parts = String(D.ac_source).split(":");
+    var kind = parts[0], name = parts.slice(1).join(":");
+    var label = kind === "ticket" ? "from ticket " + name
+      : kind === "spec" ? "from spec " + name
+      : kind === "pr-body" ? "from the PR body checklist"
+      : "from " + D.ac_source;
+    return '<p class="ac-src">' + esc(label) + "</p>";
+  }
+  function buildLedger() {
+    var acHtml = (D.acceptance_criteria && D.acceptance_criteria.length) ?
+      '<h2 class="sec">Acceptance criteria &mdash; gaps first</h2>' + acSourceLabel() +
+      '<table class="ac-table"><thead><tr><th>AC</th><th>Criterion</th><th>State</th><th>Evidence</th></tr></thead><tbody>' +
+      acRows() + "</tbody></table>" : "";
+    var gaps = (D.acceptance_criteria || []).filter(function (a) { return a.state !== "covered"; });
+    var gapLoud = gaps.length ? '<p class="loud">' +
+      esc(gaps.length === 1 ? "One acceptance criterion is not fully met" : gaps.length + " acceptance criteria are not fully met") +
+      " &mdash; the states above sort them first.</p>" : "";
+
+    var packsHtml = (D.packs && D.packs.length) ?
+      '<h2 class="sec">Compliance packs</h2><ul class="pack-list">' +
+      D.packs.map(function (p) {
+        var where = p.state === "uncovered" ? esc(p.ref || "uncovered")
+          : (p.ref && p.ref.indexOf("art") === 0 ? esc(articleLabel(p.ref)) : esc(p.ref || ""));
+        return '<li class="pack-row' + (p.state === "uncovered" ? " uncovered" : "") + '">' +
+          '<span class="pack-cite">' + esc(p.cite) + "</span>" +
+          '<span class="pack-text">' + fmt(p.text) + "</span>" +
+          (where ? '<span class="pack-ref">' + where + "</span>" : "") + "</li>";
+      }).join("") + "</ul>" : "";
+
+    var jcHtml = D.judgment_calls.length ?
+      '<h2 class="sec">Judgment calls &mdash; only a human closes these</h2><ol class="jlist">' +
+      D.judgment_calls.map(function (jc) {
+        return "<li>" + fmt(jc.text) + (jc.source ? ' <span class="sq-src">(' + esc(jc.source) + ")</span>" : "") + "</li>";
+      }).join("") + "</ol>" : "";
+
+    var sqHtml = '<h2 class="sec">Standing questions</h2>' +
+      '<p class="legend">Decide each one: looks right, I have a question, or flag it. Questions and flags take an optional note. ' +
+      'The review draft unlocks when every question is decided and the appendix is acknowledged.</p><ul id="sq-list">' +
+      D.standing_questions.map(function (q) {
+        var v = state.verdicts[q.id];
+        var noted = v === "ask" || v === "flag";
+        var srcArticle = q.raised_in && q.raised_in !== "cover" ? articleLabel(q.raised_in) : "the editor's note";
+        var carried = state.carried[q.id] ? '<span class="sq-carried">carried</span>' : "";
+        return '<li class="sq' + (noted ? " noted" : "") + '" data-q="' + esc(q.id) + '">' +
+          '<p class="sq-text">' + fmt(q.text) + "</p>" +
+          '<span class="sq-src">Raised in ' + esc(srcArticle) + (q.raised_note ? " &middot; " + esc(q.raised_note) : "") + "</span>" + carried +
+          '<div class="sq-tools">' +
+          '<button class="v-btn' + (v === "right" ? " on" : "") + '" type="button" data-v="right">Looks right</button>' +
+          '<button class="v-btn' + (v === "ask" ? " on" : "") + '" type="button" data-v="ask">I have a question</button>' +
+          '<button class="v-btn' + (v === "flag" ? " on" : "") + '" type="button" data-v="flag">Flag it</button>' +
+          '<input class="sq-note" name="note-' + esc(q.id) + '" aria-label="Note for the review draft" placeholder="Note for the review draft" value="' + esc(state.notes[q.id] || "") + '"></div></li>';
+      }).join("") + "</ul>";
+
+    var h = '<div class="col">' +
+      '<p class="kicker">End matter &middot; The Ledger</p>' +
+      "<h1>What the ticket asked, what the diff answers</h1>" +
+      '<p class="standfirst">Gaps first. The verdicts belong to you.</p>' +
+      (D.delta ? '<p class="delta-note">' + deltaLine() + "</p>" : "") +
+      acHtml + gapLoud + packsHtml + jcHtml + sqHtml +
+      '<p id="gate-line"></p>' +
+      '<div class="ledger-actions"><button id="copy-btn" type="button" disabled>Copy review draft</button>' +
+      '<button id="export-btn" type="button">Download review-state.json</button></div>' +
+      '<p class="colophon">Compiled from PR #' + D.pr.number + " &middot; " + D.pr.files + " files &middot; head " +
+      esc((D.pr.head_sha || "").slice(0, 7)) + "</p>" +
+      '<div class="art-foot"><nav class="artnav">' +
+      '<a class="lnk" href="#' + esc(D.articles[D.articles.length - 1].id) + '" data-goto="' + esc(D.articles[D.articles.length - 1].id) + '">&larr; ' + esc(D.articles[D.articles.length - 1].title) + "</a>" +
+      '<a class="lnk" href="#appendix" data-goto="appendix">Next: The Appendix &rarr;</a></nav></div></div>';
+    sectionEl("ledger").innerHTML = h;
+    wireLedger();
+  }
+  function articleLabel(id) {
+    for (var i = 0; i < D.articles.length; i++) if (D.articles[i].id === id) return "Article " + (i + 1);
+    return id;
+  }
+  function deltaLine() {
+    var cq = (D.delta.changed_questions || []).length, cf = (D.delta.changed_files || []).length;
+    var bits = [];
+    if (D.delta.note) bits.push(esc(D.delta.note));
+    bits.push("↻ " + cq + " question" + (cq !== 1 ? "s" : "") + " and " + cf + " file" + (cf !== 1 ? "s" : "") + " changed since your last pass");
+    var carried = Object.keys(state.carried).length;
+    if (carried) bits.push(carried + " verdict" + (carried !== 1 ? "s" : "") + " carried forward");
+    return bits.join(" · ");
+  }
+  function wireLedger() {
+    Array.prototype.forEach.call(sectionEl("ledger").querySelectorAll(".sq"), function (li) {
+      var q = li.getAttribute("data-q");
+      li.querySelectorAll(".v-btn").forEach(function (b) {
+        b.addEventListener("click", function () { setVerdict(q, b.getAttribute("data-v")); });
+      });
+      var note = li.querySelector(".sq-note");
+      note.addEventListener("input", function (e) { state.notes[q] = e.target.value; saveState(); });
+    });
+    sectionEl("ledger").querySelectorAll(".pinbox").forEach(bindPin);
+    el("copy-btn").addEventListener("click", copyDraft);
+    el("export-btn").addEventListener("click", exportState);
+    updateGate();
+  }
+  function setVerdict(q, v) {
+    if (state.verdicts[q] === v) v = null;
+    state.verdicts[q] = v;
+    delete state.carried[q];
+    var li = sectionEl("ledger").querySelector('.sq[data-q="' + q + '"]');
+    if (li) {
+      li.querySelectorAll(".v-btn").forEach(function (b) { b.classList.toggle("on", b.getAttribute("data-v") === v); });
+      li.classList.toggle("noted", v === "ask" || v === "flag");
+    }
+    syncPins(q);
+    saveState(); updateGate();
+  }
+  function bindPin(box) {
+    box.addEventListener("change", function () {
+      var q = box.getAttribute("data-q");
+      if (box.checked) { if (state.verdicts[q] !== "ask" && state.verdicts[q] !== "flag") setVerdict(q, "ask"); }
+      else { if (state.verdicts[q] === "ask" || state.verdicts[q] === "flag") setVerdict(q, null); }
+    });
+  }
+  function syncPins(q) {
+    var pinned = state.verdicts[q] === "ask" || state.verdicts[q] === "flag";
+    Array.prototype.forEach.call(document.querySelectorAll('.pinbox[data-q="' + q + '"]'), function (box) { box.checked = pinned; });
+  }
+
+  /* ============ appendix ============ */
+  function buildAppendix() {
+    var p = coveragePercents();
+    var groups = D.appendix.groups.map(function (g) {
+      var tmpl = g.template ? '<div class="tmpl"><p class="tmpl-cap">' + esc(g.template.caption) + "</p>" +
+        codeBlock(g.template.lines, []) + "</div>" : "";
+      var rows = g.rows.map(function (r) {
+        var link = r.article_ref ? '<a class="lnk" href="#' + esc(r.article_ref) + '" data-goto="' + esc(r.article_ref) + '">' + esc(r.article_label || "article") + "</a>" : "";
+        return '<div class="frow' + (state.seen[r.path] ? " seen-row" : "") + '" data-path="' + esc(r.path) + '">' +
+          '<label class="q-pin"><input type="checkbox" class="seen" name="seen-' + esc(r.path) + '" aria-label="Mark ' + esc(r.path) + ' seen"' + (state.seen[r.path] ? " checked" : "") + "></label>" +
+          '<span class="f-name">' + esc(r.path) + "</span>" +
+          '<span class="f-note">' + fmt(r.what_changed || "") + "</span>" +
+          '<span class="f-meta">' + r.hunks + (r.hunks === 1 ? " hunk" : " hunks") + "</span>" +
+          link +
+          '<button class="lnk difftgl" type="button">diff</button></div>' +
+          '<div class="fdiff" hidden>' + codeBlock(r.diff_lines || [], []) + "</div>";
+      }).join("");
+      var action = g.mark_all_label ? '<p class="grp-actions"><button class="lnk mark-all" type="button">' + esc(g.mark_all_label) + "</button></p>" : "";
+      return '<div class="grp" data-grp="' + esc(g.id) + '">' +
+        '<h2 class="sec grp-head">' + esc(g.title) + " &middot; " + g.files + " files &middot; " + g.hunks +
+        ' hunks <span class="gprog"></span></h2>' +
+        '<p class="grp-why">' + fmt(g.why) + "</p>" + tmpl +
+        '<div class="grows">' + rows + "</div>" + action + "</div>";
+    }).join("");
+
+    var h = '<div class="col">' +
+      '<p class="kicker">End matter &middot; The Appendix</p>' +
+      "<h1>Every hunk, accounted</h1>" +
+      '<p class="standfirst">Grouped by why each file is skimmable &mdash; not hidden, just cheap to see.</p>' +
+      '<div class="cov">' +
+      '<p class="cov-line">' + D.coverage.total_hunks + " hunks &mdash; " +
+      D.coverage.shown_in_articles + " shown in articles &middot; " + D.coverage.pattern_verified + " pattern-verified &middot; " +
+      D.coverage.mechanical_remainder + " mechanical &middot; " + D.coverage.trusted + " trusted</p>" +
+      '<div class="cov-bar" aria-hidden="true">' +
+      '<span class="s1" style="width:' + p.s1.toFixed(1) + '%"></span><span class="s2" style="width:' + p.s2.toFixed(1) + '%"></span>' +
+      '<span class="s3" style="width:' + p.s3.toFixed(1) + '%"></span><span class="s4" style="width:' + p.s4.toFixed(1) + '%"></span></div>' +
+      '<p class="cov-note" id="ax-progress"></p></div>' +
+      groups +
+      "<hr><p class=\"colophon\">Nothing merges unexamined &middot; the ledger&rsquo;s review draft unlocks when every row above is seen.</p>" +
+      '<div class="art-foot"><nav class="artnav">' +
+      '<a class="lnk" href="#ledger" data-goto="ledger">&larr; The Ledger</a>' +
+      '<a class="lnk" href="#cover" data-goto="cover">Cover &uarr;</a></nav></div></div>';
+    sectionEl("appendix").innerHTML = h;
+    wireAppendix();
+  }
+  var openDiff = null;
+  function wireAppendix() {
+    Array.prototype.forEach.call(sectionEl("appendix").querySelectorAll(".frow"), function (row) {
+      var path = row.getAttribute("data-path");
+      var box = row.querySelector(".seen");
+      var tgl = row.querySelector(".difftgl");
+      var dv = row.nextElementSibling;
+      box.addEventListener("change", function () { state.seen[path] = box.checked; row.classList.toggle("seen-row", box.checked); saveState(); updateSeen(); });
+      tgl.addEventListener("click", function () {
+        var was = !dv.hidden;
+        if (openDiff && openDiff.dv !== dv) { openDiff.dv.hidden = true; openDiff.tgl.textContent = "diff"; }
+        dv.hidden = was; tgl.textContent = was ? "diff" : "hide";
+        openDiff = was ? null : { dv: dv, tgl: tgl };
+      });
+    });
+    Array.prototype.forEach.call(sectionEl("appendix").querySelectorAll(".mark-all"), function (btn) {
+      btn.addEventListener("click", function () {
+        var grp = btn.closest(".grp");
+        grp.querySelectorAll(".frow").forEach(function (row) {
+          var box = row.querySelector(".seen");
+          if (!box.checked) { box.checked = true; box.dispatchEvent(new Event("change")); }
+        });
+      });
+    });
+    updateSeen();
+  }
+  function seenCount() { var n = 0; appendixPaths.forEach(function (p) { if (state.seen[p]) n++; }); return n; }
+  function updateSeen() {
+    Array.prototype.forEach.call(sectionEl("appendix").querySelectorAll(".grp"), function (grp) {
+      var boxes = grp.querySelectorAll(".seen");
+      var seen = 0; boxes.forEach(function (b) { if (b.checked) seen++; });
+      grp.querySelector(".gprog").textContent = seen + "/" + boxes.length + " seen";
+    });
+    var total = seenCount(), all = appendixPaths.length;
+    var prog = el("ax-progress");
+    if (prog) prog.textContent = total + " of " + all + " rows seen" + (total === all ? " — the appendix is acknowledged" : "");
+    updateGate();
+  }
+
+  /* ============ gate + draft ============ */
+  function undecidedCount() { return QS.filter(function (q) { return !state.verdicts[q]; }).length; }
+  function updateGate() {
+    var undecided = undecidedCount();
+    var seen = seenCount(), all = appendixPaths.length;
+    var ready = undecided === 0 && seen === all;
+    var copy = el("copy-btn");
+    if (copy) copy.disabled = !ready;
+    var gate = el("gate-line");
+    if (gate) {
+      gate.textContent = ready
+        ? "Every question decided · all " + D.coverage.total_hunks + " hunks acknowledged — the draft is ready."
+        : undecided + " of " + QS.length + " questions undecided · appendix " + seen + "/" + all +
+          " rows seen — the draft unlocks when every question is decided and every row is acknowledged.";
+    }
+    updateProgressBar(undecided, seen, all);
+  }
+  function updateProgressBar(undecided, seen, all) {
+    var doneQ = QS.length - undecided;
+    var frac = (QS.length + all) > 0 ? (doneQ + seen) / (QS.length + all) : 0;
+    el("progress").style.width = (frac * 100) + "%";
+  }
+  function buildDraft() {
+    var flag = [], ask = [], right = [];
+    D.standing_questions.forEach(function (q) {
+      var line = "- " + q.draft;
+      var note = (state.notes[q.id] || "").trim();
+      if (note) line += "\n  note: " + note;
+      var v = state.verdicts[q.id];
+      if (v === "flag") flag.push(line);
+      else if (v === "ask") ask.push(line);
+      else right.push("- " + q.draft);
+    });
+    var t = "Review draft — PR #" + D.pr.number + " · " + D.pr.repo +
+      (D.pr.branch ? " · " + D.pr.branch : "") + " · head " + (D.pr.head_sha || "").slice(0, 7) + "\n\n";
+    if (flag.length) t += "Flag it:\n" + flag.join("\n") + "\n\n";
+    if (ask.length) t += "I have a question:\n" + ask.join("\n") + "\n\n";
+    if (right.length) t += "Looks right:\n" + right.join("\n") + "\n\n";
+    var c = D.coverage;
+    t += "Coverage: all " + c.total_hunks + " hunks accounted — " + c.shown_in_articles + " shown in articles · " +
+      c.pattern_verified + " pattern-verified · " + c.mechanical_remainder + " mechanical · " + c.trusted +
+      " trusted. Appendix acknowledged.\n";
+    return t;
+  }
+  function copyDraft() {
+    var t = buildDraft(), btn = el("copy-btn");
+    function flash(label) { var old = "Copy review draft"; btn.textContent = label; setTimeout(function () { btn.textContent = old; }, 1600); }
+    function fallback() {
+      var ta = document.createElement("textarea");
+      ta.value = t; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select();
+      try { document.execCommand("copy"); flash("Copied"); } catch (e) { flash("Copy failed"); }
+      document.body.removeChild(ta);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function () { flash("Copied"); }, fallback);
+    else fallback();
+  }
+  function exportState() {
+    var blob = new Blob([JSON.stringify(reviewStateObject(), null, 2)], { type: "application/json" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "review-state.json";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 500);
+  }
+
+  /* ============ exhibit bars (shared, delegated) ============ */
+  document.addEventListener("click", function (e) {
+    var barEl = e.target.closest ? e.target.closest(".xbar") : null;
+    if (barEl) {
+      var xb = barEl.closest(".xb");
+      var open = xb.classList.toggle("open");
+      xb.querySelector(".xbody").hidden = !open;
+      xb.querySelector(".xview").textContent = open ? "hide" : "view code";
+      return;
+    }
+    var t = e.target.closest ? e.target.closest(".fulltgl") : null;
+    if (t) {
+      e.stopPropagation();
+      var body = t.closest(".xbody");
+      var trim = body.querySelector(".xtrim"), full = body.querySelector(".xfull");
+      var showFull = full.hidden;
+      full.hidden = !showFull; trim.hidden = showFull;
+      t.textContent = showFull ? "trimmed frame" : "full diff";
+    }
+  });
+
+  /* ============ router ============ */
+  var current = "cover";
+  function show(id) {
+    if (VIEWS.indexOf(id) < 0) id = "cover";
+    current = id;
+    VIEWS.forEach(function (v) { sectionEl(v).classList.toggle("on", v === id); });
+    el("tb-pos").textContent = POS[id];
+    el("tb-prev").disabled = (VIEWS.indexOf(id) === 0);
+    el("tb-next").disabled = (VIEWS.indexOf(id) === VIEWS.length - 1);
+    window.scrollTo(0, 0);
+    if (id === "ledger" || id === "appendix") updateGate();
+  }
+  function goto(id) { if (("#" + id) === location.hash) show(id); else location.hash = id; }
+  window.addEventListener("hashchange", function () { show(location.hash.replace("#", "") || "cover"); });
+  el("tb-prev").addEventListener("click", function () { var i = VIEWS.indexOf(current); if (i > 0) goto(VIEWS[i - 1]); });
+  el("tb-next").addEventListener("click", function () { var i = VIEWS.indexOf(current); if (i < VIEWS.length - 1) goto(VIEWS[i + 1]); });
+  document.addEventListener("click", function (e) {
+    var g = e.target.closest ? e.target.closest("[data-goto]") : null;
+    if (g) { e.preventDefault(); goto(g.dataset.goto); }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") { document.dispatchEvent(new CustomEvent("reenact-esc")); return; }
+    if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA")) return;
+    var art = D.articles.filter(function (a) { return a.id === current; })[0];
+    if (art && art.reenactment) {
+      var root = sectionEl(art.id).querySelector('[data-reenact="' + art.id + '"]');
+      if (root && root._reenact && root._reenact.isActive()) {
+        if (e.key === "ArrowRight" || e.key === "j" || e.key === "J") { e.preventDefault(); root._reenact.step(); return; }
+        if (e.key === "ArrowLeft" || e.key === "k" || e.key === "K") { e.preventDefault(); root._reenact.back(); return; }
+      }
+    }
+    if (e.key === "ArrowRight") { var i = VIEWS.indexOf(current); if (i < VIEWS.length - 1) goto(VIEWS[i + 1]); }
+    if (e.key === "ArrowLeft") { var j = VIEWS.indexOf(current); if (j > 0) goto(VIEWS[j - 1]); }
+  });
+  document.addEventListener("reenact-esc", function () {
+    D.articles.forEach(function (a) {
+      if (!a.reenactment) return;
+      var root = sectionEl(a.id).querySelector('[data-reenact="' + a.id + '"]');
+      if (root && root._reenact) root._reenact.exit();
+    });
+  });
+  window.addEventListener("scroll", function () {
+    if (current === "ledger" || current === "appendix") return;
+    var doc = document.documentElement;
+    var max = doc.scrollHeight - window.innerHeight;
+    var y = window.pageYOffset || doc.scrollTop;
+    el("progress").style.width = (max > 0 ? (y / max) * 100 : 0) + "%";
+  }, { passive: true });
+
+  /* ============ mount ============ */
+  function guard(name, fn) {
+    try { fn(); } catch (e) {
+      if (window.console) console.error("walkthrough: " + name + " failed to render", e);
+      var d = document.createElement("div");
+      d.className = "boot-error";
+      d.innerHTML = "<b>" + name + " failed to render.</b> The data may not match this template version — regenerate with <code>/anthara:pr-walkthrough</code>. <code>" + esc(String(e)) + "</code>";
+      el("main").insertBefore(d, el("main").firstChild);
+    }
+  }
+  var main = el("main");
+  main.innerHTML = VIEWS.map(function (v) { return '<section class="view" id="view-' + v + '"></section>'; }).join("");
+  sectionEl("cover").classList.add("on");
+  el("topbar").hidden = false;
+  main.hidden = false;
+
+  guard("Cover", buildCover);
+  D.articles.forEach(function (a, i) { guard("Article " + (i + 1), function () { buildArticle(a, i); }); });
+  guard("Ledger", buildLedger);
+  guard("Appendix", buildAppendix);
+
+  show(location.hash.replace("#", "") || "cover");
+})();
+</script>
+</body>
+</html>

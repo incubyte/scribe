@@ -1,0 +1,16 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "anthara",
+  "owner": {
+    "name": "Anthara AI",
+    "url": "https://anthara.ai"
+  },
+  "plugins": [
+    {
+      "name": "anthara",
+      "source": "./anthara",
+      "version": "0.14.0",
+      "description": "AI adoption platform for regulated industries. End-to-end SDLC chain — start, brainstorm, discovery, spec-writer, create-ticket, plan-implementer, collaboration-loop — with compliance packs (HIPAA / PCI / SOC 2 / FDA SaMD / WCAG / OWASP / Clean Code) injected by context via Fabric MCP's get_relevant_standards. /anthara:start triages the work and routes to the right entry. /anthara:brainstorm generates and evaluates options for open-ended problems before discovery begins. /anthara:plan-implementer is a plan-driven executor: one slice-builder per slice (tests + code in one warm context), then a single specialized reviewer at end-of-spec (quality at construction and end-of-spec, not correction). /anthara:workflow-builder turns a short interview into an Anthara workflow YAML draft, offline, from a bundled authoring guide and example workflows. /anthara:inbox is a role-tuned, channel-agnostic work aggregator that pulls every connected MCP channel (Jira / GitHub / Slack / Linear / Notion / Gmail / Teams) and ranks the day's work in one flat table."
+    }
+  ]
+}

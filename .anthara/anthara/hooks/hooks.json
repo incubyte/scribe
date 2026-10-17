@@ -1,0 +1,182 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__plugin_anthara_anthara-fabric__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/inject-fabric-session-id.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__plugin_anthara_anthara-fabric__add_shared_memory",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/gate-shared-memory.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/block-local-memory.sh\""
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/findings-hook.sh\" brief",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/report-skill-telemetry.sh\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/findings-hook.sh\" hand-back",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "TaskCreate|TaskUpdate",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/findings-hook.sh\" track",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/findings-hook.sh\" review-stop",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/findings-hook.sh\" close",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/findings-hook.sh\" start",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/check-fabric-auth.sh\"",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "cat <<'HOOK'\n<standards-gate>\n<when>Before writing or modifying code. Skip only for pure questions or read-only inspection.</when>\n\n<step1 priority=\"required\">\nCall mcp__plugin_anthara_anthara-fabric__list_standard_packs(raw_remote_url) FIRST — it returns this repo's packs (name, description, tags). The tags are the canonical vocabulary for surface_area and data_handled in step 2 — reuse them verbatim. A tag is matched both as a whole phrase and word by word, so \"Application Security\" also answers a caller who says \"security\" — but a pack's own wording always scores best.\nAlready called this session? Reuse that output — packs rarely change mid-session; do not re-call.\n</step1>\n\n<step2 priority=\"required\">\nCall mcp__plugin_anthara_anthara-fabric__get_relevant_standards with a task object built FROM step 1's output — not from any list written into this prompt.\n\n<retrieval-how-it-works>\nRetrieval fuses UP TO 4 signals by RRF. A signal that cannot contribute is left out, so with one live signal you are reading raw BM25, not a fused score.\n\nTwo signals judge the STANDARD itself, carry full weight, and decide the order:\n1. BM25 on the rule's own text, against the enriched query\n2. Cosine similarity on the rule's embedding — joins only when a query embedding and at least one embedded standard both exist\n\nTwo signals judge the standard's PACK, are weighted lower, and only reorder what the first two found:\n3. BM25 on the pack's tags, name and applicability description\n4. Tag overlap — your surface_area and data_handled values against the tags the standard carries. Scored as the fraction of YOUR values the standard covers, so a thoroughly-tagged rule is never penalised for carrying tags you did not ask for.\n\nWhy the split matters to you: a pack's tags and description are the same for every rule inside it, so at equal weight one matching pack would fill the whole response. It cannot. A standard has to match on its own text to be returned at all, and its pack then decides how high it sits. Tags steer the ranking; they do not choose the results. The exception is data_handled, which guarantees the matching compliance rules a place wherever ranking put them — so declare every data class your task really touches.\n\nThe lexical and pack legs share one enriched query: description + surface_area + data_handled + file_paths + task_type. There is no separate tags input — surface_area and data_handled ARE the tag vocabulary.\n</retrieval-how-it-works>\n\n<how-to-craft-the-description>\nFor the packs that apply to your task, echo their domain keywords (from step 1's descriptions) in YOUR description — the standards were written around those words, so reusing them maximizes BM25 + semantic match. Use only vocabulary step 1 actually returned, never examples hardcoded in this prompt. E.g. if a returned pack description mentions \"ePHI, audit logging, encryption at rest\" and your task touches that data, reuse those exact terms.\n</how-to-craft-the-description>\n\n<task-object>\n- raw_remote_url: output of git remote get-url origin (never ORG_WIDE)\n- task_type: feature | bugfix | refactor | test | docs | infra | migration\n- description: 1-3 sentences, verb-first, keyword-rich (see above)\n- surface_area: the tag values step 1 returned that fit this task — never a canned or invented list; a value sharing no word with any pack's tags scores zero on tag-overlap\n- data_handled: data categories this task touches, drawn from step 1's tag vocabulary where it expresses them; [] if none\n- user_facing: bool\n- external_io: bool\n- file_paths: globs of files being changed\n</task-object>\n\n<good-description>Add account-lockout to Express login with configurable threshold, lockout duration, and AuditEvent emission.</good-description>\n<bad-description>Fix the security issue.</bad-description>\n</step2>\n\n<rules>\n- Re-call get_relevant_standards if scope shifts mid-task (step 1 stays cached)\n- Treat returned standards as hard constraints\n- If a request conflicts with a standard, surface the conflict before proceeding\n</rules>\n</standards-gate>\nHOOK"
+          },
+          {
+            "type": "command",
+            "command": "cat <<'HOOK'\n<craft-router>\n<when>Label every substantive prompt with the crafts the work will ACTUALLY EXERCISE as it plays out — predict the effect of acting on the prompt, not just the verb the user used. 'Review this code' means read AND then fix, so it exercises review + code (+ test if the fix touches tested behavior). This is multi-label, not single-choice: the categories are additive expertise that compose, they do not compete for one slot. Load the matching Anthara skill(s) BEFORE doing the work. Sibling to the standards-gate: it decides which craft expertise to pull in, the way the gate decides which compliance packs to pull in.</when>\n\n<categories>\n- code   -> writing or modifying implementation code -> Skill(anthara:code-craft)\n- test   -> writing or fixing tests, test strategy, coverage -> Skill(anthara:test-craft)\n- review -> reviewing a diff / PR / someone's code (outside the /anthara:code-review command); a review that leads to fixes also exercises code (+ test) -> Skill(anthara:review-craft)\n- arch   -> structural / architectural decisions (module boundaries, style, dependencies) -> Skill(anthara:architecture-craft)\n- design -> UI / UX, layout, visual, accessibility work -> Skill(anthara:design-craft)\n- debug  -> diagnosing a failure, bug, error, or broken test; a fix that lands also exercises code (+ test) -> Skill(anthara:debug-fix)\n</categories>\n\n<how-to-act>\n1. Predict the effect of acting on the prompt, then label it with EVERY craft that effect will exercise — tag the work, not the verb. They compose, they do not compete (e.g. 'review this code' = review + code + maybe test; 'add a feature with tests' = code + test; 'refactor a module and its tests' = arch + code + test; 'fix the failing test' = debug + code + test). Load each matching Skill. Never force a single pick.\n2. Predict the PROBABLE effect, not every possible one. Tag a craft when acting on the prompt will very likely reach it; do NOT tag a craft that is merely conceivable. When genuinely unsure whether an effect lands, leave it out — the next prompt re-labels (a <craft-router-reminder> fires on every user prompt, so a missed label is recovered one turn later, never lost).\n3. If the work will exercise NO craft (chit-chat, acknowledgement, pure factual Q&A, read-only inspection with no expected change, or the user already invoked an /anthara: command) -> load nothing and stay silent. Do NOT announce a non-load.\n4. When one or more labels apply, print one terse line naming them ('Loading review-craft, code-craft.') and call the mapped Skill(s) NOW, before writing code or answering.\n5. Load a given craft skill at most once per session; if already loaded, skip it silently and only load the labels not yet loaded.\n</how-to-act>\n\n<plan-offer>\nThe planner route is not a craft label and never auto-loads — it starts a side-effecting workflow (writes a plan file, spawns agents), so it is OFFERED, not loaded, and only after you have understood the task.\n- After your initial read and analysis of the prompt, apply the planner test: does the work need its DESIGN decided up front (classes, collaborators, control-flow shape, test strategy) AND span MULTIPLE slices / files? That is planner's sweet spot — the strongest model decides the structure once so the build is cheaper. A single localized edit, or many-file work with no design to decide (e.g. a mechanical rename), is NOT planner -> just proceed with the craft labels.\n- When the task meets that test, before building ask the user via AskUserQuestion whether to plan first. State in ONE line WHY this task fits planning (grounded in the test above, e.g. 'introduces a new subsystem with several collaborators, so deciding the structure before coding will pay off'). Offer two options: option 1 (recommended) 'Plan it first (/anthara:planner)' -> hands off to planner then plan-implementer; option 2 'Build directly' -> skip planning and implement here. AskUserQuestion adds its own 'Other' escape hatch.\n- Confirm once. After the user answers either way, honor it for this line of work and do NOT re-ask on follow-up turns. 'Build directly' in particular sticks — never re-prompt.\n- Stay silent when the user already invoked /anthara:planner or /anthara:plan-implementer, or already answered this offer.\n</plan-offer>\n\n<guardrails>\n- This is additive expertise, never a takeover. After loading, proceed with the user's actual request.\n- Bias toward zero labels for short / ambiguous prompts, and toward the PROBABLE effect over the possible one. A wrong load is noise and over-firing erodes trust; but when the effect genuinely spans several crafts, load them all — a missing craft skill is a worse failure than a mildly redundant one.\n- Never auto-run side-effecting workflows (create-ticket, full spec-writer, plan-implementer). The plan-offer above OFFERS planner via AskUserQuestion; it never starts it without the user's answer.\n</guardrails>\n</craft-router>\nHOOK"
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'MANDATORY — PRE-COMPACTION: Context compaction is about to happen. Check for unsaved durable learnings that match SAVE triggers: user corrections, stated preferences, decisions made, gotchas discovered, reference URLs shared. Each memory must be atomic, context-independent, durable, and include subject name and WHY. Update existing memories instead of duplicating. Do NOT dump session state or task summaries. If nothing unsaved, skip silently.'"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/check-fabric-auth.sh\"",
+            "timeout": 60
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/report-skill-telemetry.sh\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "cat <<'HOOK'\n<standards-gate-reminder>\nApplies when this turn will write or modify code; skip for pure questions or read-only inspection. Follow the full <standards-gate> protocol injected at session start:\n1. mcp__plugin_anthara_anthara-fabric__list_standard_packs(raw_remote_url) once per session — reuse this session's output if already called.\n2. mcp__plugin_anthara_anthara-fabric__get_relevant_standards with a task object built FROM step 1's output: verb-first keyword-rich description that echoes the applicable packs' domain keywords; surface_area and data_handled drawn ONLY from the exact tag values step 1 returned (an invented tag scores zero); plus raw_remote_url (git remote get-url origin, never ORG_WIDE), task_type, file_paths globs, user_facing, external_io.\nReturned standards are hard constraints; surface any conflict with the request before proceeding; re-call get_relevant_standards when scope shifts mid-task (step 1 stays cached).\n</standards-gate-reminder>\nHOOK"
+          },
+          {
+            "type": "command",
+            "command": "cat <<'HOOK'\n<craft-router-reminder>\nLabel this prompt with EVERY craft the work will actually exercise, then load each matching skill BEFORE doing the work. Multi-label: tag the predicted work, not the verb ('review this code' = review + code + maybe test). Full protocol: the <craft-router> injected at session start.\n- code -> Skill(anthara:code-craft) · test -> Skill(anthara:test-craft) · review -> Skill(anthara:review-craft) · arch -> Skill(anthara:architecture-craft) · design -> Skill(anthara:design-craft) · debug -> Skill(anthara:debug-fix)\n- Each craft skill loads at most once per session — skip already-loaded ones silently; only load labels not yet loaded.\n- Zero labels (load nothing, stay silent) for chit-chat, pure factual Q&A, read-only inspection, or when the user already invoked an /anthara: command. Tag the PROBABLE effect, not every conceivable one; a missed label is recovered next turn.\n- When labels apply: print one terse line naming them, then call the Skill(s) NOW, before writing code or answering.\n- Planner is never a label. For work that needs its design decided up front AND spans multiple slices/files, OFFER /anthara:planner once via AskUserQuestion (one-line why; options: 'Plan it first (/anthara:planner)' recommended / 'Build directly') — never auto-run it, and never re-ask after either answer.\n</craft-router-reminder>\nHOOK"
+          },
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/memory-search.sh\""
+          },
+          {
+            "type": "command",
+            "command": "echo 'MANDATORY — WRITE WELL-FORMED FACTS: A memory write takes `data` plus two optional arguments (`reference_time`, `name`). Nothing else indexes the write, so THE FACT TEXT IS THE INDEX. PROVENANCE — write only what the user actually asserted, never your own inference dressed up as their preference. The extractor splits `data` into separate standalone facts, so any implication you bundle in becomes a fabricated user preference that is indistinguishable from a real one later. Concretely: if the user says they work on Windows only, that sentence is the fact — the shell they use, the paths they favour, and how you should configure their tooling are YOUR inferences, to be drawn at read time and never written. Do not append application guidance (apply X when doing Y, assume Z) to `data`. Details that came from the session environment rather than from the user (OS build number, shell, editor version) are observed context, not stated preferences: leave them out, or say plainly that they were observed rather than stated. Make `data` atomic (one fact), context-independent (readable with none of this session in scope), and self-identifying: name the subject, and say in plain words what KIND of knowledge it is (a preference, a decision, an anti-pattern, a fix, a convention, a policy, a tooling setup step) — those words are what a future search_memories query matches against. \"Dinesh prefers Python 3.12 with type hints for new services\" is findable; \"Python 3.12\" is not. Pass `reference_time` whenever the conversation says WHEN the fact became true (\"we moved to ArgoCD in March\") — otherwise the fact is stamped now, and a stale fact will wrongly outrank the truth on a later point-in-time read. Pass `name` (short label, max 1000 chars) when the opening of `data` would not make a useful one. The call returns {task_id, scope, org_id, fact_preview} and extraction is asynchronous — a fact is not searchable the instant it returns.'"
+          },
+          {
+            "type": "command",
+            "command": "echo 'MANDATORY — MEMORY SAVE POLICY: When asked to remember or save anything, ALWAYS use Fabric (mcp__plugin_anthara_anthara-fabric__add_private_memory for personal preferences, mcp__plugin_anthara_anthara-fabric__add_shared_memory for team conventions — confirm shared with user via AskUserQuestion first). NEVER use the local .claude/projects/ file-based memory system. This is enforced by PreToolUse hooks.'"
+          },
+          {
+            "type": "command",
+            "command": "echo 'MANDATORY — POST-RESPONSE MEMORY: After responding, silently check if this turn matches a SAVE trigger. SAVE triggers (only these): user corrected your approach, user stated a preference, a decision was made (architecture/process/tooling), a gotcha or pitfall was discovered, user shared a reference URL or resource. Quality rules: each memory must be atomic (one fact), context-independent (readable without this session), durable (useful in future sessions), traceable to something the user actually said rather than to your own inference, include subject name (<user-name> prefers X not user prefers X), include WHY if known. Before saving, check if an existing memory should be UPDATED instead of adding a duplicate. When a trigger clearly matches, SAVE immediately without waiting to be asked. Default to SKIP only when it is genuinely ambiguous whether a trigger was hit. If saving: tell user Saved: short summary. If skipping: stop silently with NO message.'"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/scripts/findings-hook.sh\" end",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

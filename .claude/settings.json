@@ -1,0 +1,26 @@
+{
+  "extraKnownMarketplaces": {
+    "anthara": {
+      "source": {
+        "source": "directory",
+        "path": ".anthara"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "anthara@anthara": true
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "claude plugin marketplace add \"${CLAUDE_PROJECT_DIR}/.anthara\" && claude plugin install anthara@anthara && claude plugin update anthara@anthara"
+          }
+        ]
+      }
+    ]
+  }
+}
