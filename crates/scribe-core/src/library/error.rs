@@ -7,6 +7,8 @@ pub enum LibraryError {
     InvalidId(String),
     #[error("Transcript not found: {0}")]
     NotFound(SessionId),
+    #[error("Search query is empty")]
+    EmptyQuery,
     #[error(transparent)]
     Store(StoreError),
 }

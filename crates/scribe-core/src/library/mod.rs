@@ -1,10 +1,14 @@
 mod error;
 mod query;
+mod search;
 
 use std::sync::Arc;
 
 pub use error::LibraryError;
 pub use query::{Limit, ListQuery};
+pub use search::{SearchHit, SearchQuery, SegmentMatch};
+
+use search::find_matches;
 
 use crate::ports::TranscriptStore;
 use crate::recording::{SessionDocument, SessionId, SessionStatus, SessionSummary};
@@ -21,15 +25,12 @@ impl TranscriptLibrary {
     }
 
     pub fn list(&self, query: ListQuery) -> Result<Vec<SessionSummary>, LibraryError> {
-        let mut readable: Vec<SessionSummary> = self
-            .store
-            .list_all()?
+        Ok(self
+            .readable_newest_first()?
             .into_iter()
-            .filter(|summary| is_readable(summary.status) && query.includes(summary))
-            .collect();
-        readable.sort_by(|a, b| b.started_at.cmp(&a.started_at));
-        readable.truncate(query.limit.get());
-        Ok(readable)
+            .filter(|summary| query.includes(summary))
+            .take(query.limit.get())
+            .collect())
     }
 
     pub fn get(&self, raw_id: &str) -> Result<SessionDocument, LibraryError> {
@@ -41,6 +42,44 @@ impl TranscriptLibrary {
         } else {
             Err(LibraryError::NotFound(id))
         }
+    }
+
+    pub fn search(
+        &self,
+        query: &SearchQuery,
+        limit: Limit,
+    ) -> Result<Vec<SearchHit>, LibraryError> {
+        self.readable_newest_first()?
+            .into_iter()
+            .filter_map(|summary| self.hit_for(summary, query).transpose())
+            .take(limit.get())
+            .collect()
+    }
+
+    fn readable_newest_first(&self) -> Result<Vec<SessionSummary>, LibraryError> {
+        let mut readable: Vec<SessionSummary> = self
+            .store
+            .list_all()?
+            .into_iter()
+            .filter(|summary| is_readable(summary.status))
+            .collect();
+        readable.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+        Ok(readable)
+    }
+
+    fn hit_for(
+        &self,
+        summary: SessionSummary,
+        query: &SearchQuery,
+    ) -> Result<Option<SearchHit>, LibraryError> {
+        let document = self.store.read(&summary.id)?;
+        let matches = find_matches(&document, query);
+        Ok((!matches.is_empty()).then_some(SearchHit {
+            id: summary.id,
+            title: summary.title,
+            started_at: summary.started_at,
+            matches,
+        }))
     }
 }
 

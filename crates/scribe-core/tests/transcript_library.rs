@@ -2,7 +2,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::{DateTime, FixedOffset, NaiveDate};
-use scribe_core::library::{LibraryError, Limit, ListQuery, TranscriptLibrary};
+use scribe_core::library::{
+    LibraryError, Limit, ListQuery, SearchHit, SearchQuery, TranscriptLibrary,
+};
 use scribe_core::ports::TranscriptStore;
 use scribe_core::recording::{Segment, SessionHeader, SessionId, SessionStatus, Speaker};
 use scribe_core::testing::InMemoryTranscriptStore;
@@ -195,4 +197,78 @@ fn reading_an_id_that_is_not_a_session_id_is_rejected() {
     let error = library_over(&store).get("../secrets").unwrap_err();
 
     assert_eq!(error.to_string(), "Invalid transcript id: ../secrets");
+}
+
+fn said(speaker: Speaker, start_secs: u64, text: &str) -> Segment {
+    Segment {
+        speaker,
+        start: Duration::from_secs(start_secs),
+        end: Duration::from_secs(start_secs),
+        text: text.to_owned(),
+    }
+}
+
+fn searching(store: &Arc<InMemoryTranscriptStore>, phrase: &str, limit: usize) -> Vec<SearchHit> {
+    let query = SearchQuery::parse(phrase).unwrap();
+    library_over(store)
+        .search(&query, Limit::clamped(limit))
+        .unwrap()
+}
+
+#[test]
+fn a_phrase_no_call_mentions_finds_no_calls() {
+    let store = Arc::new(InMemoryTranscriptStore::default());
+    let id = finished_call(&store, "2026-10-15T09:00:00+00:00");
+    store
+        .append(&id, &said(Speaker::Them, 4, "Welcome everyone"))
+        .unwrap();
+
+    let hits = searching(&store, "quarterly", 10);
+
+    assert!(hits.is_empty());
+}
+
+#[test]
+fn each_match_carries_the_stamp_speaker_and_text_as_stored() {
+    let store = Arc::new(InMemoryTranscriptStore::default());
+    let id = finished_call(&store, "2026-10-15T09:00:00+00:00");
+    store
+        .append(&id, &said(Speaker::Me, 65, "Quarterly Review"))
+        .unwrap();
+
+    let hits = searching(&store, "quarterly", 10);
+
+    let matched = &hits[0].matches[0];
+    assert_eq!(matched.at, "00:01:05");
+    assert_eq!(matched.speaker, Speaker::Me);
+    assert_eq!(matched.text, "Quarterly Review");
+}
+
+#[test]
+fn matching_calls_come_back_newest_first_up_to_the_limit() {
+    let store = Arc::new(InMemoryTranscriptStore::default());
+    for started_at in [
+        "2026-10-15T09:00:00+00:00",
+        "2026-10-17T09:00:00+00:00",
+        "2026-10-16T09:00:00+00:00",
+    ] {
+        let id = finished_call(&store, started_at);
+        store
+            .append(&id, &said(Speaker::Them, 4, "budget approved"))
+            .unwrap();
+    }
+
+    let ids: Vec<String> = searching(&store, "budget", 2)
+        .iter()
+        .map(|hit| hit.id.to_string())
+        .collect();
+
+    assert_eq!(ids, ["2026-10-17-090000", "2026-10-16-090000"]);
+}
+
+#[test]
+fn a_blank_search_query_is_rejected() {
+    let error = SearchQuery::parse(" \t ").unwrap_err();
+
+    assert!(matches!(error, LibraryError::EmptyQuery));
 }

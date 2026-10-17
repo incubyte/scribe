@@ -109,11 +109,16 @@ async fn an_ai_app_discovers_the_list_and_read_tools_with_descriptions_and_input
     tools.sort_by(|a, b| a.name.cmp(&b.name));
 
     let names: Vec<&str> = tools.iter().map(|tool| tool.name.as_ref()).collect();
-    assert_eq!(names, ["get_transcript", "list_transcripts"]);
+    assert_eq!(
+        names,
+        ["get_transcript", "list_transcripts", "search_transcripts"]
+    );
     assert!(tools.iter().all(|tool| tool.description.is_some()));
     assert!(tools[0].input_schema["properties"]["id"].is_object());
     assert!(tools[1].input_schema["properties"]["limit"].is_object());
     assert!(tools[1].input_schema["properties"]["since"].is_object());
+    assert!(tools[2].input_schema["properties"]["query"].is_object());
+    assert!(tools[2].input_schema["properties"]["limit"].is_object());
 }
 
 #[tokio::test]
@@ -306,6 +311,112 @@ async fn a_corrupt_transcript_file_is_skipped_rather_than_crashing_the_server() 
     assert!(!is_tool_error(&good_read));
 }
 
+fn save_call_saying(
+    store: &MarkdownTranscriptStore,
+    started_at: &str,
+    lines: &[Segment],
+) -> SessionId {
+    let id = start_call(store, started_at);
+    for spoken in lines {
+        store.append(&id, spoken).unwrap();
+    }
+    store.finalise(&id, moment(started_at)).unwrap();
+    id
+}
+
+fn matched_texts(result: &Value) -> Vec<&str> {
+    result["structuredContent"]["transcripts"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .flat_map(|hit| hit["matches"].as_array().unwrap())
+        .map(|hit_match| hit_match["text"].as_str().unwrap())
+        .collect()
+}
+
+fn save_quarterly_review(store: &MarkdownTranscriptStore) -> SessionId {
+    save_call_saying(
+        store,
+        "2026-10-15T09:00:00+00:00",
+        &[
+            line(Speaker::Them, "Let's review the QUARTERLY numbers"),
+            line(Speaker::Me, "Sounds good"),
+        ],
+    )
+}
+
+#[tokio::test]
+async fn an_ai_app_finds_the_lines_that_mention_a_phrase_regardless_of_case() {
+    let folder = tempfile::tempdir().unwrap();
+    save_quarterly_review(&store_in(folder.path()));
+    let client = connect_to(folder.path()).await;
+
+    let result = call(
+        &client,
+        "search_transcripts",
+        json!({ "query": "quarterly" }),
+    )
+    .await;
+
+    assert!(!is_tool_error(&result));
+    assert_eq!(listed_ids(&result), ["2026-10-15-090000"]);
+    assert_eq!(
+        result["structuredContent"]["transcripts"][0]["matches"],
+        json!([{ "at": "00:00:04", "speaker": "Them", "text": "Let's review the QUARTERLY numbers" }])
+    );
+}
+
+#[tokio::test]
+async fn a_query_full_of_regex_syntax_is_matched_as_plain_text() {
+    let folder = tempfile::tempdir().unwrap();
+    let store = store_in(folder.path());
+    save_call_saying(
+        &store,
+        "2026-10-15T09:00:00+00:00",
+        &[
+            line(Speaker::Me, "We spent 5.* more than planned"),
+            line(Speaker::Them, "Nothing special here"),
+        ],
+    );
+    let client = connect_to(folder.path()).await;
+
+    let result = call(&client, "search_transcripts", json!({ "query": ".*" })).await;
+
+    assert!(!is_tool_error(&result));
+    assert_eq!(matched_texts(&result), ["We spent 5.* more than planned"]);
+}
+
+#[tokio::test]
+async fn a_blank_search_is_reported_as_a_tool_error() {
+    let folder = tempfile::tempdir().unwrap();
+    let client = connect_to(folder.path()).await;
+
+    let result = call(&client, "search_transcripts", json!({ "query": "   " })).await;
+
+    assert!(is_tool_error(&result));
+    assert_eq!(text_of(&result), "Search query is empty");
+}
+
+#[tokio::test]
+async fn a_call_still_being_recorded_is_not_searched() {
+    let folder = tempfile::tempdir().unwrap();
+    let store = store_in(folder.path());
+    save_call_saying(
+        &store,
+        "2026-10-15T09:00:00+00:00",
+        &[line(Speaker::Them, "budget approved")],
+    );
+    let live = start_call(&store, "2026-10-16T09:00:00+00:00");
+    store
+        .append(&live, &line(Speaker::Them, "budget approved"))
+        .unwrap();
+    let client = connect_to(folder.path()).await;
+
+    let result = call(&client, "search_transcripts", json!({ "query": "budget" })).await;
+
+    assert_eq!(listed_ids(&result), ["2026-10-15-090000"]);
+}
+
 fn seed_mixed_folder(folder: &Path) -> SessionId {
     let store = store_in(folder);
     let id = start_call(&store, "2026-10-15T09:00:00+00:00");
@@ -320,8 +431,7 @@ fn seed_mixed_folder(folder: &Path) -> SessionId {
     id
 }
 
-async fn use_every_tool_every_way(client: &RunningService<RoleClient, ()>, id: &SessionId) {
-    let reads = [id.as_str(), "2026-10-16-090000", "../x"];
+async fn list_calls_every_way(client: &RunningService<RoleClient, ()>) {
     call(client, "list_transcripts", json!({})).await;
     call(
         client,
@@ -329,9 +439,18 @@ async fn use_every_tool_every_way(client: &RunningService<RoleClient, ()>, id: &
         json!({ "since": "2026-10-01", "limit": 5 }),
     )
     .await;
-    for read in reads {
+}
+
+async fn read_calls_every_way(client: &RunningService<RoleClient, ()>, id: &SessionId) {
+    for read in [id.as_str(), "2026-10-16-090000", "../x"] {
         call(client, "get_transcript", json!({ "id": read })).await;
     }
+}
+
+async fn use_every_tool_every_way(client: &RunningService<RoleClient, ()>, id: &SessionId) {
+    list_calls_every_way(client).await;
+    read_calls_every_way(client, id).await;
+    call(client, "search_transcripts", json!({ "query": "before" })).await;
 }
 
 #[tokio::test]
