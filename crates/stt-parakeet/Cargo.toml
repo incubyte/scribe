@@ -6,6 +6,9 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+scribe-core.workspace = true
+parakeet-rs = "=0.4.0"
+ort = { version = "=2.0.0-rc.13", default-features = false, features = ["std", "ndarray"] }
 thiserror.workspace = true
 tracing.workspace = true
 dirs.workspace = true
@@ -14,6 +17,7 @@ reqwest = { version = "0.13", default-features = false, features = ["blocking", 
 
 [dev-dependencies]
 tempfile.workspace = true
+hound = "3.5"
 
 [lints]
 workspace = true

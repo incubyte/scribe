@@ -44,7 +44,42 @@ mod macos {
 #[cfg(target_os = "macos")]
 pub use macos::{ENGINE, LANGUAGE, build_lanes, ensure_speech_model};
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(windows)]
+mod windows {
+    use std::sync::Arc;
+
+    use audio_mic::MicSource;
+    use audio_windows::LoopbackSource;
+    use scribe_core::ports::{RecordingListener, TranscribeError};
+    use scribe_core::recording::{Lane, Speaker};
+    use stt_parakeet::{ParakeetTranscriber, default_models_dir};
+
+    pub const ENGINE: &str = stt_parakeet::ENGINE_NAME;
+    pub const LANGUAGE: &str = stt_parakeet::AUTO_LANGUAGE;
+
+    pub fn build_lanes(
+        listener: &Arc<dyn RecordingListener>,
+    ) -> Result<Vec<Lane>, TranscribeError> {
+        let models_dir = default_models_dir()
+            .map_err(|error| TranscribeError::EngineUnavailable(error.to_string()))?;
+        let mic = Lane {
+            speaker: Speaker::Me,
+            source: Box::new(MicSource::new()),
+            transcriber: Box::new(ParakeetTranscriber::load(&models_dir)?),
+        };
+        let loopback = Lane {
+            speaker: Speaker::Them,
+            source: Box::new(LoopbackSource::new(Arc::clone(listener))),
+            transcriber: Box::new(ParakeetTranscriber::load(&models_dir)?),
+        };
+        Ok(vec![mic, loopback])
+    }
+}
+
+#[cfg(windows)]
+pub use windows::{ENGINE, LANGUAGE, build_lanes};
+
+#[cfg(not(any(target_os = "macos", windows)))]
 mod unsupported {
     use std::sync::Arc;
 
@@ -67,5 +102,5 @@ mod unsupported {
     }
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", windows)))]
 pub use unsupported::{ENGINE, LANGUAGE, build_lanes};

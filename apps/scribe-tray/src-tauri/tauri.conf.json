@@ -39,7 +39,8 @@
       "binaries/scribe-mcp"
     ],
     "icon": [
-      "icons/icon.png"
+      "icons/icon.png",
+      "icons/icon.ico"
     ],
     "macOS": {
       "minimumSystemVersion": "26.0"

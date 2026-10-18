@@ -6,6 +6,10 @@ mod part_file;
 mod part_sink;
 mod progress;
 mod provisioner;
+mod transcriber;
+mod utterance_cutter;
+mod vad;
+mod vad_windows;
 
 pub use download_error::DownloadError;
 pub use fetcher::{FetchOutcome, FetchSink, HttpsFetcher, RangeFetcher, RangeRequest};
@@ -13,3 +17,6 @@ pub use model_manifest::{ModelFile, PARAKEET_MODEL};
 pub use models_location::default_models_dir;
 pub use progress::DownloadProgress;
 pub use provisioner::ModelProvisioner;
+pub use transcriber::{AUTO_LANGUAGE, ENGINE_NAME, ParakeetTranscriber};
+pub use utterance_cutter::{CutterConfig, PendingUtterance, UtteranceCutter, VAD_WINDOW_SAMPLES};
+pub use vad::SileroVad;

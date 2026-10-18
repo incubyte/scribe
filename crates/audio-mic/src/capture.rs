@@ -129,14 +129,25 @@ where
         .map_err(|error| capture_error(&error))
 }
 
+const WINDOWS_ACCESS_DENIED: &str = "(os error -2147024891)";
+
 fn capture_error(error: &cpal::Error) -> CaptureError {
     match error.kind() {
         cpal::ErrorKind::PermissionDenied => CaptureError::PermissionDenied,
+        cpal::ErrorKind::BackendError if is_windows_access_denied(error) => {
+            CaptureError::PermissionDenied
+        }
         cpal::ErrorKind::DeviceNotAvailable | cpal::ErrorKind::HostUnavailable => {
             CaptureError::DeviceUnavailable
         }
         _ => CaptureError::StreamFailed(error.to_string()),
     }
+}
+
+fn is_windows_access_denied(error: &cpal::Error) -> bool {
+    error
+        .message()
+        .is_some_and(|message| message.contains(WINDOWS_ACCESS_DENIED))
 }
 
 struct Pump {
@@ -169,5 +180,33 @@ impl Pump {
                 .chunks
                 .send(AudioChunk::ending_at(samples, delivery.clock.elapsed()))
                 .is_ok()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const WINDOWS_ACCESS_DENIED_MESSAGE: &str = "Access is denied. (os error -2147024891)";
+
+    #[test]
+    fn a_microphone_blocked_in_windows_privacy_settings_is_reported_as_permission_denied() {
+        let blocked =
+            cpal::Error::with_message(cpal::ErrorKind::BackendError, WINDOWS_ACCESS_DENIED_MESSAGE);
+
+        assert_eq!(capture_error(&blocked), CaptureError::PermissionDenied);
+    }
+
+    #[test]
+    fn other_windows_backend_failures_stay_stream_failures() {
+        let failure = cpal::Error::with_message(
+            cpal::ErrorKind::BackendError,
+            "The device is in use. (os error -2004287478)",
+        );
+
+        assert!(matches!(
+            capture_error(&failure),
+            CaptureError::StreamFailed(_)
+        ));
     }
 }

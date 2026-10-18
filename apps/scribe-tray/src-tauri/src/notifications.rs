@@ -2,8 +2,11 @@ use tauri::{AppHandle, Runtime};
 use tauri_plugin_notification::NotificationExt;
 
 const MICROPHONE_DENIED_TITLE: &str = "Scribe can't use the microphone";
+#[cfg(not(windows))]
 const MICROPHONE_DENIED_BODY: &str = "Allow Scribe in System Settings > Privacy & Security > Microphone, then start recording again.";
+#[cfg(not(windows))]
 const OTHER_SIDE_SILENT_TITLE: &str = "Scribe can't hear the other side of the call";
+#[cfg(not(windows))]
 const OTHER_SIDE_SILENT_BODY: &str =
     "Allow Scribe in System Settings > Privacy & Security > Screen & System Audio Recording.";
 
@@ -22,16 +25,25 @@ pub fn notify_mcp_config_not_copied<R: Runtime>(app: &AppHandle<R>) {
     show_plain(app, MCP_CONFIG_NOT_COPIED_TITLE, MCP_CONFIG_NOT_COPIED_BODY);
 }
 
+#[cfg(not(windows))]
 pub fn notify_microphone_denied<R: Runtime>(app: &AppHandle<R>) {
     show_plain(app, MICROPHONE_DENIED_TITLE, MICROPHONE_DENIED_BODY);
 }
 
+#[cfg(windows)]
+pub use privacy_settings::notify_microphone_denied;
+
 #[cfg(target_os = "macos")]
 pub use system_settings::notify_cannot_hear_other_side;
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", windows)))]
 pub fn notify_cannot_hear_other_side<R: Runtime>(app: &AppHandle<R>) {
     show_plain(app, OTHER_SIDE_SILENT_TITLE, OTHER_SIDE_SILENT_BODY);
+}
+
+#[cfg(windows)]
+pub fn notify_cannot_hear_other_side<R: Runtime>(_app: &AppHandle<R>) {
+    tracing::info!("the other side has been silent since the recording started");
 }
 
 fn show_plain<R: Runtime>(app: &AppHandle<R>, title: &str, body: &str) {
@@ -96,6 +108,50 @@ mod system_settings {
             .open_url(SYSTEM_AUDIO_SETTINGS_URL, None::<&str>)
         {
             tracing::warn!(%error, "could not open the system audio privacy settings");
+        }
+    }
+}
+
+#[cfg(windows)]
+mod privacy_settings {
+    use tauri::{AppHandle, Runtime};
+    use tauri_plugin_opener::OpenerExt;
+    use tauri_winrt_notification::Toast;
+
+    use super::MICROPHONE_DENIED_TITLE;
+
+    const MICROPHONE_BLOCKED_BODY: &str = "Turn on microphone access for desktop apps in Settings > Privacy & security > Microphone, then start recording again.";
+    const OPEN_SETTINGS: &str = "Open Settings";
+    const OPEN_SETTINGS_ACTION: &str = "open-microphone-privacy";
+    const MICROPHONE_PRIVACY_URL: &str = "ms-settings:privacy-microphone";
+
+    pub fn notify_microphone_denied<R: Runtime>(app: &AppHandle<R>) {
+        let opener = app.clone();
+        let shown = Toast::new(&notification_sender(app))
+            .title(MICROPHONE_DENIED_TITLE)
+            .text1(MICROPHONE_BLOCKED_BODY)
+            .add_button(OPEN_SETTINGS, OPEN_SETTINGS_ACTION)
+            .on_activated(move |_action| {
+                open_microphone_privacy_settings(&opener);
+                Ok(())
+            })
+            .show();
+        if let Err(error) = shown {
+            tracing::warn!(%error, "could not show the microphone permission notification");
+        }
+    }
+
+    fn notification_sender<R: Runtime>(app: &AppHandle<R>) -> String {
+        if tauri::is_dev() {
+            Toast::POWERSHELL_APP_ID.to_owned()
+        } else {
+            app.config().identifier.clone()
+        }
+    }
+
+    fn open_microphone_privacy_settings<R: Runtime>(app: &AppHandle<R>) {
+        if let Err(error) = app.opener().open_url(MICROPHONE_PRIVACY_URL, None::<&str>) {
+            tracing::warn!(%error, "could not open the microphone privacy settings");
         }
     }
 }

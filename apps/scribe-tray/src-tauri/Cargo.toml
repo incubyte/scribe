@@ -34,6 +34,9 @@ thiserror.workspace = true
 
 [target.'cfg(windows)'.dependencies]
 stt-parakeet.workspace = true
+audio-windows.workspace = true
+tauri-winrt-notification = "0.7"
+windows = { version = "0.62", features = ["Win32_Foundation", "Win32_System_Power", "Win32_UI_WindowsAndMessaging"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 stt-speechanalyzer.workspace = true

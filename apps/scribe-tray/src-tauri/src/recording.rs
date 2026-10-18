@@ -130,11 +130,11 @@ fn mark_abandoned_sessions(store: &MarkdownTranscriptStore) {
     }
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", windows))]
 fn stop_before_sleep<R: Runtime>(app: &AppHandle<R>) {
     let app = app.clone();
     crate::power::on_will_sleep(move || app.state::<RecordingController>().stop());
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(not(any(target_os = "macos", windows)))]
 fn stop_before_sleep<R: Runtime>(_app: &AppHandle<R>) {}

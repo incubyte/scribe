@@ -315,6 +315,39 @@ fn my_lines_and_their_lines_are_saved_in_the_order_they_started() {
     );
 }
 
+fn lane_finalising_after(
+    speaker: Speaker,
+    silent_pushes: usize,
+    events: Vec<TranscriptEvent>,
+) -> Lane {
+    let mut replies = vec![Vec::new(); silent_pushes];
+    replies.push(events);
+    lane_lasting(speaker, 3_500, ScriptedTranscriber::new(replies))
+}
+
+#[test]
+fn lines_finalised_only_after_each_pause_are_saved_in_the_order_spoken_when_speakers_take_turns() {
+    let mut call = Call::ready();
+    let id = call
+        .start(vec![
+            lane_finalising_after(Speaker::Me, 16, utterance(0, 1_000, "Hi there")),
+            lane_finalising_after(Speaker::Them, 30, utterance(1_800, 2_400, "How are you")),
+        ])
+        .unwrap();
+
+    wait_until(|| call.store.segments(&id).len() == 2);
+    let saved_while_recording = call.store.segments(&id);
+    call.recorder.stop().unwrap();
+
+    assert_eq!(
+        saved_while_recording,
+        vec![
+            line(Speaker::Me, (0, 1_000), "Hi there"),
+            line(Speaker::Them, (1_800, 2_400), "How are you"),
+        ]
+    );
+}
+
 #[test]
 fn a_stalled_side_does_not_hold_back_the_other_sides_lines_beyond_the_maximum_hold() {
     let mut call = Call::ready();
