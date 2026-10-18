@@ -38,14 +38,30 @@ impl ClaudeDesktopConfig {
     }
 
     pub fn replace(&self, contents: &str) -> io::Result<()> {
+        let target = self.write_target()?;
+        let staging = target.with_file_name(STAGING_FILE);
+        stage(&staging, &target, contents)
+            .and_then(|()| self.back_up(&target))
+            .and_then(|()| fs::rename(&staging, &target))
+            .inspect_err(|_| {
+                let _ = fs::remove_file(&staging);
+            })
+    }
+
+    fn write_target(&self) -> io::Result<PathBuf> {
         let config = self.config_path();
-        let staging = self.folder.join(STAGING_FILE);
         if config.exists() {
-            fs::copy(&config, self.folder.join(BACKUP_FILE))?;
+            fs::canonicalize(config)
+        } else {
+            Ok(config)
         }
-        stage_and_swap(&staging, &config, contents).inspect_err(|_| {
-            let _ = fs::remove_file(&staging);
-        })
+    }
+
+    fn back_up(&self, target: &Path) -> io::Result<()> {
+        if target.exists() {
+            fs::copy(target, self.folder.join(BACKUP_FILE))?;
+        }
+        Ok(())
     }
 
     fn config_path(&self) -> PathBuf {
@@ -53,14 +69,14 @@ impl ClaudeDesktopConfig {
     }
 }
 
-fn stage_and_swap(staging: &Path, config: &Path, contents: &str) -> io::Result<()> {
+fn stage(staging: &Path, target: &Path, contents: &str) -> io::Result<()> {
     let mut file = open_staging(staging)?;
     file.write_all(contents.as_bytes())?;
     file.sync_data()?;
-    if config.exists() {
-        fs::set_permissions(staging, fs::metadata(config)?.permissions())?;
+    if target.exists() {
+        fs::set_permissions(staging, fs::metadata(target)?.permissions())?;
     }
-    fs::rename(staging, config)
+    Ok(())
 }
 
 fn open_staging(staging: &Path) -> io::Result<File> {

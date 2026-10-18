@@ -118,3 +118,13 @@ fn a_path_with_spaces_and_backslashes_is_stored_exactly() {
 fn the_merged_config_ends_with_a_newline() {
     assert!(merged(None, SCRIBE_PATH).ends_with('\n'));
 }
+
+#[test]
+fn a_whitespace_only_config_is_treated_like_a_missing_one() {
+    let content = parse(&merged(Some(" \n\t"), SCRIBE_PATH));
+
+    assert_eq!(
+        content,
+        serde_json::json!({"mcpServers": {"scribe": {"command": SCRIBE_PATH}}})
+    );
+}

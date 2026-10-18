@@ -60,11 +60,10 @@ fn connecting_backs_up_the_previous_config_first() {
         fs::read_to_string(folder.join(BACKUP_FILE)).unwrap(),
         previous
     );
-    assert!(
-        fs::read_to_string(folder.join(CONFIG_FILE))
-            .unwrap()
-            .contains("\"theme\": \"dark\"")
-    );
+    let updated: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(folder.join(CONFIG_FILE)).unwrap()).unwrap();
+    assert_eq!(updated["theme"], "dark");
+    assert_eq!(updated["mcpServers"]["scribe"]["command"], SCRIBE_PATH);
 }
 
 #[test]
@@ -144,4 +143,123 @@ fn a_new_config_is_private_to_the_owner() {
         .permissions()
         .mode();
     assert_eq!(mode & 0o777, 0o600);
+}
+
+#[test]
+fn an_empty_config_is_treated_like_a_missing_one() {
+    let root = tempdir().unwrap();
+    let folder = claude_folder(root.path());
+    fs::write(folder.join(CONFIG_FILE), "  \n").unwrap();
+
+    let outcome = connect_in(&folder);
+
+    assert_eq!(outcome, ConnectOutcome::Connected);
+    assert!(
+        fs::read_to_string(folder.join(CONFIG_FILE))
+            .unwrap()
+            .contains(SCRIBE_PATH)
+    );
+}
+
+#[test]
+fn a_config_that_is_not_text_is_reported_unreadable_and_left_as_it_was() {
+    let root = tempdir().unwrap();
+    let folder = claude_folder(root.path());
+    let binary = [0xff_u8, 0xfe, 0x00, 0x80];
+    fs::write(folder.join(CONFIG_FILE), binary).unwrap();
+
+    let outcome = connect_in(&folder);
+
+    assert_eq!(outcome, ConnectOutcome::ConfigUnreadable);
+    assert_eq!(fs::read(folder.join(CONFIG_FILE)).unwrap(), binary);
+}
+
+#[test]
+fn a_config_path_that_cannot_be_read_fails_and_leaves_the_folder_clean() {
+    let root = tempdir().unwrap();
+    let folder = claude_folder(root.path());
+    fs::create_dir(folder.join(CONFIG_FILE)).unwrap();
+
+    let outcome = connect_in(&folder);
+
+    assert_eq!(outcome, ConnectOutcome::Failed);
+    assert!(folder.join(CONFIG_FILE).is_dir());
+    assert!(!folder.join(STAGING_FILE).exists());
+}
+
+#[test]
+fn a_failed_backup_aborts_the_connect_and_leaves_the_original_untouched() {
+    let root = tempdir().unwrap();
+    let folder = claude_folder(root.path());
+    let original = r#"{"theme":"dark"}"#;
+    fs::write(folder.join(CONFIG_FILE), original).unwrap();
+    fs::create_dir(folder.join(BACKUP_FILE)).unwrap();
+
+    let outcome = connect_in(&folder);
+
+    assert_eq!(outcome, ConnectOutcome::Failed);
+    assert_eq!(
+        fs::read_to_string(folder.join(CONFIG_FILE)).unwrap(),
+        original
+    );
+    assert!(!folder.join(STAGING_FILE).exists());
+}
+
+#[test]
+fn a_second_changed_connect_overwrites_the_backup_with_the_previous_content() {
+    let root = tempdir().unwrap();
+    let folder = claude_folder(root.path());
+    fs::write(folder.join(CONFIG_FILE), r#"{"theme":"dark"}"#).unwrap();
+    connect_in(&folder);
+    let after_first = fs::read_to_string(folder.join(CONFIG_FILE)).unwrap();
+    let moved_app = Path::new("/Applications/Moved.app/scribe-mcp");
+
+    let outcome = connect(&ClaudeDesktopConfig::in_folder(folder.clone()), moved_app);
+
+    assert_eq!(outcome, ConnectOutcome::Connected);
+    assert_eq!(
+        fs::read_to_string(folder.join(BACKUP_FILE)).unwrap(),
+        after_first
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_folder_that_cannot_be_written_fails_and_keeps_the_original() {
+    use std::os::unix::fs::PermissionsExt;
+    let root = tempdir().unwrap();
+    let folder = claude_folder(root.path());
+    let original = r#"{"theme":"dark"}"#;
+    fs::write(folder.join(CONFIG_FILE), original).unwrap();
+    fs::set_permissions(&folder, fs::Permissions::from_mode(0o555)).unwrap();
+
+    let outcome = connect_in(&folder);
+
+    fs::set_permissions(&folder, fs::Permissions::from_mode(0o755)).unwrap();
+    assert_eq!(outcome, ConnectOutcome::Failed);
+    assert_eq!(
+        fs::read_to_string(folder.join(CONFIG_FILE)).unwrap(),
+        original
+    );
+    assert!(!folder.join(STAGING_FILE).exists());
+}
+
+#[cfg(unix)]
+#[test]
+fn a_symlinked_config_stays_a_symlink_and_its_target_gets_the_update() {
+    let root = tempdir().unwrap();
+    let folder = claude_folder(root.path());
+    let dotfiles = root.path().join("dotfiles");
+    fs::create_dir(&dotfiles).unwrap();
+    let target = dotfiles.join("claude.json");
+    fs::write(&target, r#"{"theme":"dark"}"#).unwrap();
+    std::os::unix::fs::symlink(&target, folder.join(CONFIG_FILE)).unwrap();
+
+    let outcome = connect_in(&folder);
+
+    let link = fs::symlink_metadata(folder.join(CONFIG_FILE)).unwrap();
+    assert_eq!(outcome, ConnectOutcome::Connected);
+    assert!(link.file_type().is_symlink());
+    assert!(fs::read_to_string(&target).unwrap().contains(SCRIBE_PATH));
+    assert!(!dotfiles.join(STAGING_FILE).exists());
 }

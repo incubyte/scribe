@@ -24,6 +24,7 @@ pub fn merge_scribe_server(
     existing: Option<&str>,
     server_command: &Path,
 ) -> Result<MergeResult, UnreadableConfig> {
+    let existing = existing.filter(|text| !text.trim().is_empty());
     let mut root = match existing {
         Some(text) => parse_root(text)?,
         None => Map::new(),
@@ -34,7 +35,7 @@ pub fn merge_scribe_server(
         return Ok(MergeResult::Unchanged);
     }
     servers.insert(SCRIBE_SERVER_NAME.to_owned(), entry);
-    Ok(MergeResult::Write(render(&root)))
+    Ok(MergeResult::Write(render(root)))
 }
 
 fn parse_root(existing: &str) -> Result<Map<String, Value>, UnreadableConfig> {
@@ -52,8 +53,6 @@ fn servers_of(root: &mut Map<String, Value>) -> Result<&mut Map<String, Value>, 
         .ok_or(UnreadableConfig::ServersNotObject)
 }
 
-fn render(root: &Map<String, Value>) -> String {
-    let mut rendered = serde_json::to_string_pretty(root).expect("a JSON map always serialises");
-    rendered.push('\n');
-    rendered
+fn render(root: Map<String, Value>) -> String {
+    format!("{:#}\n", Value::Object(root))
 }

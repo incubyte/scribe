@@ -1,6 +1,7 @@
 mod location;
 mod merge;
 
+use std::io;
 use std::path::Path;
 
 pub use location::ClaudeDesktopConfig;
@@ -20,14 +21,28 @@ pub fn connect(config: &ClaudeDesktopConfig, server_command: &Path) -> ConnectOu
     if !config.is_installed() {
         return ConnectOutcome::ClaudeNotInstalled;
     }
-    let existing = match config.read() {
-        Ok(existing) => existing,
-        Err(error) => {
-            tracing::error!(kind = ?error.kind(), "could not read the Claude Desktop config");
-            return ConnectOutcome::Failed;
+    match read_existing(config) {
+        Ok(existing) => merge_outcome(config, existing.as_deref(), server_command),
+        Err(outcome) => outcome,
+    }
+}
+
+fn read_existing(config: &ClaudeDesktopConfig) -> Result<Option<String>, ConnectOutcome> {
+    config.read().map_err(|error| {
+        tracing::error!(kind = ?error.kind(), "could not read the Claude Desktop config");
+        match error.kind() {
+            io::ErrorKind::InvalidData => ConnectOutcome::ConfigUnreadable,
+            _ => ConnectOutcome::Failed,
         }
-    };
-    match merge_scribe_server(existing.as_deref(), server_command) {
+    })
+}
+
+fn merge_outcome(
+    config: &ClaudeDesktopConfig,
+    existing: Option<&str>,
+    server_command: &Path,
+) -> ConnectOutcome {
+    match merge_scribe_server(existing, server_command) {
         Ok(MergeResult::Unchanged) => ConnectOutcome::AlreadyConnected,
         Ok(MergeResult::Write(contents)) => write_outcome(config, &contents),
         Err(error) => {
