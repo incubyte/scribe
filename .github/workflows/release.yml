@@ -1,8 +1,11 @@
 name: release
 
 on:
-  push:
-    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to build for, e.g. v0.1.0
+        required: true
 
 permissions:
   contents: write
@@ -15,12 +18,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
       - name: The tag matches the app version
         shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
         run: |
           app_version=$(jq -r .version apps/scribe-tray/src-tauri/tauri.conf.json)
-          if [ "${GITHUB_REF_NAME}" != "v${app_version}" ]; then
-            echo "Tag ${GITHUB_REF_NAME} does not match app version v${app_version} in tauri.conf.json"
+          if [ "${RELEASE_TAG}" != "v${app_version}" ]; then
+            echo "Tag ${RELEASE_TAG} does not match app version v${app_version} in tauri.conf.json"
             exit 1
           fi
 
@@ -29,10 +36,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-26, windows-latest]
+        os: [windows-latest]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
       - uses: dtolnay/rust-toolchain@1.93.1
       - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-node@v4
@@ -52,8 +61,8 @@ jobs:
           projectPath: apps/scribe-tray
           tauriScript: npm run tauri
           args: --config src-tauri/tauri.ci.conf.json
-          tagName: ${{ github.ref_name }}
-          releaseName: Scribe ${{ github.ref_name }}
+          tagName: ${{ inputs.tag }}
+          releaseName: Scribe ${{ inputs.tag }}
           releaseBody: |
             Unsigned build. On first launch:
             - macOS: open System Settings → Privacy & Security and choose Open Anyway for Scribe.
