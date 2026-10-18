@@ -1,13 +1,18 @@
 pub const MENU_TOGGLE_RECORDING: &str = "toggle-recording";
 pub const MENU_OPEN_FOLDER: &str = "open-transcripts-folder";
 pub const MENU_COPY_MCP_CONFIG: &str = "copy-mcp-config";
+pub const MENU_CONNECT_CLAUDE_DESKTOP: &str = "connect-claude-desktop";
 pub const MENU_PRIVACY: &str = "privacy";
 pub const MENU_QUIT: &str = "quit";
 
-const ACTIONS_BY_ID: [(&str, MenuAction); 5] = [
+const ACTIONS_BY_ID: [(&str, MenuAction); 6] = [
     (MENU_TOGGLE_RECORDING, MenuAction::ToggleRecording),
     (MENU_OPEN_FOLDER, MenuAction::OpenTranscriptsFolder),
     (MENU_COPY_MCP_CONFIG, MenuAction::CopyMcpConfig),
+    (
+        MENU_CONNECT_CLAUDE_DESKTOP,
+        MenuAction::ConnectClaudeDesktop,
+    ),
     (MENU_PRIVACY, MenuAction::ShowPrivacy),
     (MENU_QUIT, MenuAction::Quit),
 ];
@@ -17,6 +22,7 @@ pub enum MenuAction {
     ToggleRecording,
     OpenTranscriptsFolder,
     CopyMcpConfig,
+    ConnectClaudeDesktop,
     ShowPrivacy,
     Quit,
 }

@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use scribe_tray::mcp_config::config_snippet;
+use scribe_tray::mcp_config::{config_snippet, scribe_server_entry};
 use serde_json::Value;
 
 fn command_in(snippet: &str) -> String {
@@ -45,4 +45,13 @@ fn a_path_with_quotes_cannot_break_out_of_the_command_value() {
     let path = r#"/tmp/odd "name"/scribe-mcp"#;
 
     assert_eq!(command_in(&config_snippet(Path::new(path))), path);
+}
+
+#[test]
+fn the_snippet_registers_the_shared_scribe_server_entry() {
+    let path = Path::new("/Applications/Scribe.app/Contents/MacOS/scribe-mcp");
+
+    let snippet: Value = serde_json::from_str(&config_snippet(path)).unwrap();
+
+    assert_eq!(snippet["mcpServers"]["scribe"], scribe_server_entry(path));
 }

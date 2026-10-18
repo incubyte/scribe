@@ -1,6 +1,7 @@
 use tauri::{AppHandle, Runtime};
 use tauri_plugin_notification::NotificationExt;
 
+use crate::claude_desktop::ConnectOutcome;
 use crate::start_failure::StartFailureKind;
 
 const MICROPHONE_DENIED_TITLE: &str = "Scribe can't use the microphone";
@@ -20,6 +21,38 @@ const MCP_CONFIG_COPIED_BODY: &str =
 const MCP_CONFIG_NOT_COPIED_TITLE: &str = "Could not copy the MCP config";
 const MCP_CONFIG_NOT_COPIED_BODY: &str =
     "Scribe's bundled MCP server was not found. Reinstall Scribe and try again.";
+
+const CLAUDE_DESKTOP_CONNECTED: (&str, &str) = (
+    "Scribe connected to Claude Desktop",
+    "Restart Claude Desktop to use your Scribe transcripts.",
+);
+const CLAUDE_DESKTOP_ALREADY_CONNECTED: (&str, &str) = (
+    "Scribe is already connected",
+    "Claude Desktop is already set up to use Scribe.",
+);
+const CLAUDE_DESKTOP_NOT_INSTALLED: (&str, &str) = (
+    "Claude Desktop not found",
+    "Install Claude Desktop, open it once, then try again.",
+);
+const CLAUDE_DESKTOP_CONFIG_UNREADABLE: (&str, &str) = (
+    "Couldn't update Claude Desktop",
+    "Its config file has errors. Fix it, or use Copy MCP config.",
+);
+const CLAUDE_DESKTOP_FAILED: (&str, &str) = (
+    "Couldn't connect to Claude Desktop",
+    "Something went wrong. Use Copy MCP config instead.",
+);
+
+pub fn notify_claude_desktop<R: Runtime>(app: &AppHandle<R>, outcome: ConnectOutcome) {
+    let (title, body) = match outcome {
+        ConnectOutcome::Connected => CLAUDE_DESKTOP_CONNECTED,
+        ConnectOutcome::AlreadyConnected => CLAUDE_DESKTOP_ALREADY_CONNECTED,
+        ConnectOutcome::ClaudeNotInstalled => CLAUDE_DESKTOP_NOT_INSTALLED,
+        ConnectOutcome::ConfigUnreadable => CLAUDE_DESKTOP_CONFIG_UNREADABLE,
+        ConnectOutcome::Failed => CLAUDE_DESKTOP_FAILED,
+    };
+    show_plain(app, title, body);
+}
 
 pub fn notify_mcp_config_copied<R: Runtime>(app: &AppHandle<R>) {
     show_plain(app, MCP_CONFIG_COPIED_TITLE, MCP_CONFIG_COPIED_BODY);

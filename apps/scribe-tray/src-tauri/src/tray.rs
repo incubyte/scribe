@@ -8,10 +8,11 @@ use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, Tray
 use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_opener::OpenerExt;
 
+use crate::claude_desktop_connect;
 use crate::mcp_clipboard;
 use crate::menu_action::{
-    MENU_COPY_MCP_CONFIG, MENU_OPEN_FOLDER, MENU_PRIVACY, MENU_QUIT, MENU_TOGGLE_RECORDING,
-    MenuAction,
+    MENU_CONNECT_CLAUDE_DESKTOP, MENU_COPY_MCP_CONFIG, MENU_OPEN_FOLDER, MENU_PRIVACY, MENU_QUIT,
+    MENU_TOGGLE_RECORDING, MenuAction,
 };
 use crate::popover;
 use crate::privacy;
@@ -60,22 +61,31 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
     let toggle = recording_toggle_item(app)?;
     let open_folder = enabled_item(app, MENU_OPEN_FOLDER, "Open transcripts folder")?;
     let copy_mcp_config = enabled_item(app, MENU_COPY_MCP_CONFIG, "Copy MCP config")?;
+    let connect_claude_desktop = connect_claude_desktop_item(app)?;
     let privacy = enabled_item(app, MENU_PRIVACY, "Privacy")?;
     let quit = enabled_item(app, MENU_QUIT, "Quit Scribe")?;
-    let separator = PredefinedMenuItem::separator(app)?;
     let menu = Menu::with_items(
         app,
         &[
             &toggle,
-            &separator,
+            &PredefinedMenuItem::separator(app)?,
             &open_folder,
             &copy_mcp_config,
+            &connect_claude_desktop,
             &privacy,
             &quit,
         ],
     )?;
     app.manage(RecordingMenuItem(toggle));
     Ok(menu)
+}
+
+fn connect_claude_desktop_item<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<MenuItem<R>> {
+    enabled_item(
+        app,
+        MENU_CONNECT_CLAUDE_DESKTOP,
+        "Connect to Claude Desktop",
+    )
 }
 
 fn recording_toggle_item<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<MenuItem<R>> {
@@ -198,6 +208,9 @@ fn dispatch<R: Runtime>(app: &AppHandle<R>, id: &str) {
         Some(MenuAction::ToggleRecording) => toggle_recording(app),
         Some(MenuAction::OpenTranscriptsFolder) => open_transcripts_folder(app),
         Some(MenuAction::CopyMcpConfig) => mcp_clipboard::copy_config(app),
+        Some(MenuAction::ConnectClaudeDesktop) => {
+            claude_desktop_connect::connect_claude_desktop(app);
+        }
         Some(MenuAction::ShowPrivacy) => show_privacy(app),
         Some(MenuAction::Quit) => quit(app),
         None => {}

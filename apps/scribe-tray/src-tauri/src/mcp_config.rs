@@ -1,7 +1,11 @@
 use std::io;
 use std::path::{Path, PathBuf};
 
-use serde_json::json;
+use serde_json::{Value, json};
+
+pub const SERVERS_KEY: &str = "mcpServers";
+pub const SCRIBE_SERVER_NAME: &str = "scribe";
+const COMMAND_KEY: &str = "command";
 
 const MCP_BINARY_NAME: &str = if cfg!(windows) {
     "scribe-mcp.exe"
@@ -29,10 +33,15 @@ pub fn bundled_mcp_path() -> Result<PathBuf, McpConfigError> {
 }
 
 #[must_use]
+pub fn scribe_server_entry(path: &Path) -> Value {
+    json!({ COMMAND_KEY: path.to_string_lossy() })
+}
+
+#[must_use]
 pub fn config_snippet(path: &Path) -> String {
     json!({
-        "mcpServers": {
-            "scribe": { "command": path.to_string_lossy() }
+        SERVERS_KEY: {
+            SCRIBE_SERVER_NAME: scribe_server_entry(path)
         }
     })
     .to_string()

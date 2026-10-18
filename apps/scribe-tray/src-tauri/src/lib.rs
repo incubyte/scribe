@@ -1,4 +1,6 @@
 pub mod blur_guard;
+pub mod claude_desktop;
+mod claude_desktop_connect;
 mod commands;
 mod lanes;
 pub mod live_feed;

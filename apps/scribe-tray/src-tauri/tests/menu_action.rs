@@ -46,3 +46,11 @@ fn copy_mcp_config_id_maps_to_copying_the_mcp_config() {
         Some(MenuAction::CopyMcpConfig)
     );
 }
+
+#[test]
+fn connect_claude_desktop_id_maps_to_connecting_claude_desktop() {
+    assert_eq!(
+        MenuAction::from_id("connect-claude-desktop"),
+        Some(MenuAction::ConnectClaudeDesktop)
+    );
+}
