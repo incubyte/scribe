@@ -7,5 +7,6 @@ pub enum RecordingEvent {
     SegmentFinalised(Segment),
     RecordingStopped { id: SessionId },
     CaptureSilenced { speaker: Speaker },
+    CaptureUnavailable { speaker: Speaker },
     OutputDeviceChanged,
 }

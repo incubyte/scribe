@@ -10,8 +10,9 @@ use scribe_core::recording::{
     SessionHeader, SessionId, SessionStatus, Speaker, TranscriptEvent,
 };
 use scribe_core::testing::{
-    FakeAudioSource, InMemoryTranscriptStore, RecordingListenerSpy, ScriptedTranscriber, chunk_at,
-    finalising, finished, partial, still_speaking_since,
+    FakeAudioSource, InMemoryTranscriptStore, RecordingListenerSpy, ScriptedReply,
+    ScriptedTranscriber, chunk_at, finalising, finalising_through, finished, partial,
+    still_speaking_since,
 };
 
 const READY: Readiness = Readiness {
@@ -411,7 +412,7 @@ fn the_other_side_falling_quiet_after_being_heard_raises_no_warning() {
 }
 
 #[test]
-fn when_the_other_side_cannot_be_captured_my_side_still_records_and_a_warning_is_raised() {
+fn when_the_other_side_cannot_be_captured_my_side_still_records_and_says_so() {
     let mut call = Call::ready();
     let mine = ScriptedTranscriber::new(vec![utterance(0, 900, "Hello? Anyone?")]);
 
@@ -421,11 +422,12 @@ fn when_the_other_side_cannot_be_captured_my_side_still_records_and_a_warning_is
         call.store.segments(&id),
         vec![line(Speaker::Me, (0, 900), "Hello? Anyone?")]
     );
-    assert_eq!(
-        silence_warnings(call.listener.events()),
-        vec![RecordingEvent::CaptureSilenced {
-            speaker: Speaker::Them
-        }]
+    assert!(
+        call.listener
+            .events()
+            .contains(&RecordingEvent::CaptureUnavailable {
+                speaker: Speaker::Them
+            })
     );
     assert_eq!(
         call.store.header(&id).unwrap().status,
@@ -542,5 +544,89 @@ fn the_current_session_can_be_stopped_by_its_id() {
     assert_eq!(
         call.store.header(&id).unwrap().status,
         SessionStatus::Complete
+    );
+}
+
+const FINAL_RESULTS_WAIT: Duration = Duration::from_secs(6);
+
+fn replies(parts: &[(usize, ScriptedReply)]) -> Vec<ScriptedReply> {
+    parts
+        .iter()
+        .flat_map(|(count, reply)| vec![reply.clone(); *count])
+        .collect()
+}
+
+fn silent_after_a_late_final() -> ScriptedTranscriber {
+    ScriptedTranscriber::scripted(replies(&[
+        (15, still_speaking_since(Duration::ZERO)),
+        (
+            1,
+            finalising_through(utterance(0, 1_000, "Hi there"), Duration::from_secs(1)),
+        ),
+        (80, still_speaking_since(Duration::from_secs(1))),
+    ]))
+    .waiting_for_finals_at_most(FINAL_RESULTS_WAIT)
+}
+
+#[test]
+fn their_line_is_saved_while_recording_once_my_silent_side_has_been_waited_for_long_enough() {
+    let mut call = Call::ready();
+    let theirs = speaking_until(30, utterance(2_000, 2_500, "How are you"));
+    let id = call
+        .start(vec![
+            lane_lasting(Speaker::Me, 9_000, silent_after_a_late_final()),
+            lane_lasting(Speaker::Them, 3_900, theirs),
+        ])
+        .unwrap();
+
+    wait_until(|| call.store.segments(&id).len() == 2);
+    let saved_while_recording = call.store.segments(&id);
+    call.recorder.stop().unwrap();
+
+    assert_eq!(
+        saved_while_recording,
+        vec![
+            line(Speaker::Me, (0, 1_000), "Hi there"),
+            line(Speaker::Them, (2_000, 2_500), "How are you"),
+        ]
+    );
+}
+
+fn their_late_echoed_final_then_silence() -> ScriptedTranscriber {
+    ScriptedTranscriber::scripted(replies(&[
+        (35, still_speaking_since(Duration::from_secs(1))),
+        (
+            1,
+            finalising_through(
+                utterance(1_000, 2_000, "Let's review the budget"),
+                Duration::from_secs(2),
+            ),
+        ),
+        (70, still_speaking_since(Duration::from_secs(2))),
+    ]))
+    .waiting_for_finals_at_most(FINAL_RESULTS_WAIT)
+}
+
+#[test]
+fn an_echo_is_dropped_when_their_side_finalises_late_and_then_falls_silent() {
+    let mut call = Call::ready();
+    let mine = speaking_until(21, utterance(1_100, 2_100, "let's review the budget"));
+
+    let id = call.record(vec![
+        lane_lasting(Speaker::Me, 3_500, mine),
+        lane_lasting(
+            Speaker::Them,
+            10_000,
+            their_late_echoed_final_then_silence(),
+        ),
+    ]);
+
+    assert_eq!(
+        call.store.segments(&id),
+        vec![line(
+            Speaker::Them,
+            (1_000, 2_000),
+            "Let's review the budget"
+        )]
     );
 }

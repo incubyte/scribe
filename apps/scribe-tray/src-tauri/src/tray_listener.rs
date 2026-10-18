@@ -78,6 +78,7 @@ impl<R: Runtime> TrayUpdater<R> {
             RecordingEvent::SegmentFinalised(segment) => self.segment(&segment),
             RecordingEvent::RecordingStopped { id } => self.stopped(&id),
             RecordingEvent::CaptureSilenced { speaker } => self.capture_silenced(speaker),
+            RecordingEvent::CaptureUnavailable { speaker } => self.capture_unavailable(speaker),
             RecordingEvent::OutputDeviceChanged => {
                 tracing::info!("the output device changed; the other side is being captured again");
             }
@@ -88,6 +89,13 @@ impl<R: Runtime> TrayUpdater<R> {
         match speaker {
             Speaker::Them => notifications::notify_cannot_hear_other_side(&self.app),
             Speaker::Me => tracing::warn!("the microphone delivers only silence"),
+        }
+    }
+
+    fn capture_unavailable(&self, speaker: Speaker) {
+        match speaker {
+            Speaker::Them => notifications::notify_other_side_unavailable(&self.app),
+            Speaker::Me => tracing::warn!("the microphone could not be started"),
         }
     }
 

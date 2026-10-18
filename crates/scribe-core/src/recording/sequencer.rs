@@ -11,6 +11,7 @@ const RECENT_THEM_WINDOW: Duration = Duration::from_secs(3);
 pub struct SegmentSequencer {
     finalised_through: BTreeMap<Speaker, Duration>,
     heard_through: BTreeMap<Speaker, Duration>,
+    final_results_waits: BTreeMap<Speaker, Duration>,
     pending: Vec<Segment>,
     recent_them: Vec<Segment>,
     echo_filter: EchoFilter,
@@ -24,6 +25,7 @@ impl SegmentSequencer {
         SegmentSequencer {
             finalised_through: starting_points.clone(),
             heard_through: starting_points,
+            final_results_waits: BTreeMap::new(),
             pending: Vec::new(),
             recent_them: Vec::new(),
             echo_filter: EchoFilter::new(ECHO_OVERLAP_TOLERANCE, ECHO_SIMILARITY_THRESHOLD),
@@ -40,6 +42,10 @@ impl SegmentSequencer {
     pub fn advance(&mut self, speaker: Speaker, finalised_through: Duration) {
         self.finalised_through.insert(speaker, finalised_through);
         self.hear(speaker, finalised_through);
+    }
+
+    pub fn limit_wait_for_finals(&mut self, speaker: Speaker, wait: Duration) {
+        self.final_results_waits.insert(speaker, wait);
     }
 
     pub fn hear(&mut self, speaker: Speaker, heard_through: Duration) {
@@ -105,8 +111,16 @@ impl SegmentSequencer {
             .iter()
             .filter(|(lane, _)| **lane != segment.speaker)
             .all(|(lane, finalised)| {
-                *finalised >= needed || self.has_stopped_waiting_for(*lane, segment)
+                *finalised >= needed
+                    || self.has_stopped_waiting_for(*lane, segment)
+                    || self.has_waited_long_enough_for_finals(*lane, needed)
             })
+    }
+
+    fn has_waited_long_enough_for_finals(&self, lane: Speaker, needed: Duration) -> bool {
+        self.final_results_waits
+            .get(&lane)
+            .is_some_and(|wait| self.heard(lane) >= needed.saturating_add(*wait))
     }
 
     fn has_stopped_waiting_for(&self, lane: Speaker, segment: &Segment) -> bool {

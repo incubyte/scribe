@@ -3,6 +3,8 @@
 mod bridge;
 mod reply;
 
+use std::time::Duration;
+
 use scribe_core::ports::{TranscribeError, Transcriber};
 use scribe_core::recording::{AudioChunk, TranscriptEvent, Transcription};
 
@@ -10,6 +12,7 @@ use crate::reply::Reply;
 
 pub const ENGINE_NAME: &str = "speechanalyzer";
 pub const ENGLISH: &str = "en-US";
+pub const FINAL_RESULTS_WAIT: Duration = Duration::from_secs(6);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AssetStatus {
@@ -54,6 +57,10 @@ impl Transcriber for SpeechAnalyzerTranscriber {
     fn finish(&mut self) -> Result<Vec<TranscriptEvent>, TranscribeError> {
         self.finished = true;
         Ok(Reply::parse(&bridge::finish(self.session))?.events())
+    }
+
+    fn final_results_wait(&self) -> Option<Duration> {
+        Some(FINAL_RESULTS_WAIT)
     }
 }
 

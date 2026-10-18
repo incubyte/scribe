@@ -126,7 +126,7 @@ impl Recorder {
             .on_event(RecordingEvent::RecordingStarted { id: id.clone() });
         for speaker in unavailable {
             self.listener
-                .on_event(RecordingEvent::CaptureSilenced { speaker: *speaker });
+                .on_event(RecordingEvent::CaptureUnavailable { speaker: *speaker });
         }
     }
 
@@ -146,13 +146,19 @@ impl Recorder {
 
     fn session_writer(&self, lanes: &[StartedLane], context: SessionContext) -> SessionWriter {
         let speakers: Vec<Speaker> = lanes.iter().map(|lane| lane.speaker).collect();
+        let mut sequencer = SegmentSequencer::new(&speakers);
+        for lane in lanes {
+            if let Some(wait) = lane.transcriber.final_results_wait() {
+                sequencer.limit_wait_for_finals(lane.speaker, wait);
+            }
+        }
         SessionWriter {
             store: Arc::clone(&self.store),
             listener: Arc::clone(&self.listener),
             id: context.id,
             started_at: context.header.started_at,
             clock: context.clock,
-            sequencer: SegmentSequencer::new(&speakers),
+            sequencer,
             open_lanes: speakers.len(),
         }
     }

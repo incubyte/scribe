@@ -97,28 +97,34 @@ impl AudioSource for FakeAudioSource {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScriptedReply {
     events: Vec<TranscriptEvent>,
-    open_since: Option<Duration>,
+    finalised_through: Option<Duration>,
 }
 
 #[must_use]
 pub fn finalising(events: Vec<TranscriptEvent>) -> ScriptedReply {
     ScriptedReply {
         events,
-        open_since: None,
+        finalised_through: None,
+    }
+}
+
+#[must_use]
+pub fn finalising_through(events: Vec<TranscriptEvent>, through: Duration) -> ScriptedReply {
+    ScriptedReply {
+        events,
+        finalised_through: Some(through),
     }
 }
 
 #[must_use]
 pub fn still_speaking_since(start: Duration) -> ScriptedReply {
-    ScriptedReply {
-        events: Vec::new(),
-        open_since: Some(start),
-    }
+    finalising_through(Vec::new(), start)
 }
 
 pub struct ScriptedTranscriber {
     replies: VecDeque<Result<ScriptedReply, TranscribeError>>,
     origin: Option<Duration>,
+    final_results_wait: Option<Duration>,
 }
 
 impl ScriptedTranscriber {
@@ -132,6 +138,7 @@ impl ScriptedTranscriber {
         ScriptedTranscriber {
             replies: replies.into_iter().map(Ok).collect(),
             origin: None,
+            final_results_wait: None,
         }
     }
 
@@ -140,6 +147,15 @@ impl ScriptedTranscriber {
         ScriptedTranscriber {
             replies: VecDeque::from([Err(error)]),
             origin: None,
+            final_results_wait: None,
+        }
+    }
+
+    #[must_use]
+    pub fn waiting_for_finals_at_most(self, wait: Duration) -> ScriptedTranscriber {
+        ScriptedTranscriber {
+            final_results_wait: Some(wait),
+            ..self
         }
     }
 
@@ -149,7 +165,7 @@ impl ScriptedTranscriber {
             .saturating_sub(self.origin.unwrap_or_default());
         Transcription {
             events: reply.events,
-            finalised_through: reply.open_since.unwrap_or(heard_through),
+            finalised_through: reply.finalised_through.unwrap_or(heard_through),
         }
     }
 }
@@ -166,6 +182,10 @@ impl Transcriber for ScriptedTranscriber {
 
     fn finish(&mut self) -> Result<Vec<TranscriptEvent>, TranscribeError> {
         Ok(Vec::new())
+    }
+
+    fn final_results_wait(&self) -> Option<Duration> {
+        self.final_results_wait
     }
 }
 

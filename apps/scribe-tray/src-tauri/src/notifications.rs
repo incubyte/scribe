@@ -53,6 +53,17 @@ pub fn notify_cannot_hear_other_side<R: Runtime>(app: &AppHandle<R>) {
 }
 
 #[cfg(windows)]
+pub fn notify_other_side_unavailable<R: Runtime>(app: &AppHandle<R>) {
+    let alert = crate::other_side_alert::OTHER_SIDE_UNAVAILABLE_ON_WINDOWS;
+    show_plain(app, alert.title, alert.body);
+}
+
+#[cfg(not(windows))]
+pub fn notify_other_side_unavailable<R: Runtime>(app: &AppHandle<R>) {
+    notify_cannot_hear_other_side(app);
+}
+
+#[cfg(windows)]
 pub fn notify_cannot_hear_other_side<R: Runtime>(_app: &AppHandle<R>) {
     tracing::info!("the other side has been silent since the recording started");
 }

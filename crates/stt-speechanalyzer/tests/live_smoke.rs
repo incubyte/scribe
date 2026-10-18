@@ -3,7 +3,7 @@
 use std::time::Duration;
 
 use scribe_core::ports::Transcriber;
-use scribe_core::recording::{AudioChunk, TranscriptEvent};
+use scribe_core::recording::{AudioChunk, TranscriptEvent, Transcription};
 use stt_speechanalyzer::{
     AssetStatus, ENGLISH, SpeechAnalyzerTranscriber, english_asset_status, install_english_asset,
 };
@@ -78,4 +78,39 @@ fn the_finalised_point_never_runs_ahead_of_the_audio_pushed() {
     transcriber.finish().unwrap();
 
     assert!(ahead.is_empty(), "ran ahead after {ahead:?}");
+}
+
+fn latest_final_end(transcription: &Transcription) -> Option<Duration> {
+    transcription
+        .events
+        .iter()
+        .filter_map(|event| match event {
+            TranscriptEvent::Final(utterance) => Some(utterance.end),
+            TranscriptEvent::Partial(_) => None,
+        })
+        .max()
+}
+
+fn finalised_points_past_the_finals(transcriber: &mut SpeechAnalyzerTranscriber) -> Vec<Duration> {
+    let mut finals_through = Duration::ZERO;
+    let mut ahead = Vec::new();
+    for chunk in fixture_chunks() {
+        let transcription = transcriber.push(&chunk).unwrap();
+        finals_through = finals_through.max(latest_final_end(&transcription).unwrap_or_default());
+        if transcription.finalised_through > finals_through + ROUNDING {
+            ahead.push(transcription.finalised_through);
+        }
+    }
+    ahead
+}
+
+#[test]
+#[ignore = "needs macOS 26 with the English speech asset installed"]
+fn the_finalised_point_waits_for_finals_instead_of_following_the_audio() {
+    let mut transcriber = SpeechAnalyzerTranscriber::start(ENGLISH).unwrap();
+
+    let ahead = finalised_points_past_the_finals(&mut transcriber);
+    transcriber.finish().unwrap();
+
+    assert!(ahead.is_empty(), "ran past the finals at {ahead:?}");
 }

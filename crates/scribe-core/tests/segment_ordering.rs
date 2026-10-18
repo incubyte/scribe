@@ -280,3 +280,36 @@ fn an_echo_is_caught_even_when_their_line_is_finalised_after_mine() {
     assert_eq!(after_their_line_is_final, vec![their_budget_line()]);
     assert!(sequencer.drain().is_empty());
 }
+
+const FINAL_RESULTS_WAIT: Duration = Duration::from_secs(6);
+
+#[test]
+fn their_line_waits_no_longer_than_the_final_results_wait_while_my_side_is_silent() {
+    let mut sequencer = SegmentSequencer::new(&BOTH_SIDES);
+    sequencer.limit_wait_for_finals(Speaker::Me, FINAL_RESULTS_WAIT);
+    sequencer.accept(line(Speaker::Them, (5_000, 6_000), "Are you still there"));
+    sequencer.advance(Speaker::Them, millis(11_000));
+    sequencer.advance(Speaker::Me, millis(4_260));
+    sequencer.hear(Speaker::Me, millis(10_999));
+    let just_before_the_limit = sequencer.release_ready();
+
+    sequencer.hear(Speaker::Me, millis(11_000));
+    let at_the_limit = sequencer.release_ready();
+
+    assert!(just_before_the_limit.is_empty());
+    assert_eq!(
+        at_the_limit,
+        vec![line(Speaker::Them, (5_000, 6_000), "Are you still there")]
+    );
+}
+
+#[test]
+fn without_a_final_results_wait_their_line_keeps_waiting_for_my_side() {
+    let mut sequencer = SegmentSequencer::new(&BOTH_SIDES);
+    sequencer.accept(line(Speaker::Them, (5_000, 6_000), "Are you still there"));
+    sequencer.advance(Speaker::Them, millis(30_000));
+    sequencer.advance(Speaker::Me, millis(4_260));
+    sequencer.hear(Speaker::Me, millis(30_000));
+
+    assert!(sequencer.release_ready().is_empty());
+}

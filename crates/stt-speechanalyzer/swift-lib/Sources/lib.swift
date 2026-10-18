@@ -100,7 +100,7 @@ private final class LaneSession: @unchecked Sendable {
   private let lock = NSLock()
   private var queued: [EventPayload] = []
   private var failure: String?
-  private var heardSeconds = 0.0
+  private var finalisedSeconds = 0.0
   private var outstandingVolatileStart: Double?
 
   init(analyzer: SpeechAnalyzer, continuation: AsyncStream<AnalyzerInput>.Continuation, audio: AudioAdapter) {
@@ -129,13 +129,14 @@ private final class LaneSession: @unchecked Sendable {
       outstandingVolatileStart = min(outstandingVolatileStart ?? start, start)
       return
     }
-    if let volatileStart = outstandingVolatileStart, CMTimeRangeGetEnd(result.range).seconds > volatileStart {
+    let end = CMTimeRangeGetEnd(result.range).seconds
+    finalisedSeconds = max(finalisedSeconds, end)
+    if let volatileStart = outstandingVolatileStart, end > volatileStart {
       outstandingVolatileStart = nil
     }
   }
 
   func feed(_ samples: [Float]) throws {
-    lock.withLock { heardSeconds += Double(samples.count) / inputSampleRate }
     guard let buffer = try audio.buffer(for: samples) else { return }
     continuation.yield(AnalyzerInput(buffer: buffer))
   }
@@ -148,7 +149,7 @@ private final class LaneSession: @unchecked Sendable {
     try lock.withLock {
       if let failure { throw BridgeError(failure) }
       defer { queued.removeAll() }
-      return (queued, outstandingVolatileStart ?? heardSeconds)
+      return (queued, outstandingVolatileStart ?? finalisedSeconds)
     }
   }
 }

@@ -7,6 +7,7 @@ pub mod mcp_config;
 pub mod menu_action;
 mod model_setup;
 mod notifications;
+pub mod other_side_alert;
 mod popover;
 mod power;
 mod privacy;

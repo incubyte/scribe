@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use std::sync::mpsc::Receiver;
+use std::time::Duration;
 
 use chrono::{DateTime, FixedOffset};
 
@@ -16,6 +17,10 @@ pub trait AudioSource: Send {
 pub trait Transcriber: Send {
     fn push(&mut self, chunk: &AudioChunk) -> Result<Transcription, TranscribeError>;
     fn finish(&mut self) -> Result<Vec<TranscriptEvent>, TranscribeError>;
+
+    fn final_results_wait(&self) -> Option<Duration> {
+        None
+    }
 }
 
 pub trait TranscriptStore: Send + Sync {
