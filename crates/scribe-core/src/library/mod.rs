@@ -65,7 +65,7 @@ impl TranscriptLibrary {
             .into_iter()
             .filter(|summary| is_readable(summary.status))
             .collect();
-        readable.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+        readable.sort_by_key(|summary| std::cmp::Reverse(summary.started_at));
         Ok(readable)
     }
 

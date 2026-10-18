@@ -350,7 +350,7 @@ impl TranscriptStore for InMemoryTranscriptStore {
                 .map(|session| session.header.summary())
                 .collect()
         });
-        summaries.sort_by(|a, b| b.started_at.cmp(&a.started_at));
+        summaries.sort_by_key(|summary| std::cmp::Reverse(summary.started_at));
         summaries.truncate(limit);
         Ok(summaries)
     }
