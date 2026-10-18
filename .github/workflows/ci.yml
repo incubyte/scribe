@@ -33,6 +33,11 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all -- --check
       - run: cargo clippy $PORTABLE_CRATES --all-targets -- -D warnings
+      - name: Give the runner a Documents folder, as macOS and Windows have
+        shell: bash
+        run: |
+          mkdir -p "$HOME/.config" "$HOME/Documents"
+          echo 'XDG_DOCUMENTS_DIR="$HOME/Documents"' > "$HOME/.config/user-dirs.dirs"
       - run: cargo test $PORTABLE_CRATES
       - name: Only the Parakeet adapter may depend on an HTTP client
         shell: bash
