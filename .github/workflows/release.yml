@@ -1,0 +1,62 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: The tag matches the app version
+        shell: bash
+        run: |
+          app_version=$(jq -r .version apps/scribe-tray/src-tauri/tauri.conf.json)
+          if [ "${GITHUB_REF_NAME}" != "v${app_version}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match app version v${app_version} in tauri.conf.json"
+            exit 1
+          fi
+
+  build:
+    needs: check-version
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-26, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.93.1
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/scribe-tray/package-lock.json
+      - run: npm ci
+        working-directory: apps/scribe-tray
+      - name: Stage the MCP server the tray bundles as a sidecar
+        shell: bash
+        run: apps/scribe-tray/scripts/stage-sidecar.sh
+      - uses: tauri-apps/tauri-action@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: apps/scribe-tray
+          tauriScript: npm run tauri
+          args: --config src-tauri/tauri.ci.conf.json
+          tagName: ${{ github.ref_name }}
+          releaseName: Scribe ${{ github.ref_name }}
+          releaseBody: |
+            Unsigned build. On first launch:
+            - macOS: open System Settings → Privacy & Security and choose Open Anyway for Scribe.
+            - Windows: on the SmartScreen prompt choose More info → Run anyway.
+          releaseDraft: true
+          prerelease: false
