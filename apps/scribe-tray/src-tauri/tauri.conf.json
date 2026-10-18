@@ -10,12 +10,19 @@
     "beforeBuildCommand": "bash scripts/stage-sidecar.sh && npm run build"
   },
   "app": {
+    "macOSPrivateApi": true,
     "windows": [
       {
         "label": "popover",
         "url": "index.html#popover",
         "visible": false,
         "decorations": false,
+        "transparent": true,
+        "windowEffects": {
+          "effects": ["popover", "mica"],
+          "state": "active",
+          "radius": 12
+        },
         "alwaysOnTop": true,
         "resizable": false,
         "skipTaskbar": true,

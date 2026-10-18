@@ -28,3 +28,5 @@ export type ModelDownload =
   | { readonly state: "ready" }
   | { readonly state: "downloading"; readonly percent: number | null }
   | { readonly state: "failed"; readonly reason_kind: string };
+
+export type ClaudeDesktopStatus = "not_installed" | "not_connected" | "outdated" | "connected";

@@ -56,3 +56,9 @@ fn servers_of(root: &mut Map<String, Value>) -> Result<&mut Map<String, Value>, 
 fn render(root: Map<String, Value>) -> String {
     format!("{:#}\n", Value::Object(root))
 }
+
+#[must_use]
+pub fn scribe_server_in(existing: &str) -> Option<Value> {
+    let mut root = parse_root(existing).ok()?;
+    servers_of(&mut root).ok()?.remove(SCRIBE_SERVER_NAME)
+}

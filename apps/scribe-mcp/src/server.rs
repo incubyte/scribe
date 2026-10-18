@@ -1,5 +1,5 @@
 use rmcp::handler::server::wrapper::Parameters;
-use rmcp::{Json, tool, tool_router};
+use rmcp::{Json, ServerHandler, tool, tool_handler, tool_router};
 use scribe_core::library::{LibraryError, SearchQuery, TranscriptLibrary};
 
 use crate::requests::{
@@ -19,10 +19,10 @@ impl ScribeServer {
     }
 }
 
-#[tool_router(server_handler)]
+#[tool_router]
 impl ScribeServer {
     #[tool(
-        description = "List the user's saved call transcripts, newest first. Returns id, title, start time, duration and status for each call. Calls still being recorded are not included."
+        description = "List the call transcripts Scribe has recorded and saved on this computer, newest first. Returns id, title, start time, duration and status for each call. Calls still being recorded are not included."
     )]
     async fn list_transcripts(
         &self,
@@ -34,7 +34,7 @@ impl ScribeServer {
     }
 
     #[tool(
-        description = "Read one saved call transcript by id as markdown, including its header (title, start and end time, status) and every spoken line with its timestamp and speaker."
+        description = "Read one call transcript recorded by Scribe, by id, as markdown, including its header (title, start and end time, status) and every spoken line with its timestamp and speaker."
     )]
     async fn get_transcript(
         &self,
@@ -48,7 +48,7 @@ impl ScribeServer {
     }
 
     #[tool(
-        description = "Search the user's saved call transcripts for a phrase, matched literally and ignoring case. Returns the newest calls that have a matching line, each with its matching lines' timestamp, speaker and text. Use get_transcript to read a whole call. Calls still being recorded are not searched."
+        description = "Search the call transcripts Scribe has recorded on this computer for a phrase, matched literally and ignoring case. Returns the newest calls that have a matching line, each with its matching lines' timestamp, speaker and text. Use get_transcript to read a whole call. Calls still being recorded are not searched."
     )]
     async fn search_transcripts(
         &self,
@@ -67,3 +67,9 @@ fn report(error: &LibraryError) -> String {
     tracing::warn!(%error, "a transcript request failed");
     error.to_string()
 }
+
+#[tool_handler(
+    name = "scribe",
+    instructions = "Scribe records the user's calls and meetings on this computer and saves each one as a transcript, with the user's lines marked Me and the other side marked Them. Use these tools when the user asks about their Scribe calls, their meetings, or what someone said on a call. Nothing here leaves the computer."
+)]
+impl ServerHandler for ScribeServer {}

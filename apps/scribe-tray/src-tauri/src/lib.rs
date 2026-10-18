@@ -23,24 +23,31 @@ mod webview;
 use tauri::{AppHandle, Builder, Runtime};
 
 pub fn run() -> tauri::Result<()> {
-    with_plugins(Builder::default())
-        .invoke_handler(tauri::generate_handler![
-            privacy::acknowledge_privacy,
-            commands::recorder_snapshot,
-            commands::recent_sessions,
-            commands::start_recording,
-            commands::stop_recording,
-            commands::open_session,
-            commands::model_download_status,
-            commands::retry_model_download,
-            popover::hide_popover,
-        ])
+    with_commands(with_plugins(Builder::default()))
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             start_scribe(app.handle())
         })
         .run(tauri::generate_context!())
+}
+
+fn with_commands<R: Runtime>(builder: Builder<R>) -> Builder<R> {
+    builder.invoke_handler(tauri::generate_handler![
+        privacy::acknowledge_privacy,
+        commands::recorder_snapshot,
+        commands::recent_sessions,
+        commands::start_recording,
+        commands::stop_recording,
+        commands::open_session,
+        commands::model_download_status,
+        commands::retry_model_download,
+        commands::connect_claude_desktop,
+        commands::claude_desktop_status,
+        commands::copy_mcp_config,
+        commands::open_transcripts_folder,
+        popover::hide_popover,
+    ])
 }
 
 fn with_plugins<R: Runtime>(builder: Builder<R>) -> Builder<R> {

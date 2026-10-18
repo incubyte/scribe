@@ -19,12 +19,21 @@ interface ControlLook {
 
 const STATUS_TEXT: Readonly<Record<RecorderPhase, string>> = {
   locked: "Not ready yet",
-  idle: "Not recording",
+  idle: "Ready to record",
   recording: "Recording",
 };
 
-const START_LOOK: ControlLook = { label: "Start recording", className: "button" };
-const STOP_LOOK: ControlLook = { label: "Stop recording", className: "button button--recording" };
+const DETAIL_TEXT: Readonly<Record<RecorderPhase, string>> = {
+  locked: "Scribe is getting set up.",
+  idle: "Your mic and this computer's sound, transcribed on this computer.",
+  recording: "Recording",
+};
+
+const START_LOOK: ControlLook = { label: "Start recording", className: "record-button" };
+const STOP_LOOK: ControlLook = {
+  label: "Stop recording",
+  className: "record-button record-button--recording",
+};
 
 const START_FAILURE_TEXT: Readonly<Record<string, string>> = {
   microphone_denied: "Scribe can't use the microphone.",
@@ -38,10 +47,18 @@ function describeStartFailure(reasonKind: string): string {
 export function StatusBar({ phase, startedAt, startFailure, onStart, onStop }: StatusBarProps) {
   return (
     <header className="status-bar">
-      <RecordingDot phase={phase} />
-      <span className="status-bar__text">{STATUS_TEXT[phase]}</span>
-      {phase === "recording" ? <Elapsed startedAt={startedAt} /> : null}
       <RecordingButton phase={phase} onStart={onStart} onStop={onStop} />
+      <div className="status-bar__summary">
+        {phase === "recording" ? (
+          <Elapsed startedAt={startedAt} />
+        ) : (
+          <p className="status-bar__headline">{STATUS_TEXT[phase]}</p>
+        )}
+        <p className="status-bar__detail">
+          <RecordingDot phase={phase} />
+          <span>{DETAIL_TEXT[phase]}</span>
+        </p>
+      </div>
       <StatusMessage phase={phase} startFailure={startFailure} />
     </header>
   );
@@ -60,8 +77,21 @@ function RecordingButton({ phase, onStart, onStop }: RecordingButtonProps) {
       disabled={phase === "locked"}
       onClick={recording ? onStop : onStart}
     >
-      {look.label}
+      <RecordGlyph recording={recording} />
+      <span className="visually-hidden">{look.label}</span>
     </button>
+  );
+}
+
+function RecordGlyph({ recording }: Readonly<{ recording: boolean }>) {
+  return (
+    <svg className="record-button__glyph" viewBox="0 0 22 22" aria-hidden="true">
+      {recording ? (
+        <rect x="6" y="6" width="10" height="10" rx="2.5" fill="currentColor" />
+      ) : (
+        <circle cx="11" cy="11" r="7" fill="currentColor" />
+      )}
+    </svg>
   );
 }
 

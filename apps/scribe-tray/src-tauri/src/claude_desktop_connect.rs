@@ -1,6 +1,8 @@
 use tauri::{AppHandle, Runtime};
 
-use crate::claude_desktop::{ClaudeDesktopConfig, ConnectOutcome, connect};
+use crate::claude_desktop::{
+    ClaudeDesktopConfig, ConnectOutcome, ConnectionStatus, connect, connection_status,
+};
 use crate::mcp_config::bundled_mcp_path;
 use crate::notifications;
 
@@ -19,5 +21,16 @@ fn connect_outcome() -> ConnectOutcome {
     match ClaudeDesktopConfig::default_location() {
         Some(config) => connect(&config, &server_command),
         None => ConnectOutcome::ClaudeNotInstalled,
+    }
+}
+
+#[must_use]
+pub fn claude_desktop_status() -> ConnectionStatus {
+    let Ok(server_command) = bundled_mcp_path() else {
+        return ConnectionStatus::NotConnected;
+    };
+    match ClaudeDesktopConfig::default_location() {
+        Some(config) => connection_status(&config, &server_command),
+        None => ConnectionStatus::NotInstalled,
     }
 }

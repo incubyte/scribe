@@ -3,35 +3,60 @@
 
   --space-1: 4px;
   --space-2: 8px;
-  --space-3: 16px;
-  --space-4: 24px;
-  --radius: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
 
-  --surface: #ffffff;
-  --surface-raised: #f2f2f7;
-  --text: #1c1c1e;
-  --text-muted: #48484a;
-  --accent: #0b57d0;
+  --radius-window: 12px;
+  --radius-control: 8px;
+  --record-size: 48px;
+
+  --glass: rgb(250 250 252 / 0.84);
+  --surface: #fafafc;
+  --surface-sunken: rgb(0 0 0 / 0.045);
+  --surface-hover: rgb(0 0 0 / 0.06);
+  --hairline: rgb(0 0 0 / 0.1);
+  --text: #1d1d1f;
+  --text-muted: #4a4a50;
+  --accent: #0f6f6a;
   --on-accent: #ffffff;
-  --recording: #b3261e;
+  --accent-soft: rgb(15 111 106 / 0.12);
+  --recording: #c9302c;
   --on-recording: #ffffff;
-  --focus-ring: 3px solid #0b57d0;
+  --recording-glow: rgb(201 48 44 / 0.35);
+  --focus-ring: 3px solid #0f6f6a;
   --focus-ring-offset: 2px;
 
-  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", sans-serif;
+  --font-figures: ui-rounded, "SF Pro Rounded", -apple-system, "Segoe UI Variable", sans-serif;
+  --text-sm: 12px;
+  --text-md: 13px;
+  --text-lg: 15px;
+  --text-timer: 28px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --surface: #1c1c1e;
-    --surface-raised: #2c2c2e;
-    --text: #f2f2f7;
-    --text-muted: #c7c7cc;
-    --accent: #8ab4f8;
-    --on-accent: #0b0b0c;
-    --recording: #ff8a80;
-    --on-recording: #0b0b0c;
-    --focus-ring: 3px solid #8ab4f8;
+    --glass: rgb(30 30 33 / 0.86);
+    --surface: #1e1e21;
+    --surface-sunken: rgb(255 255 255 / 0.05);
+    --surface-hover: rgb(255 255 255 / 0.08);
+    --hairline: rgb(255 255 255 / 0.12);
+    --text: #f2f2f5;
+    --text-muted: #b9b9c0;
+    --accent: #5fd3c6;
+    --on-accent: #062b28;
+    --accent-soft: rgb(95 211 198 / 0.14);
+    --recording: #ff6b62;
+    --on-recording: #2a0605;
+    --recording-glow: rgb(255 107 98 / 0.4);
+    --focus-ring: 3px solid #5fd3c6;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass: var(--surface);
   }
 }
 

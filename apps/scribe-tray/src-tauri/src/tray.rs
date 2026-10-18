@@ -22,7 +22,7 @@ use crate::recording_label::{START_RECORDING, stop_recording_label};
 const TRAY_ID: &str = "main";
 const IDLE_TOOLTIP: &str = "Scribe";
 const RECORDING_TOOLTIP: &str = "Scribe — recording";
-const IDLE_ICON: Image<'static> = tauri::include_image!("icons/icon.png");
+const IDLE_ICON: Image<'static> = tauri::include_image!("icons/tray-idle.png");
 const RECORDING_ICON: Image<'static> = tauri::include_image!("icons/tray-recording.png");
 
 struct RecordingMenuItem<R: Runtime>(MenuItem<R>);
@@ -236,7 +236,7 @@ fn show_privacy<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
-fn open_transcripts_folder<R: Runtime>(app: &AppHandle<R>) {
+pub(crate) fn open_transcripts_folder<R: Runtime>(app: &AppHandle<R>) {
     if let Err(error) = try_open_transcripts_folder(app) {
         tracing::error!(%error, "could not open the transcripts folder");
     }

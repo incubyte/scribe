@@ -122,6 +122,38 @@ async fn an_ai_app_discovers_the_list_and_read_tools_with_descriptions_and_input
 }
 
 #[tokio::test]
+async fn every_tool_says_it_reads_scribe_transcripts_so_ai_apps_can_tell_it_apart() {
+    let folder = tempfile::tempdir().unwrap();
+    let client = connect_to(folder.path()).await;
+
+    let tools = client.list_all_tools().await.unwrap();
+
+    assert!(tools.iter().all(|tool| {
+        tool.description
+            .as_deref()
+            .is_some_and(|text| text.contains("Scribe"))
+    }));
+}
+
+#[tokio::test]
+async fn the_server_introduces_itself_as_scribe_with_instructions_for_the_ai_app() {
+    let folder = tempfile::tempdir().unwrap();
+    let client = connect_to(folder.path()).await;
+
+    let info = client.peer_info().unwrap();
+
+    assert_eq!(
+        info.server_info.as_ref().map(|server| server.name.as_str()),
+        Some("scribe")
+    );
+    assert!(
+        info.instructions
+            .as_deref()
+            .is_some_and(|text| text.contains("Scribe"))
+    );
+}
+
+#[tokio::test]
 async fn an_ai_app_sees_saved_calls_newest_first() {
     let folder = tempfile::tempdir().unwrap();
     let store = store_in(folder.path());

@@ -1,4 +1,5 @@
 import type {
+  ClaudeDesktopStatus,
   ModelDownload,
   RecorderPhase,
   RecorderSnapshot,
@@ -126,3 +127,7 @@ export function expecting<T>(guard: Guard<T>, what: string): (value: unknown) =>
     return value;
   };
 }
+
+const CLAUDE_DESKTOP_STATUSES: readonly string[] = ["not_installed", "not_connected", "outdated", "connected"];
+
+export const isClaudeDesktopStatus: Guard<ClaudeDesktopStatus> = isOneOf(CLAUDE_DESKTOP_STATUSES);

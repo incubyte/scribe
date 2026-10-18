@@ -7,6 +7,7 @@ use store_markdown::MarkdownTranscriptStore;
 use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_opener::OpenerExt;
 
+use crate::claude_desktop::ConnectionStatus;
 use crate::live_feed::{LiveFeed, RecorderSnapshot};
 use crate::model_setup::{self, ModelDownloadView};
 use crate::recording::{self, RecordingController};
@@ -69,4 +70,28 @@ pub fn model_download_status<R: Runtime>(app: AppHandle<R>) -> ModelDownloadView
 #[allow(clippy::needless_pass_by_value)]
 pub fn retry_model_download<R: Runtime>(app: AppHandle<R>) {
     model_setup::retry(&app);
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn connect_claude_desktop<R: Runtime>(app: AppHandle<R>) -> ConnectionStatus {
+    crate::claude_desktop_connect::connect_claude_desktop(&app);
+    crate::claude_desktop_connect::claude_desktop_status()
+}
+
+#[tauri::command]
+pub fn claude_desktop_status() -> ConnectionStatus {
+    crate::claude_desktop_connect::claude_desktop_status()
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn copy_mcp_config<R: Runtime>(app: AppHandle<R>) {
+    crate::mcp_clipboard::copy_config(&app);
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn open_transcripts_folder<R: Runtime>(app: AppHandle<R>) {
+    crate::tray::open_transcripts_folder(&app);
 }

@@ -1,11 +1,13 @@
 mod location;
 mod merge;
+mod status;
 
 use std::io;
 use std::path::Path;
 
 pub use location::ClaudeDesktopConfig;
 pub use merge::{MergeResult, UnreadableConfig, merge_scribe_server};
+pub use status::{ConnectionStatus, connection_status};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ConnectOutcome {

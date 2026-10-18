@@ -9,6 +9,7 @@ interface LiveTranscriptProps {
 
 const BOTTOM_TOLERANCE_PX = 8;
 const SPEAKERS: readonly Speaker[] = ["Me", "Them"];
+const LINE_CLASS: Readonly<Record<Speaker, string>> = { Me: "line line--me", Them: "line line--them" };
 
 function isAtBottom(region: HTMLDivElement): boolean {
   return region.scrollHeight - region.scrollTop - region.clientHeight <= BOTTOM_TOLERANCE_PX;
@@ -48,13 +49,13 @@ export function LiveTranscript({ lines, partials }: LiveTranscriptProps) {
     >
       <ol className="transcript__lines">
         {lines.map((line) => (
-          <li key={`${line.speaker}-${line.startMs}`} className="line">
+          <li key={`${line.speaker}-${line.startMs}`} className={LINE_CLASS[line.speaker]}>
             <span className="line__speaker">{line.speaker}</span>
             <span className="line__text">{line.text}</span>
           </li>
         ))}
         {SPEAKERS.filter((speaker) => partials[speaker] !== undefined).map((speaker) => (
-          <li key={`${speaker}-partial`} className="line partial" aria-hidden="true">
+          <li key={`${speaker}-partial`} className={`${LINE_CLASS[speaker]} partial`} aria-hidden="true">
             <span className="line__speaker">{speaker}</span>
             <span className="line__text">{partials[speaker]}</span>
           </li>
