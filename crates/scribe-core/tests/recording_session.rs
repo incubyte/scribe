@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::mpsc;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -628,5 +629,99 @@ fn an_echo_is_dropped_when_their_side_finalises_late_and_then_falls_silent() {
             (1_000, 2_000),
             "Let's review the budget"
         )]
+    );
+}
+
+const BRIEFLY: Duration = Duration::from_millis(300);
+
+fn saved_after_a_moment(call: &Call, id: &SessionId) -> Vec<Segment> {
+    let deadline = Instant::now() + BRIEFLY;
+    while call.store.segments(id).is_empty() && Instant::now() < deadline {
+        thread::sleep(Duration::from_millis(10));
+    }
+    call.store.segments(id)
+}
+
+struct Gate {
+    open: mpsc::Sender<()>,
+    closed: mpsc::Receiver<()>,
+}
+
+fn gate() -> Gate {
+    let (open, closed) = mpsc::channel();
+    Gate { open, closed }
+}
+
+fn my_side_pausing_mid_transcription(is_waiting: &Gate, gate: Gate) -> Lane {
+    let mine = speaking_until(15, utterance(1_000, 1_500, "Hello"))
+        .announcing_push(15, is_waiting.open.clone())
+        .pausing_before_push(15, gate.closed);
+    lane_lasting(Speaker::Me, 4_000, mine)
+}
+
+fn their_side_running_ahead(gate: Gate, is_done: &Gate) -> Lane {
+    let theirs = speaking_until(25, utterance(2_000, 2_500, "How are you"))
+        .pausing_before_push(0, gate.closed)
+        .announcing_push(59, is_done.open.clone());
+    lane_lasting(Speaker::Them, 6_000, theirs)
+}
+
+struct SlowTranscription {
+    my_side_is_waiting: Gate,
+    open_my_gate: mpsc::Sender<()>,
+    open_their_gate: mpsc::Sender<()>,
+    their_side_is_done: Gate,
+}
+
+impl SlowTranscription {
+    fn let_their_side_run_ahead(&self) {
+        self.my_side_is_waiting
+            .closed
+            .recv_timeout(PATIENCE)
+            .unwrap();
+        self.open_their_gate.send(()).unwrap();
+        self.their_side_is_done
+            .closed
+            .recv_timeout(PATIENCE)
+            .unwrap();
+    }
+
+    fn let_my_side_finish(&self) {
+        self.open_my_gate.send(()).unwrap();
+    }
+}
+
+fn start_with_my_side_paused_mid_transcription(call: &mut Call) -> (SessionId, SlowTranscription) {
+    let (my_gate, their_gate) = (gate(), gate());
+    let slow = SlowTranscription {
+        my_side_is_waiting: gate(),
+        open_my_gate: my_gate.open.clone(),
+        open_their_gate: their_gate.open.clone(),
+        their_side_is_done: gate(),
+    };
+    let lanes = vec![
+        my_side_pausing_mid_transcription(&slow.my_side_is_waiting, my_gate),
+        their_side_running_ahead(their_gate, &slow.their_side_is_done),
+    ];
+    (call.start(lanes).unwrap(), slow)
+}
+
+#[test]
+fn a_side_waiting_on_a_slow_transcription_is_not_mistaken_for_a_stalled_one() {
+    let mut call = Call::ready();
+    let (id, slow) = start_with_my_side_paused_mid_transcription(&mut call);
+
+    slow.let_their_side_run_ahead();
+    let saved_while_my_side_transcribes = saved_after_a_moment(&call, &id);
+    slow.let_my_side_finish();
+    call.recorder.stop().unwrap();
+
+    assert!(saved_while_my_side_transcribes.is_empty());
+    assert_eq!(
+        call.store.segments(&id),
+        vec![
+            line(Speaker::Me, (1_000, 1_500), "Hello"),
+            line(Speaker::Them, (2_000, 2_500), "How are you"),
+        ]
     );
 }

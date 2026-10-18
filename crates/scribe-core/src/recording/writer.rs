@@ -34,6 +34,7 @@ impl SessionWriter {
     fn handle(&mut self, message: LaneMessage) {
         match message {
             LaneMessage::Final(segment) => self.sequencer.accept(segment),
+            LaneMessage::Transcribing(speaker) => self.sequencer.start_transcribing(speaker),
             LaneMessage::Progress(progress) => self.advance(&progress),
             LaneMessage::Partial(speaker, text) => self
                 .listener
@@ -52,9 +53,11 @@ impl SessionWriter {
             .advance(progress.speaker, progress.finalised_through);
         self.sequencer
             .hear(progress.speaker, progress.heard_through);
+        self.sequencer.finish_transcribing(progress.speaker);
     }
 
     fn end_lane(&mut self, speaker: Speaker) {
+        self.sequencer.finish_transcribing(speaker);
         self.sequencer.close(speaker);
         self.open_lanes = self.open_lanes.saturating_sub(1);
     }

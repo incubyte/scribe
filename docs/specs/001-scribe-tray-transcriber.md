@@ -631,7 +631,7 @@ Greenfield — every module is new.
 - CI has never run: `main` is 10+ commits ahead of origin. AC 5.1.5 stays unproven until a PR passes on both runners.
 
 **9.7 Findings from the re-review of the fixes (2026-10-18).** The ordering HIGH is closed, within the accepted trade-off: on macOS, finished lines may lag up to about 6 s. Still open:
-- **MED (Windows):** both lanes share one Parakeet model behind a single mutex, so while one lane decodes, the other lane's heard position stops advancing. The 1.5 s stall rule can then misread it as stalled and release lines out of order. Fix by giving each lane its own decode session, or by not counting time spent waiting for the lock as a stall.
+- Resolved 2026-10-18 (commit "fix(windows): keep shared parakeet decode from stalling lane order"): a lane now reports when it starts transcribing, and the sequencer never treats a lane that is mid-transcription, whether decoding or waiting for the shared model, as stalled. **MED (Windows):** both lanes share one Parakeet model behind a single mutex, so while one lane decodes, the other lane's heard position stops advancing. The 1.5 s stall rule can then misread it as stalled and release lines out of order. Fix by giving each lane its own decode session, or by not counting time spent waiting for the lock as a stall.
 - **LOW:**
   - `aria-label` on the status live region;
   - a repeated start failure of the same kind is not re-announced;

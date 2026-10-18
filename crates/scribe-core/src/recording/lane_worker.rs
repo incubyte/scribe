@@ -10,6 +10,7 @@ const SILENCE_WARNING_AFTER: Duration = Duration::from_secs(5);
 
 pub(crate) enum LaneMessage {
     Final(Segment),
+    Transcribing(Speaker),
     Progress(LaneProgress),
     Partial(Speaker, String),
     Silenced(Speaker),
@@ -56,6 +57,7 @@ impl LaneRun {
         for chunk in chunks {
             self.audio_origin.get_or_insert(chunk.captured_at);
             self.watch_for_silence(&chunk);
+            self.send(LaneMessage::Transcribing(self.worker.speaker));
             let transcription = self.worker.transcriber.push(&chunk)?;
             self.forward(transcription.events);
             self.send(self.progress_after(&chunk, transcription.finalised_through));

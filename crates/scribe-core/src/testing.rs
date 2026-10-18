@@ -125,6 +125,9 @@ pub struct ScriptedTranscriber {
     replies: VecDeque<Result<ScriptedReply, TranscribeError>>,
     origin: Option<Duration>,
     final_results_wait: Option<Duration>,
+    pushes: usize,
+    gate: Option<(usize, Receiver<()>)>,
+    announcement: Option<(usize, Sender<()>)>,
 }
 
 impl ScriptedTranscriber {
@@ -139,6 +142,9 @@ impl ScriptedTranscriber {
             replies: replies.into_iter().map(Ok).collect(),
             origin: None,
             final_results_wait: None,
+            pushes: 0,
+            gate: None,
+            announcement: None,
         }
     }
 
@@ -148,6 +154,36 @@ impl ScriptedTranscriber {
             replies: VecDeque::from([Err(error)]),
             origin: None,
             final_results_wait: None,
+            pushes: 0,
+            gate: None,
+            announcement: None,
+        }
+    }
+
+    #[must_use]
+    pub fn pausing_before_push(self, push: usize, gate: Receiver<()>) -> ScriptedTranscriber {
+        ScriptedTranscriber {
+            gate: Some((push, gate)),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub fn announcing_push(self, push: usize, announce: Sender<()>) -> ScriptedTranscriber {
+        ScriptedTranscriber {
+            announcement: Some((push, announce)),
+            ..self
+        }
+    }
+
+    fn mark_push(&mut self) {
+        let push = self.pushes;
+        self.pushes += 1;
+        if let Some((_, announce)) = self.announcement.as_ref().filter(|(at, _)| *at == push) {
+            let _ = announce.send(());
+        }
+        if let Some((_, gate)) = self.gate.as_ref().filter(|(at, _)| *at == push) {
+            let _ = gate.recv();
         }
     }
 
@@ -173,6 +209,7 @@ impl ScriptedTranscriber {
 impl Transcriber for ScriptedTranscriber {
     fn push(&mut self, chunk: &AudioChunk) -> Result<Transcription, TranscribeError> {
         self.origin.get_or_insert(chunk.captured_at);
+        self.mark_push();
         let reply = self
             .replies
             .pop_front()

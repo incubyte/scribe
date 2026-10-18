@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::time::Duration;
 
 use crate::recording::{
@@ -12,6 +12,7 @@ pub struct SegmentSequencer {
     finalised_through: BTreeMap<Speaker, Duration>,
     heard_through: BTreeMap<Speaker, Duration>,
     final_results_waits: BTreeMap<Speaker, Duration>,
+    transcribing: BTreeSet<Speaker>,
     pending: Vec<Segment>,
     recent_them: Vec<Segment>,
     echo_filter: EchoFilter,
@@ -26,6 +27,7 @@ impl SegmentSequencer {
             finalised_through: starting_points.clone(),
             heard_through: starting_points,
             final_results_waits: BTreeMap::new(),
+            transcribing: BTreeSet::new(),
             pending: Vec::new(),
             recent_them: Vec::new(),
             echo_filter: EchoFilter::new(ECHO_OVERLAP_TOLERANCE, ECHO_SIMILARITY_THRESHOLD),
@@ -42,6 +44,14 @@ impl SegmentSequencer {
     pub fn advance(&mut self, speaker: Speaker, finalised_through: Duration) {
         self.finalised_through.insert(speaker, finalised_through);
         self.hear(speaker, finalised_through);
+    }
+
+    pub fn start_transcribing(&mut self, speaker: Speaker) {
+        self.transcribing.insert(speaker);
+    }
+
+    pub fn finish_transcribing(&mut self, speaker: Speaker) {
+        self.transcribing.remove(&speaker);
     }
 
     pub fn limit_wait_for_finals(&mut self, speaker: Speaker, wait: Duration) {
@@ -126,7 +136,8 @@ impl SegmentSequencer {
     fn has_stopped_waiting_for(&self, lane: Speaker, segment: &Segment) -> bool {
         let own = self.heard(segment.speaker);
         let held_too_long = own >= segment.end.saturating_add(MAX_HOLD);
-        let lane_has_stalled = self.heard(lane).saturating_add(MAX_HOLD) <= own;
+        let lane_has_stalled =
+            !self.transcribing.contains(&lane) && self.heard(lane).saturating_add(MAX_HOLD) <= own;
         held_too_long && lane_has_stalled
     }
 

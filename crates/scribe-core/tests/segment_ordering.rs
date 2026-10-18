@@ -313,3 +313,22 @@ fn without_a_final_results_wait_their_line_keeps_waiting_for_my_side() {
 
     assert!(sequencer.release_ready().is_empty());
 }
+
+#[test]
+fn a_side_busy_transcribing_is_waited_for_however_far_the_other_side_runs_ahead() {
+    let mut sequencer = SegmentSequencer::new(&BOTH_SIDES);
+    sequencer.accept(line(Speaker::Them, (2_000, 2_500), "How are you"));
+    sequencer.hear(Speaker::Me, millis(1_500));
+    sequencer.start_transcribing(Speaker::Me);
+    sequencer.advance(Speaker::Them, millis(6_000));
+    let while_my_side_transcribes = sequencer.release_ready();
+
+    sequencer.finish_transcribing(Speaker::Me);
+    let once_my_side_lags_without_transcribing = sequencer.release_ready();
+
+    assert!(while_my_side_transcribes.is_empty());
+    assert_eq!(
+        once_my_side_lags_without_transcribing,
+        vec![line(Speaker::Them, (2_000, 2_500), "How are you")]
+    );
+}
