@@ -4,14 +4,15 @@ use std::time::{Duration, Instant};
 
 use chrono::Local;
 use scribe_core::ports::RecordingListener;
-use scribe_core::recording::{RecorderState, RecordingEvent, Segment, SessionId, Speaker};
+use scribe_core::recording::{RecordingEvent, Segment, SessionId, Speaker};
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, Runtime};
+use tauri::{AppHandle, Manager, Runtime};
 
 use crate::live_feed::{LiveFeed, LiveLine};
 use crate::notifications;
-use crate::recording::RecordingController;
+use crate::recording::{self, RecordingController};
 use crate::tray;
+use crate::webview;
 
 const TICK: Duration = Duration::from_secs(1);
 const STARTED_EVENT: &str = "recording://started";
@@ -95,7 +96,7 @@ impl<R: Runtime> TrayUpdater<R> {
         self.app
             .state::<LiveFeed>()
             .started(Local::now().fixed_offset());
-        tray::show_recorder_state(&self.app, RecorderState::Recording);
+        recording::publish_state(&self.app);
         self.emit(STARTED_EVENT, SessionPayload { id: id.to_string() });
     }
 
@@ -115,9 +116,8 @@ impl<R: Runtime> TrayUpdater<R> {
     fn stopped(&mut self, id: &SessionId) {
         self.recording_since = None;
         self.app.state::<LiveFeed>().stopped();
-        let controller = self.app.state::<RecordingController>();
-        controller.stop();
-        tray::show_recorder_state(&self.app, controller.state());
+        self.app.state::<RecordingController>().stop_session(id);
+        recording::publish_state(&self.app);
         self.emit(STOPPED_EVENT, SessionPayload { id: id.to_string() });
     }
 
@@ -128,8 +128,6 @@ impl<R: Runtime> TrayUpdater<R> {
     }
 
     fn emit<P: Serialize + Clone>(&self, event: &str, payload: P) {
-        if let Err(error) = self.app.emit(event, payload) {
-            tracing::warn!(event, %error, "could not notify the webview");
-        }
+        webview::emit(&self.app, event, payload);
     }
 }

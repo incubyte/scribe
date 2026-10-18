@@ -1,8 +1,11 @@
 use std::path::Path;
+use std::sync::{Arc, Mutex, PoisonError};
 
 use parakeet_rs::{ParakeetTDT, TimestampMode, Transcriber as _};
 use scribe_core::ports::{TranscribeError, Transcriber};
-use scribe_core::recording::{AudioChunk, SAMPLE_RATE_HZ, TranscriptEvent, Utterance};
+use scribe_core::recording::{
+    AudioChunk, SAMPLE_RATE_HZ, TranscriptEvent, Transcription, Utterance,
+};
 
 use crate::utterance_cutter::{
     CutterConfig, PendingUtterance, UtteranceCutter, VAD_WINDOW_SAMPLES,
@@ -16,8 +19,32 @@ pub const AUTO_LANGUAGE: &str = "auto";
 const SILERO_FILE: &str = "silero_vad.onnx";
 const MONO: u16 = 1;
 
+#[derive(Clone)]
+pub struct ParakeetModel(Arc<Mutex<ParakeetTDT>>);
+
+impl ParakeetModel {
+    pub fn load(models_dir: &Path) -> Result<ParakeetModel, TranscribeError> {
+        let model = ParakeetTDT::from_pretrained(models_dir, None)
+            .map_err(|error| TranscribeError::EngineUnavailable(error.to_string()))?;
+        Ok(ParakeetModel(Arc::new(Mutex::new(model))))
+    }
+
+    fn transcribe(&self, samples: Vec<f32>) -> Result<String, TranscribeError> {
+        let mut model = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        let result = model
+            .transcribe_samples(
+                samples,
+                SAMPLE_RATE_HZ,
+                MONO,
+                Some(TimestampMode::Sentences),
+            )
+            .map_err(|error| TranscribeError::Engine(error.to_string()))?;
+        Ok(result.text.trim().to_owned())
+    }
+}
+
 pub struct ParakeetTranscriber {
-    model: ParakeetTDT,
+    model: ParakeetModel,
     vad: SileroVad,
     speech_threshold: f32,
     windows: VadWindows,
@@ -26,9 +53,14 @@ pub struct ParakeetTranscriber {
 
 impl ParakeetTranscriber {
     pub fn load(models_dir: &Path) -> Result<ParakeetTranscriber, TranscribeError> {
+        ParakeetTranscriber::sharing(ParakeetModel::load(models_dir)?, models_dir)
+    }
+
+    pub fn sharing(
+        model: ParakeetModel,
+        models_dir: &Path,
+    ) -> Result<ParakeetTranscriber, TranscribeError> {
         let config = CutterConfig::default();
-        let model = ParakeetTDT::from_pretrained(models_dir, None)
-            .map_err(|error| TranscribeError::EngineUnavailable(error.to_string()))?;
         Ok(ParakeetTranscriber {
             model,
             vad: SileroVad::load(&models_dir.join(SILERO_FILE))?,
@@ -68,32 +100,20 @@ impl ParakeetTranscriber {
     ) -> Result<Option<TranscriptEvent>, TranscribeError> {
         let start = utterance.start;
         let end = utterance.end();
-        let result = self
-            .model
-            .transcribe_samples(
-                utterance.samples,
-                SAMPLE_RATE_HZ,
-                MONO,
-                Some(TimestampMode::Sentences),
-            )
-            .map_err(|error| TranscribeError::Engine(error.to_string()))?;
-        let text = result.text.trim();
-        Ok((!text.is_empty()).then(|| {
-            TranscriptEvent::Final(Utterance {
-                start,
-                end,
-                text: text.to_owned(),
-            })
-        }))
+        let text = self.model.transcribe(utterance.samples)?;
+        Ok((!text.is_empty()).then_some(TranscriptEvent::Final(Utterance { start, end, text })))
     }
 }
 
 impl Transcriber for ParakeetTranscriber {
-    fn push(&mut self, chunk: &AudioChunk) -> Result<Vec<TranscriptEvent>, TranscribeError> {
+    fn push(&mut self, chunk: &AudioChunk) -> Result<Transcription, TranscribeError> {
         let windows = self.windows.take_whole_windows(chunk);
         let speech = self.mark_speech(&windows)?;
         let utterances = self.cutter.feed(&windows, &speech);
-        self.decode_all(utterances)
+        Ok(Transcription {
+            events: self.decode_all(utterances)?,
+            finalised_through: self.cutter.finalised_through(),
+        })
     }
 
     fn finish(&mut self) -> Result<Vec<TranscriptEvent>, TranscribeError> {

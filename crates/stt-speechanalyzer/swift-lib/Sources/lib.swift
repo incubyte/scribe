@@ -24,6 +24,7 @@ private struct Reply: Encodable {
   var ok = true
   var error: String?
   var events: [EventPayload]?
+  var finalised_through_s: Double?
   var session: Int?
   var status: String?
 
@@ -99,6 +100,8 @@ private final class LaneSession: @unchecked Sendable {
   private let lock = NSLock()
   private var queued: [EventPayload] = []
   private var failure: String?
+  private var heardSeconds = 0.0
+  private var outstandingVolatileStart: Double?
 
   init(analyzer: SpeechAnalyzer, continuation: AsyncStream<AnalyzerInput>.Continuation, audio: AudioAdapter) {
     self.analyzer = analyzer
@@ -110,23 +113,42 @@ private final class LaneSession: @unchecked Sendable {
     do {
       for try await result in results {
         let event = payload(from: result)
-        lock.withLock { queued.append(event) }
+        lock.withLock {
+          queued.append(event)
+          trackVolatility(of: result)
+        }
       }
     } catch {
       lock.withLock { failure = error.localizedDescription }
     }
   }
 
+  private func trackVolatility(of result: SpeechTranscriber.Result) {
+    let start = result.range.start.seconds
+    guard result.isFinal else {
+      outstandingVolatileStart = min(outstandingVolatileStart ?? start, start)
+      return
+    }
+    if let volatileStart = outstandingVolatileStart, CMTimeRangeGetEnd(result.range).seconds > volatileStart {
+      outstandingVolatileStart = nil
+    }
+  }
+
   func feed(_ samples: [Float]) throws {
+    lock.withLock { heardSeconds += Double(samples.count) / inputSampleRate }
     guard let buffer = try audio.buffer(for: samples) else { return }
     continuation.yield(AnalyzerInput(buffer: buffer))
   }
 
   func takeEvents() throws -> [EventPayload] {
+    try takeProgress().events
+  }
+
+  func takeProgress() throws -> (events: [EventPayload], finalisedThrough: Double) {
     try lock.withLock {
       if let failure { throw BridgeError(failure) }
       defer { queued.removeAll() }
-      return queued
+      return (queued, outstandingVolatileStart ?? heardSeconds)
     }
   }
 }
@@ -270,7 +292,8 @@ public func scribeSpeechPush(session token: Int, samples: SRData) -> SRString {
   do {
     let session = try registry.find(token)
     try session.feed(decodeSamples(samples.toArray()))
-    return encoded(Reply(events: try session.takeEvents()))
+    let progress = try session.takeProgress()
+    return encoded(Reply(events: progress.events, finalised_through_s: progress.finalisedThrough))
   } catch {
     return encoded(.failure(error))
   }

@@ -108,6 +108,43 @@ describe("the popover while nothing is recording", () => {
     expect(screen.getByRole("button", { name: "Start recording" })).toBeDisabled();
   });
 
+  it("enables Start once the app becomes ready to record", async () => {
+    backend(locked);
+    render(<Popover />);
+    await screen.findByRole("list", { name: "Recent sessions" });
+
+    await act(() => emit("recorder://state", { state: "idle" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Start recording" })).toBeEnabled(),
+    );
+  });
+
+  it("keeps focus on the recording button when the recording starts and announces it", async () => {
+    backend(idle);
+    render(<Popover />);
+    await screen.findByRole("list", { name: "Recent sessions" });
+    await userEvent.tab();
+
+    await act(() => emit("recorder://state", { state: "recording" }));
+    await act(() => emit("recording://started", { id: "2026-10-17-091000" }));
+
+    expect(await screen.findByRole("button", { name: "Stop recording" })).toHaveFocus();
+    expect(screen.getByRole("status", { name: "Recording status" })).toHaveTextContent(
+      "Recording started",
+    );
+  });
+
+  it("says why a recording could not start", async () => {
+    backend(idle);
+    render(<Popover />);
+    await screen.findByRole("list", { name: "Recent sessions" });
+
+    await act(() => emit("recording://start-failed", { reason_kind: "microphone_denied" }));
+
+    expect(await screen.findByText("Scribe can't use the microphone.")).toBeInTheDocument();
+  });
+
   it("says so when there are no sessions yet", async () => {
     backend(idle, []);
     render(<Popover />);
@@ -173,7 +210,7 @@ describe("the popover while recording", () => {
 
   it("announces only finished lines to screen readers", async () => {
     backend(recordingForSixtyFiveSeconds);
-    const { container } = render(<Popover />);
+    render(<Popover />);
     await screen.findByText("Good morning");
 
     await act(() => emit("recording://partial", { speaker: "Me", text: "still talk" }));
@@ -182,7 +219,8 @@ describe("the popover while recording", () => {
       emit("recording://segment", { speaker: "Them", start_ms: 900, text: "All done" }),
     );
 
-    const announcements = container.querySelector('[aria-live="polite"]');
+    const transcript = screen.getByRole("region", { name: "Live transcript" });
+    const announcements = transcript.querySelector('[aria-live="polite"]');
     expect(announcements).toHaveTextContent("Them: All done");
     expect(announcements).not.toHaveTextContent("still talk");
     expect(partialLine.closest("li")).toHaveAttribute("aria-hidden", "true");
@@ -197,6 +235,9 @@ describe("the popover while recording", () => {
     await act(() => emit("recording://stopped", { id: "2026-10-17-091000" }));
 
     expect(await screen.findByRole("button", { name: "Start recording" })).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Recording status" })).toHaveTextContent(
+      "Recording stopped",
+    );
     const callsAfter = handler.mock.calls.filter(([c]) => c === "recent_sessions").length;
     expect(callsAfter).toBeGreaterThan(callsBefore);
   });

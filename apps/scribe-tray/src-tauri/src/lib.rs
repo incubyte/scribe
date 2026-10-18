@@ -12,10 +12,12 @@ mod power;
 mod privacy;
 mod recording;
 pub mod recording_label;
+pub mod start_failure;
 mod tray;
 mod tray_listener;
+mod webview;
 
-use tauri::{AppHandle, Builder, Manager, Runtime};
+use tauri::{AppHandle, Builder, Runtime};
 
 pub fn run() -> tauri::Result<()> {
     with_plugins(Builder::default())
@@ -50,7 +52,7 @@ fn with_plugins<R: Runtime>(builder: Builder<R>) -> Builder<R> {
 fn start_scribe<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::error::Error>> {
     tray::install(app)?;
     recording::install(app)?;
-    tray::show_recorder_state(app, app.state::<recording::RecordingController>().state());
+    recording::publish_state(app);
     popover::install_blur_hide(app)?;
     privacy::show_statement_until_acknowledged(app)?;
     Ok(())

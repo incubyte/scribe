@@ -4,7 +4,7 @@ mod bridge;
 mod reply;
 
 use scribe_core::ports::{TranscribeError, Transcriber};
-use scribe_core::recording::{AudioChunk, TranscriptEvent};
+use scribe_core::recording::{AudioChunk, TranscriptEvent, Transcription};
 
 use crate::reply::Reply;
 
@@ -47,8 +47,8 @@ impl SpeechAnalyzerTranscriber {
 }
 
 impl Transcriber for SpeechAnalyzerTranscriber {
-    fn push(&mut self, chunk: &AudioChunk) -> Result<Vec<TranscriptEvent>, TranscribeError> {
-        Ok(Reply::parse(&bridge::push(self.session, &chunk.samples))?.events())
+    fn push(&mut self, chunk: &AudioChunk) -> Result<Transcription, TranscribeError> {
+        Reply::parse(&bridge::push(self.session, &chunk.samples))?.transcription()
     }
 
     fn finish(&mut self) -> Result<Vec<TranscriptEvent>, TranscribeError> {

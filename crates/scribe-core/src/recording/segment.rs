@@ -37,6 +37,12 @@ pub enum TranscriptEvent {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Transcription {
+    pub events: Vec<TranscriptEvent>,
+    pub finalised_through: Duration,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Segment {
     pub speaker: Speaker,
     pub start: Duration,

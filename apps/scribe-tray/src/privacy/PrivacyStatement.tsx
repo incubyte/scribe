@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
 
 const STATEMENTS = [
   "Speech is transcribed on-device.",
@@ -10,6 +10,7 @@ const STATEMENTS = [
 
 export function PrivacyStatement() {
   const acknowledgeButton = useRef<HTMLButtonElement>(null);
+  const statementsId = useId();
 
   useEffect(() => {
     acknowledgeButton.current?.focus();
@@ -18,7 +19,7 @@ export function PrivacyStatement() {
   return (
     <main className="window">
       <h1 className="window__title">Scribe runs entirely on this computer</h1>
-      <ul>
+      <ul id={statementsId}>
         {STATEMENTS.map((statement) => (
           <li key={statement}>{statement}</li>
         ))}
@@ -27,6 +28,7 @@ export function PrivacyStatement() {
         ref={acknowledgeButton}
         className="button"
         type="button"
+        aria-describedby={statementsId}
         onClick={() => void invoke("acknowledge_privacy")}
       >
         I understand

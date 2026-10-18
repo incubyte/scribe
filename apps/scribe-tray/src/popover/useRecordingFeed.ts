@@ -1,17 +1,9 @@
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { type ActionDispatch, useCallback, useEffect, useReducer, useState } from "react";
 import { fetchRecentSessions, fetchSnapshot } from "./commands";
-import { type FeedEvent, feedReducer, initialFeed, type FeedState } from "./feedReducer";
-import type { SessionSummary, Speaker } from "./types";
-
-interface PartialPayload {
-  readonly speaker: Speaker;
-  readonly text: string;
-}
-
-interface SegmentPayload extends PartialPayload {
-  readonly start_ms: number;
-}
+import { type FeedEvent, feedEvents, feedReducer, initialFeed, type FeedState } from "./feedReducer";
+import { isPartialPayload, isSegmentPayload, isStartFailedPayload, isStatePayload } from "./guards";
+import type { SessionSummary } from "./types";
 
 export interface RecordingFeed {
   readonly feed: FeedState;
@@ -20,24 +12,37 @@ export interface RecordingFeed {
 
 type Dispatch = ActionDispatch<[FeedEvent]>;
 
+function listenFor<T>(
+  event: string,
+  guard: (payload: unknown) => payload is T,
+  handle: (payload: T) => void,
+): Promise<UnlistenFn> {
+  return listen<unknown>(event, ({ payload }) => {
+    if (guard(payload)) {
+      handle(payload);
+    }
+  });
+}
+
 function subscribe(dispatch: Dispatch, onStopped: () => void): () => void {
   const subscriptions: Promise<UnlistenFn>[] = [
-    listen("recording://started", () => dispatch({ type: "started", at: Date.now() })),
-    listen<PartialPayload>("recording://partial", ({ payload }) =>
-      dispatch({ type: "partial", speaker: payload.speaker, text: payload.text }),
+    listen("recording://started", () => dispatch(feedEvents.started(Date.now()))),
+    listenFor("recording://partial", isPartialPayload, ({ speaker, text }) =>
+      dispatch(feedEvents.partial(speaker, text)),
     ),
-    listen<SegmentPayload>("recording://segment", ({ payload }) =>
-      dispatch({
-        type: "segment",
-        speaker: payload.speaker,
-        startMs: payload.start_ms,
-        text: payload.text,
-      }),
+    listenFor("recording://segment", isSegmentPayload, ({ speaker, start_ms, text }) =>
+      dispatch(feedEvents.segment({ speaker, startMs: start_ms, text })),
     ),
     listen("recording://stopped", () => {
-      dispatch({ type: "stopped" });
+      dispatch(feedEvents.stopped());
       onStopped();
     }),
+    listenFor("recorder://state", isStatePayload, ({ state }) =>
+      dispatch(feedEvents.phaseChanged(state)),
+    ),
+    listenFor("recording://start-failed", isStartFailedPayload, ({ reason_kind }) =>
+      dispatch(feedEvents.startFailed(reason_kind)),
+    ),
   ];
   return () => subscriptions.forEach((subscription) => void subscription.then((stop) => stop()));
 }
@@ -51,7 +56,7 @@ export function useRecordingFeed(): RecordingFeed {
   }, []);
 
   const catchUp = useCallback(() => {
-    void fetchSnapshot().then((snapshot) => dispatch({ type: "snapshot", snapshot }));
+    void fetchSnapshot().then((snapshot) => dispatch(feedEvents.snapshot(snapshot)));
     refreshRecent();
   }, [refreshRecent]);
 

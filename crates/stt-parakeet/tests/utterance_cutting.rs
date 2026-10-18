@@ -107,3 +107,34 @@ fn stopping_mid_sentence_hands_over_the_speech_in_progress() {
     assert_eq!(flushed.end(), millis(1_536));
     assert_eq!(lane.cutter.flush(), None);
 }
+
+#[test]
+fn while_silent_everything_heard_is_final_except_the_lead_in_kept_for_the_next_sentence() {
+    let mut lane = Lane::new();
+
+    lane.silence(millis(1_024));
+
+    assert_eq!(lane.cutter.finalised_through(), millis(824));
+}
+
+#[test]
+fn while_someone_is_speaking_nothing_from_the_start_of_their_sentence_is_final() {
+    let mut lane = Lane::new();
+    lane.silence(millis(1_024));
+
+    lane.speech(millis(2_048));
+
+    assert_eq!(lane.cutter.finalised_through(), millis(824));
+}
+
+#[test]
+fn once_a_pause_ends_the_sentence_the_finalised_point_moves_past_it() {
+    let mut lane = Lane::new();
+    lane.silence(millis(1_024));
+    lane.speech(millis(2_048));
+
+    let heard = lane.silence(millis(640));
+
+    assert_eq!(lane.cutter.finalised_through(), millis(3_680));
+    assert!(lane.cutter.finalised_through() >= heard[0].end());
+}

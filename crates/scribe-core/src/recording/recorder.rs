@@ -75,23 +75,23 @@ impl Recorder {
         header: SessionHeader,
     ) -> Result<SessionId, RecorderError> {
         self.ensure_idle()?;
-        let clock = SessionClock::start();
-        let mut started = start_sources(lanes, clock)?;
-        let id = match self.store.create(&header) {
-            Ok(id) => id,
-            Err(error) => {
-                stop_sources(&mut started);
-                return Err(error.into());
-            }
-        };
+        self.record(CapturingLanes::start(lanes)?, header)
+    }
+
+    pub fn record(
+        &mut self,
+        mut capturing: CapturingLanes,
+        header: SessionHeader,
+    ) -> Result<SessionId, RecorderError> {
+        self.ensure_idle()?;
+        let id = self.store.create(&header)?;
         let context = SessionContext {
             id: id.clone(),
             header,
-            clock,
+            clock: capturing.clock,
         };
-        self.listener
-            .on_event(RecordingEvent::RecordingStarted { id: id.clone() });
-        self.active = Some(self.spawn_session(started, context));
+        self.announce_start(&id, &capturing.unavailable);
+        self.active = Some(self.spawn_session(capturing.take_lanes(), context));
         Ok(id)
     }
 
@@ -102,6 +102,17 @@ impl Recorder {
         }
     }
 
+    pub fn stop_session(&mut self, id: &SessionId) -> Result<(), RecorderError> {
+        if self
+            .active
+            .as_ref()
+            .is_some_and(|session| session.id == *id)
+        {
+            return self.stop();
+        }
+        Ok(())
+    }
+
     pub fn ensure_idle(&self) -> Result<(), RecorderError> {
         match self.state() {
             RecorderState::Idle => Ok(()),
@@ -110,12 +121,23 @@ impl Recorder {
         }
     }
 
+    fn announce_start(&self, id: &SessionId, unavailable: &[Speaker]) {
+        self.listener
+            .on_event(RecordingEvent::RecordingStarted { id: id.clone() });
+        for speaker in unavailable {
+            self.listener
+                .on_event(RecordingEvent::CaptureSilenced { speaker: *speaker });
+        }
+    }
+
     fn spawn_session(&self, lanes: Vec<StartedLane>, context: SessionContext) -> ActiveSession {
         let (out, messages) = mpsc::channel();
+        let id = context.id.clone();
         let writer = self.session_writer(&lanes, context);
         let writer = thread::spawn(move || run_writer(writer, &messages));
         let (sources, workers) = spawn_lane_workers(lanes, &out);
         ActiveSession {
+            id,
             sources,
             workers,
             writer,
@@ -150,6 +172,10 @@ struct StartedLane {
 }
 
 impl Lane {
+    fn is_required(&self) -> bool {
+        self.speaker == Speaker::Me
+    }
+
     fn start(mut self, clock: SessionClock) -> Result<StartedLane, CaptureError> {
         let chunks = self.source.start(clock)?;
         Ok(StartedLane {
@@ -161,23 +187,49 @@ impl Lane {
     }
 }
 
-fn start_sources(lanes: Vec<Lane>, clock: SessionClock) -> Result<Vec<StartedLane>, CaptureError> {
-    let mut started = Vec::with_capacity(lanes.len());
-    for lane in lanes {
-        match lane.start(clock) {
-            Ok(lane) => started.push(lane),
-            Err(error) => {
-                stop_sources(&mut started);
-                return Err(error);
-            }
-        }
-    }
-    Ok(started)
+pub struct CapturingLanes {
+    clock: SessionClock,
+    lanes: Vec<StartedLane>,
+    unavailable: Vec<Speaker>,
 }
 
-fn stop_sources(lanes: &mut [StartedLane]) {
-    for lane in lanes {
-        lane.source.stop();
+impl CapturingLanes {
+    pub fn start(mut lanes: Vec<Lane>) -> Result<CapturingLanes, CaptureError> {
+        lanes.sort_by_key(|lane| !lane.is_required());
+        let mut capturing = CapturingLanes {
+            clock: SessionClock::start(),
+            lanes: Vec::with_capacity(lanes.len()),
+            unavailable: Vec::new(),
+        };
+        for lane in lanes {
+            capturing.start_lane(lane)?;
+        }
+        Ok(capturing)
+    }
+
+    fn start_lane(&mut self, lane: Lane) -> Result<(), CaptureError> {
+        let (speaker, is_required) = (lane.speaker, lane.is_required());
+        match lane.start(self.clock) {
+            Ok(started) => self.lanes.push(started),
+            Err(error) if is_required => return Err(error),
+            Err(error) => {
+                tracing::warn!(speaker = speaker.label(), %error, "recording without this side");
+                self.unavailable.push(speaker);
+            }
+        }
+        Ok(())
+    }
+
+    fn take_lanes(&mut self) -> Vec<StartedLane> {
+        std::mem::take(&mut self.lanes)
+    }
+}
+
+impl Drop for CapturingLanes {
+    fn drop(&mut self) {
+        for lane in &mut self.lanes {
+            lane.source.stop();
+        }
     }
 }
 
@@ -203,6 +255,7 @@ fn spawn_lane_workers(
 }
 
 struct ActiveSession {
+    id: SessionId,
     sources: Vec<Box<dyn AudioSource>>,
     workers: Vec<JoinHandle<()>>,
     writer: JoinHandle<Result<(), StoreError>>,

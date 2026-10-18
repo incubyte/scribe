@@ -11,6 +11,7 @@ use stt_speechanalyzer::{
 const FIXTURE: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/hello.wav");
 const CHUNK_SAMPLES: usize = 1_600;
 const CHUNK_DURATION: Duration = Duration::from_millis(100);
+const ROUNDING: Duration = Duration::from_millis(1);
 
 fn fixture_chunks() -> Vec<AudioChunk> {
     let mut reader = hound::WavReader::open(FIXTURE).unwrap();
@@ -47,7 +48,7 @@ fn english_speech_from_the_fixture_is_transcribed_on_device() {
 
     let mut events: Vec<_> = fixture_chunks()
         .iter()
-        .flat_map(|chunk| transcriber.push(chunk).unwrap())
+        .flat_map(|chunk| transcriber.push(chunk).unwrap().events)
         .collect();
     events.extend(transcriber.finish().unwrap());
 
@@ -61,4 +62,20 @@ fn the_english_speech_asset_can_be_installed_on_device() {
     install_english_asset().unwrap();
 
     assert_eq!(english_asset_status().unwrap(), AssetStatus::Installed);
+}
+
+#[test]
+#[ignore = "needs macOS 26 with the English speech asset installed"]
+fn the_finalised_point_never_runs_ahead_of_the_audio_pushed() {
+    let mut transcriber = SpeechAnalyzerTranscriber::start(ENGLISH).unwrap();
+
+    let ahead: Vec<Duration> = fixture_chunks()
+        .iter()
+        .map(|chunk| (chunk.ends_at(), transcriber.push(chunk).unwrap()))
+        .filter(|(heard, transcription)| transcription.finalised_through > *heard + ROUNDING)
+        .map(|(heard, _)| heard)
+        .collect();
+    transcriber.finish().unwrap();
+
+    assert!(ahead.is_empty(), "ran ahead after {ahead:?}");
 }

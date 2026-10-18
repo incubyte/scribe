@@ -1,44 +1,34 @@
-use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
 use std::thread;
 
 use chrono::Local;
-use scribe_core::ports::{
-    CaptureError, RecordingListener, StoreError, TranscribeError, TranscriptStore,
-};
+use scribe_core::ports::{RecordingListener, StoreError, TranscriptStore};
 use scribe_core::recording::{
-    Readiness, Recorder, RecorderError, RecorderState, SessionHeader, SessionId,
+    CapturingLanes, Readiness, Recorder, RecorderError, RecorderState, SessionHeader, SessionId,
 };
+use serde::Serialize;
 use store_markdown::{MarkdownTranscriptStore, TranscriptsFolder};
 use tauri::{AppHandle, Manager, Runtime};
 
-use crate::lanes;
-use crate::live_feed::LiveFeed;
+use crate::lanes::{self, SpeechEngine};
+use crate::live_feed::{LiveFeed, state_name};
 use crate::model_setup;
 use crate::notifications;
 use crate::privacy;
+use crate::start_failure::StartError;
+use crate::tray;
 use crate::tray_listener::TrayRecordingListener;
+use crate::webview;
+
+const STATE_EVENT: &str = "recorder://state";
+const START_FAILED_EVENT: &str = "recording://start-failed";
 
 pub struct RecordingController {
     recorder: Mutex<Recorder>,
     listener: Arc<dyn RecordingListener>,
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum StartError {
-    #[error(transparent)]
-    Recorder(#[from] RecorderError),
-    #[error(transparent)]
-    Engine(#[from] TranscribeError),
-}
-
-impl StartError {
-    #[must_use]
-    pub fn is_microphone_denied(&self) -> bool {
-        matches!(
-            self,
-            StartError::Recorder(RecorderError::Capture(CaptureError::PermissionDenied))
-        )
-    }
+    engine: OnceLock<SpeechEngine>,
+    starting: AtomicBool,
 }
 
 impl RecordingController {
@@ -47,22 +37,27 @@ impl RecordingController {
         RecordingController {
             recorder: Mutex::new(recorder),
             listener,
+            engine: OnceLock::new(),
+            starting: AtomicBool::new(false),
         }
     }
 
     pub fn start(&self) -> Result<SessionId, StartError> {
-        let mut recorder = self.recorder();
-        recorder.ensure_idle()?;
-        let lanes = lanes::build_lanes(&self.listener)?;
+        let _claim = StartClaim::take(&self.starting)?;
+        self.recorder().ensure_idle()?;
+        let engine = self.engine.get().ok_or(RecorderError::NotReady)?;
+        let capturing = CapturingLanes::start(lanes::build_lanes(&self.listener, engine)?)?;
         let header =
             SessionHeader::recording(Local::now().fixed_offset(), lanes::ENGINE, lanes::LANGUAGE);
-        Ok(recorder.start(lanes, header)?)
+        Ok(self.recorder().record(capturing, header)?)
     }
 
     pub fn stop(&self) {
-        if let Err(error) = self.recorder().stop() {
-            tracing::error!(%error, "the recording did not finish cleanly");
-        }
+        log_unclean_finish(self.recorder().stop());
+    }
+
+    pub fn stop_session(&self, id: &SessionId) {
+        log_unclean_finish(self.recorder().stop_session(id));
     }
 
     pub fn state(&self) -> RecorderState {
@@ -73,7 +68,10 @@ impl RecordingController {
         self.update_readiness(|readiness| readiness.privacy_acknowledged = true);
     }
 
-    pub fn mark_model_ready(&self) {
+    pub fn mark_model_ready(&self, engine: SpeechEngine) {
+        if self.engine.set(engine).is_err() {
+            tracing::info!("the speech engine was already prepared");
+        }
         self.update_readiness(|readiness| readiness.model_ready = true);
     }
 
@@ -89,6 +87,48 @@ impl RecordingController {
     }
 }
 
+fn log_unclean_finish(outcome: Result<(), RecorderError>) {
+    if let Err(error) = outcome {
+        tracing::error!(%error, "the recording did not finish cleanly");
+    }
+}
+
+struct StartClaim<'a>(&'a AtomicBool);
+
+impl<'a> StartClaim<'a> {
+    fn take(starting: &'a AtomicBool) -> Result<StartClaim<'a>, RecorderError> {
+        starting
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .map(|_| StartClaim(starting))
+            .map_err(|_| RecorderError::AlreadyRecording)
+    }
+}
+
+impl Drop for StartClaim<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
+    }
+}
+
+#[derive(Clone, Serialize)]
+struct StatePayload {
+    state: &'static str,
+}
+
+#[derive(Clone, Serialize)]
+struct StartFailedPayload {
+    reason_kind: &'static str,
+}
+
+pub fn publish_state<R: Runtime>(app: &AppHandle<R>) {
+    let state = app.state::<RecordingController>().state();
+    tray::show_recorder_state(app, state);
+    let payload = StatePayload {
+        state: state_name(state),
+    };
+    webview::emit(app, STATE_EVENT, payload);
+}
+
 pub fn start_in_background<R: Runtime>(app: AppHandle<R>) {
     thread::spawn(move || {
         if let Err(error) = app.state::<RecordingController>().start() {
@@ -98,10 +138,13 @@ pub fn start_in_background<R: Runtime>(app: AppHandle<R>) {
 }
 
 fn report_start_failure<R: Runtime>(app: &AppHandle<R>, error: &StartError) {
-    tracing::warn!(%error, "could not start recording");
-    if error.is_microphone_denied() {
-        notifications::notify_microphone_denied(app);
-    }
+    let kind = error.kind();
+    tracing::warn!(kind = kind.as_str(), "could not start recording");
+    notifications::notify_recording_not_started(app, kind);
+    let payload = StartFailedPayload {
+        reason_kind: kind.as_str(),
+    };
+    webview::emit(app, START_FAILED_EVENT, payload);
 }
 
 pub fn install<R: Runtime>(app: &AppHandle<R>) -> Result<(), StoreError> {

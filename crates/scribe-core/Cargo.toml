@@ -7,12 +7,14 @@ license.workspace = true
 
 [features]
 testing = []
+serde = ["dep:serde"]
 
 [dependencies]
 thiserror.workspace = true
 tracing.workspace = true
 chrono.workspace = true
 strsim.workspace = true
+serde = { workspace = true, optional = true }
 
 [dev-dependencies]
 scribe-core = { workspace = true, features = ["testing"] }

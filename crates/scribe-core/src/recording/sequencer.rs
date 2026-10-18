@@ -9,7 +9,8 @@ pub const MAX_HOLD: Duration = Duration::from_millis(1_500);
 const RECENT_THEM_WINDOW: Duration = Duration::from_secs(3);
 
 pub struct SegmentSequencer {
-    watermarks: BTreeMap<Speaker, Duration>,
+    finalised_through: BTreeMap<Speaker, Duration>,
+    heard_through: BTreeMap<Speaker, Duration>,
     pending: Vec<Segment>,
     recent_them: Vec<Segment>,
     echo_filter: EchoFilter,
@@ -18,8 +19,11 @@ pub struct SegmentSequencer {
 impl SegmentSequencer {
     #[must_use]
     pub fn new(lanes: &[Speaker]) -> SegmentSequencer {
+        let starting_points: BTreeMap<Speaker, Duration> =
+            lanes.iter().map(|lane| (*lane, Duration::ZERO)).collect();
         SegmentSequencer {
-            watermarks: lanes.iter().map(|lane| (*lane, Duration::ZERO)).collect(),
+            finalised_through: starting_points.clone(),
+            heard_through: starting_points,
             pending: Vec::new(),
             recent_them: Vec::new(),
             echo_filter: EchoFilter::new(ECHO_OVERLAP_TOLERANCE, ECHO_SIMILARITY_THRESHOLD),
@@ -33,9 +37,17 @@ impl SegmentSequencer {
         self.pending.insert(position, segment);
     }
 
-    pub fn advance(&mut self, speaker: Speaker, watermark: Duration) {
-        let current = self.watermarks.entry(speaker).or_insert(Duration::ZERO);
-        *current = (*current).max(watermark);
+    pub fn advance(&mut self, speaker: Speaker, finalised_through: Duration) {
+        self.finalised_through.insert(speaker, finalised_through);
+        self.hear(speaker, finalised_through);
+    }
+
+    pub fn hear(&mut self, speaker: Speaker, heard_through: Duration) {
+        raise(&mut self.heard_through, speaker, heard_through);
+    }
+
+    pub fn close(&mut self, speaker: Speaker) {
+        self.finalised_through.insert(speaker, Duration::MAX);
     }
 
     pub fn release_ready(&mut self) -> Vec<Segment> {
@@ -88,21 +100,24 @@ impl SegmentSequencer {
     }
 
     fn is_ready(&self, segment: &Segment) -> bool {
-        self.other_lanes_have_passed(segment) || self.has_been_held_too_long(segment)
-    }
-
-    fn has_been_held_too_long(&self, segment: &Segment) -> bool {
-        self.watermarks
-            .get(&segment.speaker)
-            .is_some_and(|watermark| *watermark >= segment.end.saturating_add(MAX_HOLD))
-    }
-
-    fn other_lanes_have_passed(&self, segment: &Segment) -> bool {
         let needed = self.watermark_needed_to_release(segment);
-        self.watermarks
+        self.finalised_through
             .iter()
             .filter(|(lane, _)| **lane != segment.speaker)
-            .all(|(_, watermark)| *watermark >= needed)
+            .all(|(lane, finalised)| {
+                *finalised >= needed || self.has_stopped_waiting_for(*lane, segment)
+            })
+    }
+
+    fn has_stopped_waiting_for(&self, lane: Speaker, segment: &Segment) -> bool {
+        let own = self.heard(segment.speaker);
+        let held_too_long = own >= segment.end.saturating_add(MAX_HOLD);
+        let lane_has_stalled = self.heard(lane).saturating_add(MAX_HOLD) <= own;
+        held_too_long && lane_has_stalled
+    }
+
+    fn heard(&self, lane: Speaker) -> Duration {
+        self.heard_through.get(&lane).copied().unwrap_or_default()
     }
 
     fn watermark_needed_to_release(&self, segment: &Segment) -> Duration {
@@ -117,4 +132,9 @@ impl SegmentSequencer {
 
 fn release_order(segment: &Segment) -> (Duration, Speaker) {
     (segment.start, segment.speaker)
+}
+
+fn raise(progress: &mut BTreeMap<Speaker, Duration>, speaker: Speaker, to: Duration) {
+    let current = progress.entry(speaker).or_insert(Duration::ZERO);
+    *current = (*current).max(to);
 }

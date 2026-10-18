@@ -1,12 +1,14 @@
 mod error;
 mod query;
 mod search;
+mod summary_view;
 
 use std::sync::Arc;
 
 pub use error::LibraryError;
 pub use query::{Limit, ListQuery};
 pub use search::{SearchHit, SearchQuery, SegmentMatch};
+pub use summary_view::SessionSummaryView;
 
 use search::find_matches;
 

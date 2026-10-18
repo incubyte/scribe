@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, VecDeque};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::sync::{Mutex, PoisonError};
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
 use chrono::{DateTime, FixedOffset};
@@ -11,8 +12,8 @@ use crate::ports::{
 };
 use crate::recording::{
     AudioChunk, RecordingEvent, SAMPLE_RATE_HZ, Segment, SessionClock, SessionDocument,
-    SessionHeader, SessionId, SessionStatus, SessionSummary, TranscriptEvent, Utterance,
-    offset_as_clock,
+    SessionHeader, SessionId, SessionStatus, SessionSummary, TranscriptEvent, Transcription,
+    Utterance, offset_as_clock,
 };
 
 const CHUNK_SAMPLES: u32 = SAMPLE_RATE_HZ / 10;
@@ -43,6 +44,7 @@ pub struct FakeAudioSource {
     chunks: Vec<AudioChunk>,
     failure: Option<CaptureError>,
     sender: Option<Sender<AudioChunk>>,
+    started: Arc<AtomicBool>,
 }
 
 impl FakeAudioSource {
@@ -52,15 +54,23 @@ impl FakeAudioSource {
             chunks,
             failure: None,
             sender: None,
+            started: Arc::default(),
         }
     }
 
     #[must_use]
     pub fn failing(error: CaptureError) -> FakeAudioSource {
         FakeAudioSource {
-            chunks: Vec::new(),
             failure: Some(error),
-            sender: None,
+            ..FakeAudioSource::with_chunks(Vec::new())
+        }
+    }
+
+    #[must_use]
+    pub fn reporting_start_to(self, started: &Arc<AtomicBool>) -> FakeAudioSource {
+        FakeAudioSource {
+            started: Arc::clone(started),
+            ..self
         }
     }
 }
@@ -70,6 +80,7 @@ impl AudioSource for FakeAudioSource {
         if let Some(error) = self.failure.clone() {
             return Err(error);
         }
+        self.started.store(true, Ordering::SeqCst);
         let (sender, receiver) = mpsc::channel();
         for chunk in self.chunks.drain(..) {
             let _ = sender.send(chunk);
@@ -83,15 +94,44 @@ impl AudioSource for FakeAudioSource {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ScriptedReply {
+    events: Vec<TranscriptEvent>,
+    open_since: Option<Duration>,
+}
+
+#[must_use]
+pub fn finalising(events: Vec<TranscriptEvent>) -> ScriptedReply {
+    ScriptedReply {
+        events,
+        open_since: None,
+    }
+}
+
+#[must_use]
+pub fn still_speaking_since(start: Duration) -> ScriptedReply {
+    ScriptedReply {
+        events: Vec::new(),
+        open_since: Some(start),
+    }
+}
+
 pub struct ScriptedTranscriber {
-    replies: VecDeque<Result<Vec<TranscriptEvent>, TranscribeError>>,
+    replies: VecDeque<Result<ScriptedReply, TranscribeError>>,
+    origin: Option<Duration>,
 }
 
 impl ScriptedTranscriber {
     #[must_use]
     pub fn new(replies: Vec<Vec<TranscriptEvent>>) -> ScriptedTranscriber {
+        ScriptedTranscriber::scripted(replies.into_iter().map(finalising).collect())
+    }
+
+    #[must_use]
+    pub fn scripted(replies: Vec<ScriptedReply>) -> ScriptedTranscriber {
         ScriptedTranscriber {
             replies: replies.into_iter().map(Ok).collect(),
+            origin: None,
         }
     }
 
@@ -99,13 +139,29 @@ impl ScriptedTranscriber {
     pub fn failing(error: TranscribeError) -> ScriptedTranscriber {
         ScriptedTranscriber {
             replies: VecDeque::from([Err(error)]),
+            origin: None,
+        }
+    }
+
+    fn transcription(&self, reply: ScriptedReply, chunk: &AudioChunk) -> Transcription {
+        let heard_through = chunk
+            .ends_at()
+            .saturating_sub(self.origin.unwrap_or_default());
+        Transcription {
+            events: reply.events,
+            finalised_through: reply.open_since.unwrap_or(heard_through),
         }
     }
 }
 
 impl Transcriber for ScriptedTranscriber {
-    fn push(&mut self, _chunk: &AudioChunk) -> Result<Vec<TranscriptEvent>, TranscribeError> {
-        self.replies.pop_front().unwrap_or(Ok(Vec::new()))
+    fn push(&mut self, chunk: &AudioChunk) -> Result<Transcription, TranscribeError> {
+        self.origin.get_or_insert(chunk.captured_at);
+        let reply = self
+            .replies
+            .pop_front()
+            .unwrap_or_else(|| Ok(finalising(Vec::new())))?;
+        Ok(self.transcription(reply, chunk))
     }
 
     fn finish(&mut self) -> Result<Vec<TranscriptEvent>, TranscribeError> {

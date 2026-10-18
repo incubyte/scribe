@@ -1,12 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { ModelDownload, RecorderSnapshot, SessionSummary } from "./types";
+import { expecting, isModelDownload, isRecorderSnapshot, isSessionSummaries } from "./guards";
 
 const RECENT_SESSION_COUNT = 5;
 
-export const fetchSnapshot = () => invoke<RecorderSnapshot>("recorder_snapshot");
+export const fetchSnapshot = () =>
+  invoke<unknown>("recorder_snapshot").then(expecting(isRecorderSnapshot, "recorder snapshot"));
 
 export const fetchRecentSessions = () =>
-  invoke<readonly SessionSummary[]>("recent_sessions", { limit: RECENT_SESSION_COUNT });
+  invoke<unknown>("recent_sessions", { limit: RECENT_SESSION_COUNT }).then(
+    expecting(isSessionSummaries, "recent sessions"),
+  );
 
 export const startRecording = () => invoke("start_recording");
 
@@ -16,6 +19,7 @@ export const openSession = (id: string) => invoke("open_session", { id });
 
 export const hidePopover = () => invoke("hide_popover");
 
-export const fetchModelDownload = () => invoke<ModelDownload>("model_download_status");
+export const fetchModelDownload = () =>
+  invoke<unknown>("model_download_status").then(expecting(isModelDownload, "model download status"));
 
 export const retryModelDownload = () => invoke("retry_model_download");

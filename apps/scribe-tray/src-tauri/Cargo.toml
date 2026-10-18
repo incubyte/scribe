@@ -26,7 +26,7 @@ tauri-plugin-positioner = { version = "2.3", features = ["tray-icon"] }
 serde.workspace = true
 serde_json.workspace = true
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
-scribe-core.workspace = true
+scribe-core = { workspace = true, features = ["serde"] }
 store-markdown.workspace = true
 audio-mic.workspace = true
 tracing.workspace = true

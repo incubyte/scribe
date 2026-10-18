@@ -5,7 +5,7 @@ use chrono::{DateTime, FixedOffset};
 
 use crate::recording::{
     AudioChunk, RecordingEvent, Segment, SessionClock, SessionDocument, SessionHeader, SessionId,
-    SessionSummary, TranscriptEvent,
+    SessionSummary, TranscriptEvent, Transcription,
 };
 
 pub trait AudioSource: Send {
@@ -14,7 +14,7 @@ pub trait AudioSource: Send {
 }
 
 pub trait Transcriber: Send {
-    fn push(&mut self, chunk: &AudioChunk) -> Result<Vec<TranscriptEvent>, TranscribeError>;
+    fn push(&mut self, chunk: &AudioChunk) -> Result<Transcription, TranscribeError>;
     fn finish(&mut self) -> Result<Vec<TranscriptEvent>, TranscribeError>;
 }
 

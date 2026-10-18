@@ -18,8 +18,8 @@ pub use echo_filter::{ECHO_OVERLAP_TOLERANCE, ECHO_SIMILARITY_THRESHOLD, EchoFil
 pub use events::RecordingEvent;
 pub use offset::{offset_as_clock, offset_from_clock};
 pub use readiness::{Readiness, RecorderState, recorder_state};
-pub use recorder::{Lane, Recorder, RecorderError};
-pub use segment::{Segment, Speaker, TranscriptEvent, Utterance};
+pub use recorder::{CapturingLanes, Lane, Recorder, RecorderError};
+pub use segment::{Segment, Speaker, TranscriptEvent, Transcription, Utterance};
 pub use sequencer::{MAX_HOLD, SegmentSequencer};
 pub use session::{
     InvalidSessionId, SessionDocument, SessionHeader, SessionId, SessionStatus, SessionSummary,

@@ -17,6 +17,6 @@ pub use model_manifest::{ModelFile, PARAKEET_MODEL};
 pub use models_location::default_models_dir;
 pub use progress::DownloadProgress;
 pub use provisioner::ModelProvisioner;
-pub use transcriber::{AUTO_LANGUAGE, ENGINE_NAME, ParakeetTranscriber};
+pub use transcriber::{AUTO_LANGUAGE, ENGINE_NAME, ParakeetModel, ParakeetTranscriber};
 pub use utterance_cutter::{CutterConfig, PendingUtterance, UtteranceCutter, VAD_WINDOW_SAMPLES};
 pub use vad::SileroVad;

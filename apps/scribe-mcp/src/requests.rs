@@ -1,7 +1,7 @@
 use chrono::NaiveDate;
 use rmcp::schemars;
 use schemars::JsonSchema;
-use scribe_core::library::{Limit, ListQuery, SearchHit, SegmentMatch};
+use scribe_core::library::{Limit, ListQuery, SearchHit, SegmentMatch, SessionSummaryView};
 use scribe_core::recording::SessionSummary;
 use serde::{Deserialize, Serialize};
 
@@ -93,14 +93,14 @@ fn parse_since(raw: &str) -> Result<NaiveDate, String> {
         .map_err(|_| format!("Invalid since date: {raw} (expected YYYY-MM-DD)"))
 }
 
-impl From<SessionSummary> for TranscriptSummaryDto {
-    fn from(summary: SessionSummary) -> TranscriptSummaryDto {
+impl From<SessionSummaryView> for TranscriptSummaryDto {
+    fn from(view: SessionSummaryView) -> TranscriptSummaryDto {
         TranscriptSummaryDto {
-            id: summary.id.to_string(),
-            title: summary.title,
-            started_at: summary.started_at.to_rfc3339(),
-            duration_seconds: summary.duration_seconds,
-            status: summary.status.as_str().to_owned(),
+            id: view.id,
+            title: view.title,
+            started_at: view.started_at,
+            duration_seconds: view.duration_seconds,
+            status: view.status.to_owned(),
         }
     }
 }
@@ -108,7 +108,10 @@ impl From<SessionSummary> for TranscriptSummaryDto {
 impl From<Vec<SessionSummary>> for TranscriptList {
     fn from(summaries: Vec<SessionSummary>) -> TranscriptList {
         TranscriptList {
-            transcripts: summaries.into_iter().map(Into::into).collect(),
+            transcripts: summaries
+                .into_iter()
+                .map(|summary| SessionSummaryView::from(summary).into())
+                .collect(),
         }
     }
 }

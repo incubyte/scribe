@@ -1,11 +1,6 @@
-use tauri::{AppHandle, Runtime};
+use super::SetupFailed;
+use crate::lanes::SpeechEngine;
 
-use super::ModelDownloadView;
-
-pub fn install<R: Runtime>(_app: &AppHandle<R>) {}
-
-pub fn status<R: Runtime>(_app: &AppHandle<R>) -> ModelDownloadView {
-    ModelDownloadView::Ready
+pub fn prepare_speech_engine(_progress: &dyn Fn(Option<u8>)) -> Result<SpeechEngine, SetupFailed> {
+    Ok(SpeechEngine)
 }
-
-pub fn retry<R: Runtime>(_app: &AppHandle<R>) {}

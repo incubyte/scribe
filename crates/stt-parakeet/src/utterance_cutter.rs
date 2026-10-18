@@ -58,6 +58,7 @@ struct OpenUtterance {
 pub struct UtteranceCutter {
     limits: Limits,
     origin: Option<Duration>,
+    heard_until: Duration,
     pre_roll: VecDeque<f32>,
     open: Option<OpenUtterance>,
 }
@@ -72,6 +73,7 @@ impl UtteranceCutter {
                 pre_roll: samples_in(config.pre_roll),
             },
             origin: None,
+            heard_until: Duration::ZERO,
             pre_roll: VecDeque::new(),
             open: None,
         }
@@ -80,6 +82,7 @@ impl UtteranceCutter {
     pub fn feed(&mut self, chunk: &AudioChunk, speech: &[bool]) -> Vec<PendingUtterance> {
         let origin = *self.origin.get_or_insert(chunk.captured_at);
         let chunk_start = chunk.captured_at.saturating_sub(origin);
+        self.heard_until = chunk_start + chunk.duration();
         chunk
             .samples
             .chunks(VAD_WINDOW_SAMPLES)
@@ -93,6 +96,16 @@ impl UtteranceCutter {
                 })
             })
             .collect()
+    }
+
+    #[must_use]
+    pub fn finalised_through(&self) -> Duration {
+        match &self.open {
+            Some(open) => open.start,
+            None => self
+                .heard_until
+                .saturating_sub(duration_of(self.pre_roll.len())),
+        }
     }
 
     pub fn flush(&mut self) -> Option<PendingUtterance> {

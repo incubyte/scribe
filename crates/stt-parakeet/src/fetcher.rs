@@ -3,12 +3,12 @@ use std::time::Duration;
 
 use reqwest::StatusCode;
 use reqwest::blocking::{Client, Response};
-use reqwest::header::{CONTENT_RANGE, HeaderMap, RANGE};
+use reqwest::header::{CONTENT_RANGE, RANGE};
 
 use crate::download_error::DownloadError;
 
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
-const WHOLE_DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(30 * 60);
+const STALL_TIMEOUT: Duration = Duration::from_secs(60);
 const READ_BUFFER_BYTES: usize = 64 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -45,7 +45,7 @@ impl HttpsFetcher {
         let client = Client::builder()
             .https_only(true)
             .connect_timeout(CONNECT_TIMEOUT)
-            .timeout(WHOLE_DOWNLOAD_TIMEOUT)
+            .timeout(STALL_TIMEOUT)
             .build()
             .map_err(network_error)?;
         Ok(HttpsFetcher { client })
@@ -70,11 +70,20 @@ impl RangeFetcher for HttpsFetcher {
 }
 
 fn outcome_of(response: &Response, offset: u64) -> Result<FetchOutcome, DownloadError> {
-    match response.status() {
-        StatusCode::PARTIAL_CONTENT => {
-            require_range_to_start_at(response.headers(), offset)?;
-            Ok(FetchOutcome::Resumed)
-        }
+    let content_range = response
+        .headers()
+        .get(CONTENT_RANGE)
+        .and_then(|value| value.to_str().ok());
+    classify_response(response.status(), content_range, offset)
+}
+
+fn classify_response(
+    status: StatusCode,
+    content_range: Option<&str>,
+    requested_offset: u64,
+) -> Result<FetchOutcome, DownloadError> {
+    match status {
+        StatusCode::PARTIAL_CONTENT => require_range_to_start_at(content_range, requested_offset),
         StatusCode::OK => Ok(FetchOutcome::Restarted),
         status => Err(DownloadError::Network(format!(
             "the server answered {status}"
@@ -82,13 +91,12 @@ fn outcome_of(response: &Response, offset: u64) -> Result<FetchOutcome, Download
     }
 }
 
-fn require_range_to_start_at(headers: &HeaderMap, offset: u64) -> Result<(), DownloadError> {
-    let start = headers
-        .get(CONTENT_RANGE)
-        .and_then(|value| value.to_str().ok())
-        .and_then(range_start);
-    if start == Some(offset) {
-        return Ok(());
+fn require_range_to_start_at(
+    content_range: Option<&str>,
+    offset: u64,
+) -> Result<FetchOutcome, DownloadError> {
+    if content_range.and_then(range_start) == Some(offset) {
+        return Ok(FetchOutcome::Resumed);
     }
     Err(DownloadError::Network(
         "the server resumed from a different position than requested".to_owned(),
@@ -114,4 +122,105 @@ fn stream_into(response: &mut Response, sink: &mut dyn FetchSink) -> Result<(), 
 
 fn network_error(error: impl std::error::Error) -> DownloadError {
     DownloadError::Network(error.to_string())
+}
+
+#[cfg(test)]
+mod response_classification {
+    use super::*;
+
+    const RESUME_FROM: u64 = 100;
+
+    fn is_network_failure(outcome: &Result<FetchOutcome, DownloadError>) -> bool {
+        matches!(outcome, Err(DownloadError::Network(_)))
+    }
+
+    #[test]
+    fn a_partial_answer_starting_where_we_asked_resumes_the_file() {
+        let outcome = classify_response(
+            StatusCode::PARTIAL_CONTENT,
+            Some("bytes 100-199/200"),
+            RESUME_FROM,
+        );
+
+        assert_eq!(outcome.unwrap(), FetchOutcome::Resumed);
+    }
+
+    #[test]
+    fn a_partial_answer_starting_elsewhere_is_refused() {
+        let outcome = classify_response(
+            StatusCode::PARTIAL_CONTENT,
+            Some("bytes 0-199/200"),
+            RESUME_FROM,
+        );
+
+        assert!(is_network_failure(&outcome));
+    }
+
+    #[test]
+    fn a_partial_answer_without_a_content_range_is_refused() {
+        let outcome = classify_response(StatusCode::PARTIAL_CONTENT, None, RESUME_FROM);
+
+        assert!(is_network_failure(&outcome));
+    }
+
+    #[test]
+    fn a_partial_answer_in_a_unit_other_than_bytes_is_refused() {
+        let outcome = classify_response(
+            StatusCode::PARTIAL_CONTENT,
+            Some("items 100-199/200"),
+            RESUME_FROM,
+        );
+
+        assert!(is_network_failure(&outcome));
+    }
+
+    #[test]
+    fn a_partial_answer_with_an_unreadable_range_is_refused() {
+        let outcome = classify_response(
+            StatusCode::PARTIAL_CONTENT,
+            Some("bytes */200"),
+            RESUME_FROM,
+        );
+
+        assert!(is_network_failure(&outcome));
+    }
+
+    #[test]
+    fn a_whole_file_answer_to_a_resume_request_restarts_the_file() {
+        let outcome = classify_response(StatusCode::OK, None, RESUME_FROM);
+
+        assert_eq!(outcome.unwrap(), FetchOutcome::Restarted);
+    }
+
+    #[test]
+    fn a_whole_file_answer_to_a_fresh_request_starts_the_file() {
+        let outcome = classify_response(StatusCode::OK, None, 0);
+
+        assert_eq!(outcome.unwrap(), FetchOutcome::Restarted);
+    }
+
+    #[test]
+    fn a_missing_file_is_a_network_failure() {
+        let outcome = classify_response(StatusCode::NOT_FOUND, None, 0);
+
+        assert!(is_network_failure(&outcome));
+    }
+
+    #[test]
+    fn an_unsatisfiable_range_is_a_network_failure() {
+        let outcome = classify_response(
+            StatusCode::RANGE_NOT_SATISFIABLE,
+            Some("bytes */200"),
+            RESUME_FROM,
+        );
+
+        assert!(is_network_failure(&outcome));
+    }
+
+    #[test]
+    fn an_unfollowed_redirect_is_a_network_failure() {
+        let outcome = classify_response(StatusCode::FOUND, None, 0);
+
+        assert!(is_network_failure(&outcome));
+    }
 }

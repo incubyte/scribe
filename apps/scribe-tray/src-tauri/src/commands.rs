@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
+use scribe_core::library::SessionSummaryView;
 use scribe_core::ports::TranscriptStore;
-use scribe_core::recording::{SessionId, SessionSummary};
-use serde::Serialize;
+use scribe_core::recording::SessionId;
 use store_markdown::MarkdownTranscriptStore;
 use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_opener::OpenerExt;
@@ -10,27 +10,6 @@ use tauri_plugin_opener::OpenerExt;
 use crate::live_feed::{LiveFeed, RecorderSnapshot};
 use crate::model_setup::{self, ModelDownloadView};
 use crate::recording::{self, RecordingController};
-
-#[derive(Serialize)]
-pub struct SessionSummaryView {
-    id: String,
-    title: String,
-    started_at: String,
-    duration_seconds: Option<u64>,
-    status: &'static str,
-}
-
-impl From<SessionSummary> for SessionSummaryView {
-    fn from(summary: SessionSummary) -> SessionSummaryView {
-        SessionSummaryView {
-            id: summary.id.to_string(),
-            title: summary.title,
-            started_at: summary.started_at.to_rfc3339(),
-            duration_seconds: summary.duration_seconds,
-            status: summary.status.as_str(),
-        }
-    }
-}
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]

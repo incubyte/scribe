@@ -30,6 +30,7 @@ export function Popover() {
       <StatusBar
         phase={feed.phase}
         startedAt={feed.startedAt}
+        startFailure={feed.startFailure}
         onStart={() => void startRecording()}
         onStop={() => void stopRecording()}
       />

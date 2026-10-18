@@ -40,6 +40,25 @@ describe("the speech model download panel", () => {
     expect(screen.getByRole("button", { name: "Retry" })).toBeEnabled();
   });
 
+  it("shows an install whose size is unknown without a percentage", () => {
+    render(<ModelDownloadPanel download={{ state: "downloading", percent: null }} onRetry={vi.fn()} />);
+
+    expect(screen.getByRole("progressbar", { name: "Speech model download" })).not.toHaveAttribute(
+      "value",
+    );
+    expect(screen.getByRole("status")).toHaveTextContent("Preparing speech model");
+  });
+
+  it("keeps one status region while the download turns into a failure", () => {
+    const { rerender } = render(<ModelDownloadPanel download={downloading(42)} onRetry={vi.fn()} />);
+    const status = screen.getByRole("status");
+
+    rerender(<ModelDownloadPanel download={failed} onRetry={vi.fn()} />);
+
+    expect(screen.getByRole("status")).toBe(status);
+    expect(status).toHaveTextContent("Download failed");
+  });
+
   it("retries the download from the keyboard", async () => {
     const onRetry = vi.fn();
     render(<ModelDownloadPanel download={failed} onRetry={onRetry} />);

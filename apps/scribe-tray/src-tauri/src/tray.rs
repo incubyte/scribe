@@ -96,19 +96,39 @@ fn enabled_item<R: Runtime>(
     MenuItem::with_id(app, id, label, true, None::<&str>)
 }
 
+struct TrayLook {
+    icon: Image<'static>,
+    tooltip: &'static str,
+}
+
+const IDLE_LOOK: TrayLook = TrayLook {
+    icon: IDLE_ICON,
+    tooltip: IDLE_TOOLTIP,
+};
+const RECORDING_LOOK: TrayLook = TrayLook {
+    icon: RECORDING_ICON,
+    tooltip: RECORDING_TOOLTIP,
+};
+
 pub fn show_recorder_state<R: Runtime>(app: &AppHandle<R>, state: RecorderState) {
-    let recording = state == RecorderState::Recording;
-    let label = if recording {
-        stop_recording_label(Duration::ZERO)
-    } else {
-        START_RECORDING.to_owned()
-    };
-    update_toggle(app, &label, state != RecorderState::Locked);
-    update_icon(app, recording);
+    match state {
+        RecorderState::Locked => {
+            disable_toggle(app, START_RECORDING);
+            show_look(app, &IDLE_LOOK);
+        }
+        RecorderState::Idle => {
+            enable_toggle(app, START_RECORDING);
+            show_look(app, &IDLE_LOOK);
+        }
+        RecorderState::Recording => {
+            enable_toggle(app, &stop_recording_label(Duration::ZERO));
+            show_look(app, &RECORDING_LOOK);
+        }
+    }
 }
 
 pub fn show_elapsed<R: Runtime>(app: &AppHandle<R>, elapsed: Duration) {
-    update_toggle(app, &stop_recording_label(elapsed), true);
+    enable_toggle(app, &stop_recording_label(elapsed));
 }
 
 pub fn show_tooltip<R: Runtime>(app: &AppHandle<R>, tooltip: &str) {
@@ -124,34 +144,45 @@ pub fn show_idle_tooltip<R: Runtime>(app: &AppHandle<R>) {
     show_tooltip(app, IDLE_TOOLTIP);
 }
 
-fn update_toggle<R: Runtime>(app: &AppHandle<R>, label: &str, enabled: bool) {
-    let toggle = &app.state::<RecordingMenuItem<R>>().0;
+fn enable_toggle<R: Runtime>(app: &AppHandle<R>, label: &str) {
+    let toggle = relabel_toggle(app, label);
     log_failure(
-        toggle.set_text(label),
-        "could not update the recording menu item",
-    );
-    log_failure(
-        toggle.set_enabled(enabled),
+        toggle.set_enabled(true),
         "could not update the recording menu item",
     );
 }
 
-fn update_icon<R: Runtime>(app: &AppHandle<R>, recording: bool) {
+fn disable_toggle<R: Runtime>(app: &AppHandle<R>, label: &str) {
+    let toggle = relabel_toggle(app, label);
+    log_failure(
+        toggle.set_enabled(false),
+        "could not update the recording menu item",
+    );
+}
+
+fn relabel_toggle<'a, R: Runtime>(app: &'a AppHandle<R>, label: &str) -> &'a MenuItem<R> {
+    let toggle = &app.state::<RecordingMenuItem<R>>().inner().0;
+    log_failure(
+        toggle.set_text(label),
+        "could not update the recording menu item",
+    );
+    toggle
+}
+
+fn show_look<R: Runtime>(app: &AppHandle<R>, look: &TrayLook) {
     let Some(tray) = app.tray_by_id(TRAY_ID) else {
         return;
     };
-    let (icon, tooltip) = if recording {
-        (RECORDING_ICON, RECORDING_TOOLTIP)
-    } else {
-        (IDLE_ICON, IDLE_TOOLTIP)
-    };
-    log_failure(tray.set_icon(Some(icon)), "could not update the tray icon");
+    log_failure(
+        tray.set_icon(Some(look.icon.clone())),
+        "could not update the tray icon",
+    );
     log_failure(
         tray.set_icon_as_template(true),
         "could not update the tray icon",
     );
     log_failure(
-        tray.set_tooltip(Some(tooltip)),
+        tray.set_tooltip(Some(look.tooltip)),
         "could not update the tray tooltip",
     );
 }

@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -10,7 +11,7 @@ use scribe_core::recording::{
 };
 use scribe_core::testing::{
     FakeAudioSource, InMemoryTranscriptStore, RecordingListenerSpy, ScriptedTranscriber, chunk_at,
-    finished, partial,
+    finalising, finished, partial, still_speaking_since,
 };
 
 const READY: Readiness = Readiness {
@@ -117,9 +118,9 @@ fn silent_mic_lane() -> Lane {
     lane(Speaker::Me, ScriptedTranscriber::new(vec![]))
 }
 
-fn denied_lane() -> Lane {
+fn denied_lane(speaker: Speaker) -> Lane {
     Lane {
-        speaker: Speaker::Them,
+        speaker,
         source: Box::new(FakeAudioSource::failing(CaptureError::PermissionDenied)),
         transcriber: Box::new(ScriptedTranscriber::new(vec![])),
     }
@@ -241,7 +242,7 @@ fn a_second_recording_cannot_start_while_one_is_in_progress() {
 fn a_denied_microphone_leaves_no_session_behind() {
     let mut call = Call::ready();
 
-    let outcome = call.start(vec![silent_mic_lane(), denied_lane()]);
+    let outcome = call.start(vec![denied_lane(Speaker::Me)]);
 
     assert!(matches!(
         outcome,
@@ -255,7 +256,7 @@ fn a_denied_microphone_leaves_no_session_behind() {
 fn a_denied_microphone_announces_nothing() {
     let mut call = Call::ready();
 
-    let _ = call.start(vec![denied_lane()]);
+    let _ = call.start(vec![denied_lane(Speaker::Me)]);
 
     assert!(call.listener.events().is_empty());
 }
@@ -407,4 +408,139 @@ fn the_other_side_falling_quiet_after_being_heard_raises_no_warning() {
     )]);
 
     assert!(silence_warnings(call.listener.events()).is_empty());
+}
+
+#[test]
+fn when_the_other_side_cannot_be_captured_my_side_still_records_and_a_warning_is_raised() {
+    let mut call = Call::ready();
+    let mine = ScriptedTranscriber::new(vec![utterance(0, 900, "Hello? Anyone?")]);
+
+    let id = call.record(vec![lane(Speaker::Me, mine), denied_lane(Speaker::Them)]);
+
+    assert_eq!(
+        call.store.segments(&id),
+        vec![line(Speaker::Me, (0, 900), "Hello? Anyone?")]
+    );
+    assert_eq!(
+        silence_warnings(call.listener.events()),
+        vec![RecordingEvent::CaptureSilenced {
+            speaker: Speaker::Them
+        }]
+    );
+    assert_eq!(
+        call.store.header(&id).unwrap().status,
+        SessionStatus::Complete
+    );
+}
+
+#[test]
+fn the_other_side_is_never_captured_when_my_microphone_is_denied() {
+    let mut call = Call::ready();
+    let other_side_started = Arc::new(AtomicBool::new(false));
+    let other_side = Lane {
+        speaker: Speaker::Them,
+        source: Box::new(
+            FakeAudioSource::with_chunks(Vec::new()).reporting_start_to(&other_side_started),
+        ),
+        transcriber: Box::new(ScriptedTranscriber::new(vec![])),
+    };
+
+    let outcome = call.start(vec![other_side, denied_lane(Speaker::Me)]);
+
+    assert!(matches!(
+        outcome,
+        Err(RecorderError::Capture(CaptureError::PermissionDenied))
+    ));
+    assert!(!other_side_started.load(Ordering::SeqCst));
+}
+
+fn speaking_until(silent_pushes: usize, events: Vec<TranscriptEvent>) -> ScriptedTranscriber {
+    let mut replies = vec![Vec::new(); silent_pushes];
+    replies.push(events);
+    ScriptedTranscriber::new(replies)
+}
+
+fn still_speaking_until(
+    pushes: usize,
+    since_ms: u64,
+    events: Vec<TranscriptEvent>,
+) -> ScriptedTranscriber {
+    let mut replies = vec![still_speaking_since(Duration::from_millis(since_ms)); pushes];
+    replies.push(finalising(events));
+    ScriptedTranscriber::scripted(replies)
+}
+
+#[test]
+fn their_earlier_line_is_saved_before_my_later_line_even_when_its_final_arrives_late() {
+    let mut call = Call::ready();
+    let mine = speaking_until(25, utterance(2_000, 2_500, "Yeah"));
+    let theirs = still_speaking_until(56, 0, utterance(0, 5_000, "So the plan is simple"));
+
+    let id = call.record(vec![
+        lane_lasting(Speaker::Me, 3_900, mine),
+        lane_lasting(Speaker::Them, 6_000, theirs),
+    ]);
+
+    assert_eq!(
+        call.store.segments(&id),
+        vec![
+            line(Speaker::Them, (0, 5_000), "So the plan is simple"),
+            line(Speaker::Me, (2_000, 2_500), "Yeah"),
+        ]
+    );
+}
+
+#[test]
+fn an_echo_is_dropped_even_when_their_line_is_finalised_after_mine() {
+    let mut call = Call::ready();
+    let mine = speaking_until(21, utterance(1_100, 2_100, "let's review the budget"));
+    let theirs = still_speaking_until(
+        35,
+        1_000,
+        utterance(1_000, 2_000, "Let's review the budget"),
+    );
+
+    let id = call.record(vec![
+        lane_lasting(Speaker::Me, 3_500, mine),
+        lane_lasting(Speaker::Them, 4_000, theirs),
+    ]);
+
+    assert_eq!(
+        call.store.segments(&id),
+        vec![line(
+            Speaker::Them,
+            (1_000, 2_000),
+            "Let's review the budget"
+        )]
+    );
+}
+
+#[test]
+fn the_end_of_an_earlier_session_leaves_the_current_recording_running() {
+    let mut call = Call::ready();
+    let earlier = call.record(vec![silent_mic_lane()]);
+    let current = call.start(vec![silent_mic_lane()]).unwrap();
+
+    call.recorder.stop_session(&earlier).unwrap();
+
+    assert_eq!(call.recorder.state(), RecorderState::Recording);
+    call.recorder.stop().unwrap();
+    assert_eq!(
+        call.store.header(&current).unwrap().status,
+        SessionStatus::Complete
+    );
+}
+
+#[test]
+fn the_current_session_can_be_stopped_by_its_id() {
+    let mut call = Call::ready();
+    let id = call.start(vec![silent_mic_lane()]).unwrap();
+
+    call.recorder.stop_session(&id).unwrap();
+
+    assert_eq!(call.recorder.state(), RecorderState::Idle);
+    assert_eq!(
+        call.store.header(&id).unwrap().status,
+        SessionStatus::Complete
+    );
 }

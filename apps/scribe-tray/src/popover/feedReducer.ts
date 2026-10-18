@@ -13,61 +13,56 @@ export interface FeedState {
   readonly startedAt: number | null;
   readonly lines: readonly LiveLine[];
   readonly partials: Partials;
+  readonly startFailure: string | null;
 }
 
-export type FeedEvent =
-  | { readonly type: "snapshot"; readonly snapshot: RecorderSnapshot }
-  | { readonly type: "started"; readonly at: number }
-  | { readonly type: "partial"; readonly speaker: Speaker; readonly text: string }
-  | {
-      readonly type: "segment";
-      readonly speaker: Speaker;
-      readonly startMs: number;
-      readonly text: string;
-    }
-  | { readonly type: "stopped" };
+export type FeedEvent = (state: FeedState) => FeedState;
 
 export const initialFeed: FeedState = {
   phase: "idle",
   startedAt: null,
   lines: [],
   partials: {},
+  startFailure: null,
 };
 
-type Handlers = {
-  [Type in FeedEvent["type"]]: (
-    state: FeedState,
-    event: Extract<FeedEvent, { type: Type }>,
-  ) => FeedState;
-};
-
-const HANDLERS: Handlers = {
-  snapshot: (_state, { snapshot }) => ({
-    phase: snapshot.state,
-    startedAt: snapshot.started_at === null ? null : Date.parse(snapshot.started_at),
-    lines: snapshot.lines.map((line) => ({
-      speaker: line.speaker,
-      startMs: line.start_ms,
-      text: line.text,
-    })),
-    partials: {},
-  }),
-  started: (_state, { at }) => ({ ...initialFeed, phase: "recording", startedAt: at }),
-  partial: (state, { speaker, text }) => ({
-    ...state,
-    partials: { ...state.partials, [speaker]: text },
-  }),
-  segment: (state, { speaker, startMs, text }) => ({
-    ...state,
-    lines: [...state.lines, { speaker, startMs, text }],
-    partials: withoutSpeaker(state.partials, speaker),
-  }),
-  stopped: () => initialFeed,
+export const feedEvents = {
+  snapshot:
+    (snapshot: RecorderSnapshot): FeedEvent =>
+    () => ({
+      ...initialFeed,
+      phase: snapshot.state,
+      startedAt: snapshot.started_at === null ? null : Date.parse(snapshot.started_at),
+      lines: snapshot.lines.map((line) => ({
+        speaker: line.speaker,
+        startMs: line.start_ms,
+        text: line.text,
+      })),
+    }),
+  started:
+    (at: number): FeedEvent =>
+    () => ({ ...initialFeed, phase: "recording", startedAt: at }),
+  partial:
+    (speaker: Speaker, text: string): FeedEvent =>
+    (state) => ({ ...state, partials: { ...state.partials, [speaker]: text } }),
+  segment:
+    (line: LiveLine): FeedEvent =>
+    (state) => ({
+      ...state,
+      lines: [...state.lines, line],
+      partials: withoutSpeaker(state.partials, line.speaker),
+    }),
+  stopped: (): FeedEvent => () => initialFeed,
+  phaseChanged:
+    (phase: RecorderPhase): FeedEvent =>
+    (state) => ({ ...state, phase }),
+  startFailed:
+    (reasonKind: string): FeedEvent =>
+    (state) => ({ ...state, startFailure: reasonKind }),
 };
 
 export function feedReducer(state: FeedState, event: FeedEvent): FeedState {
-  const handle = HANDLERS[event.type] as (state: FeedState, event: FeedEvent) => FeedState;
-  return handle(state, event);
+  return event(state);
 }
 
 function withoutSpeaker(partials: Partials, speaker: Speaker): Partials {

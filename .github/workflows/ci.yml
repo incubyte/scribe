@@ -68,23 +68,91 @@ jobs:
 
   mutation:
     if: github.event_name == 'pull_request'
-    runs-on: macos-26
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-26, windows-latest]
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
       pull-requests: write
+      actions: read
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
       - name: Stage the MCP server the tray bundles as a sidecar
         run: apps/scribe-tray/scripts/stage-sidecar.sh
       - run: cargo install cargo-mutants --locked
-      - name: Mutate the pull request diff
+      - name: Mutate the pull request's Rust changes
         run: |
           git diff origin/${{ github.base_ref }}...HEAD > pr.diff
-          cargo mutants --in-diff pr.diff --no-shuffle || true
+          set +e
+          cargo mutants --in-diff pr.diff --no-shuffle 2>&1 | tee mutants.log
+          status=${PIPESTATUS[0]}
+          set -e
+          case "$status" in
+            0|2|3) echo "cargo-mutants finished (exit $status)" ;;
+            *) echo "cargo-mutants crashed (exit $status)"; exit "$status" ;;
+          esac
+      - uses: actions/setup-node@v4
+        if: matrix.os == 'macos-26'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/scribe-tray/package-lock.json
+      - run: npm ci
+        if: matrix.os == 'macos-26'
+        working-directory: apps/scribe-tray
+      - name: Mutate the frontend
+        if: matrix.os == 'macos-26'
+        run: npx stryker run
+        working-directory: apps/scribe-tray
+      - name: Fetch the main branch's mutation scores
+        if: matrix.os == 'macos-26'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id=$(gh run list --workflow ci --branch main --event push --status success --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+          if [ -z "$run_id" ]; then
+            echo "No successful run on main yet; the change against main is unavailable"
+          elif ! gh run download "$run_id" --name mutation-scores --dir base-scores; then
+            echo "The latest main run recorded no mutation scores; the change against main is unavailable"
+          fi
+      - name: Summarise mutation scores
+        run: |
+          stryker_args=()
+          if [ "${{ matrix.os }}" = "macos-26" ]; then
+            stryker_args=(--stryker-report apps/scribe-tray/reports/mutation/mutation.json --base-scores base-scores/scores.json)
+          fi
+          python .github/scripts/mutation_summary.py --title "Mutation testing (${{ matrix.os }})" \
+            --rust-diff pr.diff --rust-log mutants.log "${stryker_args[@]}" > mutation-summary.md
+      - uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: mutation-${{ matrix.os }}
+          path: mutation-summary.md
+      - name: Fail below the mutation threshold or on a missing report
+        run: |
+          stryker_args=()
+          if [ "${{ matrix.os }}" = "macos-26" ]; then
+            stryker_args=(--stryker-report apps/scribe-tray/reports/mutation/mutation.json)
+          fi
+          python .github/scripts/mutation_summary.py --rust-diff pr.diff --rust-log mutants.log \
+            "${stryker_args[@]}" --enforce 75 > /dev/null
+
+  mutation-baseline:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -92,16 +160,14 @@ jobs:
           cache-dependency-path: apps/scribe-tray/package-lock.json
       - run: npm ci
         working-directory: apps/scribe-tray
-      - name: Mutate the frontend
+      - name: Mutate the frontend on main
         run: npx stryker run
         working-directory: apps/scribe-tray
-        continue-on-error: true
-      - name: Summarise mutation scores
-        id: score
-        run: python3 .github/scripts/mutation_summary.py > mutation-summary.md
-      - uses: marocchino/sticky-pull-request-comment@v2
+      - name: Record main's mutation scores
+        run: |
+          python3 .github/scripts/mutation_summary.py --stryker-report apps/scribe-tray/reports/mutation/mutation.json \
+            --write-scores scores.json --enforce 0
+      - uses: actions/upload-artifact@v4
         with:
-          header: mutation
-          path: mutation-summary.md
-      - name: Fail below the mutation threshold
-        run: python3 .github/scripts/mutation_summary.py --enforce 75 > /dev/null
+          name: mutation-scores
+          path: scores.json

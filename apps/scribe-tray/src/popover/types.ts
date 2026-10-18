@@ -26,5 +26,5 @@ export interface SessionSummary {
 
 export type ModelDownload =
   | { readonly state: "ready" }
-  | { readonly state: "downloading"; readonly percent: number }
+  | { readonly state: "downloading"; readonly percent: number | null }
   | { readonly state: "failed"; readonly reason_kind: string };

@@ -1,11 +1,10 @@
 use std::sync::Arc;
 use std::sync::mpsc::Receiver;
-use std::time::Duration;
 
 use chrono::{DateTime, FixedOffset, TimeDelta};
 
 use crate::ports::{RecordingListener, StoreError, TranscriptStore};
-use crate::recording::lane_worker::LaneMessage;
+use crate::recording::lane_worker::{LaneMessage, LaneProgress};
 use crate::recording::{
     RecordingEvent, Segment, SegmentSequencer, SessionClock, SessionId, Speaker,
 };
@@ -35,9 +34,7 @@ impl SessionWriter {
     fn handle(&mut self, message: LaneMessage) {
         match message {
             LaneMessage::Final(segment) => self.sequencer.accept(segment),
-            LaneMessage::Watermark(speaker, watermark) => {
-                self.sequencer.advance(speaker, watermark);
-            }
+            LaneMessage::Progress(progress) => self.advance(&progress),
             LaneMessage::Partial(speaker, text) => self
                 .listener
                 .on_event(RecordingEvent::PartialSegmentUpdated { speaker, text }),
@@ -50,8 +47,15 @@ impl SessionWriter {
         self.write_all(ready);
     }
 
+    fn advance(&mut self, progress: &LaneProgress) {
+        self.sequencer
+            .advance(progress.speaker, progress.finalised_through);
+        self.sequencer
+            .hear(progress.speaker, progress.heard_through);
+    }
+
     fn end_lane(&mut self, speaker: Speaker) {
-        self.sequencer.advance(speaker, Duration::MAX);
+        self.sequencer.close(speaker);
         self.open_lanes = self.open_lanes.saturating_sub(1);
     }
 

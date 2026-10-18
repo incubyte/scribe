@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use scribe_core::ports::TranscribeError;
-use scribe_core::recording::{TranscriptEvent, Utterance};
+use scribe_core::recording::{TranscriptEvent, Transcription, Utterance};
 use serde::Deserialize;
 
 use crate::bridge::SessionToken;
@@ -12,6 +12,7 @@ pub(crate) struct Reply {
     error: Option<String>,
     #[serde(default)]
     events: Vec<EventPayload>,
+    finalised_through_s: Option<f64>,
     session: Option<SessionToken>,
     status: Option<String>,
 }
@@ -47,6 +48,17 @@ impl Reply {
 
     pub(crate) fn status(self) -> Result<String, TranscribeError> {
         self.status.ok_or_else(|| missing("status"))
+    }
+
+    pub(crate) fn transcription(self) -> Result<Transcription, TranscribeError> {
+        let finalised_through = self
+            .finalised_through_s
+            .map(seconds)
+            .ok_or_else(|| missing("finalised_through_s"))?;
+        Ok(Transcription {
+            events: self.events(),
+            finalised_through,
+        })
     }
 
     pub(crate) fn events(self) -> Vec<TranscriptEvent> {

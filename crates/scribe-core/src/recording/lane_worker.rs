@@ -10,10 +10,16 @@ const SILENCE_WARNING_AFTER: Duration = Duration::from_secs(5);
 
 pub(crate) enum LaneMessage {
     Final(Segment),
-    Watermark(Speaker, Duration),
+    Progress(LaneProgress),
     Partial(Speaker, String),
     Silenced(Speaker),
     Ended(Speaker),
+}
+
+pub(crate) struct LaneProgress {
+    pub(crate) speaker: Speaker,
+    pub(crate) finalised_through: Duration,
+    pub(crate) heard_through: Duration,
 }
 
 pub(crate) struct LaneWorker {
@@ -50,13 +56,26 @@ impl LaneRun {
         for chunk in chunks {
             self.audio_origin.get_or_insert(chunk.captured_at);
             self.watch_for_silence(&chunk);
-            let events = self.worker.transcriber.push(&chunk)?;
-            self.forward(events);
-            self.send(LaneMessage::Watermark(self.worker.speaker, chunk.ends_at()));
+            let transcription = self.worker.transcriber.push(&chunk)?;
+            self.forward(transcription.events);
+            self.send(self.progress_after(&chunk, transcription.finalised_through));
         }
         let events = self.worker.transcriber.finish()?;
         self.forward(events);
         Ok(())
+    }
+
+    fn progress_after(&self, chunk: &AudioChunk, finalised_through: Duration) -> LaneMessage {
+        let heard_through = chunk.ends_at();
+        LaneMessage::Progress(LaneProgress {
+            speaker: self.worker.speaker,
+            finalised_through: (self.origin() + finalised_through).min(heard_through),
+            heard_through,
+        })
+    }
+
+    fn origin(&self) -> Duration {
+        self.audio_origin.unwrap_or_default()
     }
 
     fn watch_for_silence(&mut self, chunk: &AudioChunk) {
@@ -81,7 +100,7 @@ impl LaneRun {
     }
 
     fn segment_from(&self, utterance: Utterance) -> Segment {
-        let origin = self.audio_origin.unwrap_or_default();
+        let origin = self.origin();
         Segment {
             speaker: self.worker.speaker,
             start: origin + utterance.start,

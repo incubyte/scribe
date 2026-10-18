@@ -1,6 +1,8 @@
 use tauri::{AppHandle, Runtime};
 use tauri_plugin_notification::NotificationExt;
 
+use crate::start_failure::StartFailureKind;
+
 const MICROPHONE_DENIED_TITLE: &str = "Scribe can't use the microphone";
 #[cfg(not(windows))]
 const MICROPHONE_DENIED_BODY: &str = "Allow Scribe in System Settings > Privacy & Security > Microphone, then start recording again.";
@@ -9,6 +11,8 @@ const OTHER_SIDE_SILENT_TITLE: &str = "Scribe can't hear the other side of the c
 #[cfg(not(windows))]
 const OTHER_SIDE_SILENT_BODY: &str =
     "Allow Scribe in System Settings > Privacy & Security > Screen & System Audio Recording.";
+
+const RECORDING_NOT_STARTED_TITLE: &str = "Scribe couldn't start recording";
 
 const MCP_CONFIG_COPIED_TITLE: &str = "MCP config copied";
 const MCP_CONFIG_COPIED_BODY: &str =
@@ -23,6 +27,13 @@ pub fn notify_mcp_config_copied<R: Runtime>(app: &AppHandle<R>) {
 
 pub fn notify_mcp_config_not_copied<R: Runtime>(app: &AppHandle<R>) {
     show_plain(app, MCP_CONFIG_NOT_COPIED_TITLE, MCP_CONFIG_NOT_COPIED_BODY);
+}
+
+pub fn notify_recording_not_started<R: Runtime>(app: &AppHandle<R>, kind: StartFailureKind) {
+    match kind {
+        StartFailureKind::MicrophoneDenied => notify_microphone_denied(app),
+        other => show_plain(app, RECORDING_NOT_STARTED_TITLE, other.advice()),
+    }
 }
 
 #[cfg(not(windows))]

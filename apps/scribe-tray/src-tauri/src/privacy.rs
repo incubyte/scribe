@@ -2,8 +2,7 @@ use serde_json::json;
 use tauri::{AppHandle, Manager, Runtime, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_store::StoreExt;
 
-use crate::recording::RecordingController;
-use crate::tray;
+use crate::recording::{self, RecordingController};
 
 const SETTINGS_FILE: &str = "settings.json";
 const ACKNOWLEDGED_KEY: &str = "privacy_acknowledged";
@@ -58,7 +57,7 @@ pub fn acknowledge_privacy<R: Runtime>(app: AppHandle<R>) -> Result<(), String> 
 }
 
 fn unlock_recording<R: Runtime>(app: &AppHandle<R>) {
-    let controller = app.state::<RecordingController>();
-    controller.mark_privacy_acknowledged();
-    tray::show_recorder_state(app, controller.state());
+    app.state::<RecordingController>()
+        .mark_privacy_acknowledged();
+    recording::publish_state(app);
 }

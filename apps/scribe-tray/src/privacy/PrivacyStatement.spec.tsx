@@ -33,6 +33,15 @@ describe("the privacy statement window", () => {
     expect(screen.getByRole("button", { name: "I understand" })).toHaveFocus();
   });
 
+  it("reads the statements to screen-reader users as the description of the button", () => {
+    render(<PrivacyStatement />);
+
+    const button = screen.getByRole("button", { name: "I understand" });
+
+    expect(button).toHaveAccessibleDescription(/Speech is transcribed on-device\./);
+    expect(button).toHaveAccessibleDescription(/Transcripts are saved as text files in Documents\/Scribe\./);
+  });
+
   it("acknowledges the statement when Enter is pressed", async () => {
     const handler = vi.fn();
     mockIPC(handler);

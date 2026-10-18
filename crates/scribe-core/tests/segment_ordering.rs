@@ -236,3 +236,47 @@ fn stopping_drains_every_held_line_in_start_order() {
     );
     assert!(sequencer.release_ready().is_empty());
 }
+
+#[test]
+fn my_line_waits_while_their_earlier_line_is_still_being_spoken() {
+    let mut sequencer = SegmentSequencer::new(&BOTH_SIDES);
+    sequencer.accept(line(Speaker::Me, (2_000, 2_500), "Yeah"));
+    sequencer.advance(Speaker::Me, millis(4_500));
+    sequencer.hear(Speaker::Them, millis(4_500));
+    let while_they_speak = sequencer.release_ready();
+
+    sequencer.accept(line(Speaker::Them, (0, 5_000), "So the plan is simple"));
+    sequencer.advance(Speaker::Them, millis(5_600));
+    let once_their_line_is_final = sequencer.release_ready();
+
+    assert!(while_they_speak.is_empty());
+    assert_eq!(
+        once_their_line_is_final,
+        vec![
+            line(Speaker::Them, (0, 5_000), "So the plan is simple"),
+            line(Speaker::Me, (2_000, 2_500), "Yeah"),
+        ]
+    );
+}
+
+fn their_budget_line() -> Segment {
+    line(Speaker::Them, (1_000, 2_000), "Let's review the budget")
+}
+
+#[test]
+fn an_echo_is_caught_even_when_their_line_is_finalised_after_mine() {
+    let mut sequencer = SegmentSequencer::new(&BOTH_SIDES);
+    sequencer.accept(line(Speaker::Me, (1_100, 2_100), "let's review the budget"));
+    sequencer.advance(Speaker::Me, millis(4_000));
+    sequencer.advance(Speaker::Them, millis(1_000));
+    sequencer.hear(Speaker::Them, millis(4_000));
+    let before_their_line_is_final = sequencer.release_ready();
+
+    sequencer.accept(their_budget_line());
+    sequencer.advance(Speaker::Them, millis(4_100));
+    let after_their_line_is_final = sequencer.release_ready();
+
+    assert!(before_their_line_is_final.is_empty());
+    assert_eq!(after_their_line_is_final, vec![their_budget_line()]);
+    assert!(sequencer.drain().is_empty());
+}

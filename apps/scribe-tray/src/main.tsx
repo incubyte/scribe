@@ -13,7 +13,12 @@ const ROUTES: Readonly<Record<string, () => React.JSX.Element>> = {
 
 const Route = ROUTES[window.location.hash] ?? PrivacyStatement;
 
-createRoot(document.getElementById("root")!).render(
+const root = document.getElementById("root");
+if (root === null) {
+  throw new Error("Scribe's page has no root element");
+}
+
+createRoot(root).render(
   <StrictMode>
     <Route />
   </StrictMode>,

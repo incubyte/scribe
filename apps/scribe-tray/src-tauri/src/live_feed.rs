@@ -70,7 +70,8 @@ impl LiveFeed {
     }
 }
 
-fn state_name(state: RecorderState) -> &'static str {
+#[must_use]
+pub fn state_name(state: RecorderState) -> &'static str {
     match state {
         RecorderState::Locked => "locked",
         RecorderState::Idle => "idle",

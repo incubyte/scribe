@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 
 use scribe_core::ports::Transcriber;
 use scribe_core::recording::{AudioChunk, TranscriptEvent};
-use stt_parakeet::{ParakeetTranscriber, default_models_dir};
+use stt_parakeet::{ParakeetModel, ParakeetTranscriber, default_models_dir};
 
 const MODELS_DIR_OVERRIDE: &str = "SCRIBE_PARAKEET_MODELS_DIR";
 const CHUNK_SAMPLES: usize = 1_600;
@@ -36,7 +36,10 @@ fn fixture(name: &str) -> Vec<f32> {
 }
 
 fn transcribe(samples: &[f32]) -> Heard {
-    let mut transcriber = loaded_transcriber();
+    transcribe_with(loaded_transcriber(), samples)
+}
+
+fn transcribe_with(mut transcriber: ParakeetTranscriber, samples: &[f32]) -> Heard {
     let mut heard = Heard {
         text: String::new(),
         slowest_finalising_push: Duration::ZERO,
@@ -48,8 +51,8 @@ fn transcribe(samples: &[f32]) -> Heard {
             captured_at,
         };
         let pushing = Instant::now();
-        let events = transcriber.push(&chunk).unwrap();
-        record(&mut heard, &events, pushing.elapsed());
+        let transcription = transcriber.push(&chunk).unwrap();
+        record(&mut heard, &transcription.events, pushing.elapsed());
         captured_at += CHUNK_DURATION;
     }
     let events = transcriber.finish().unwrap();
@@ -102,4 +105,26 @@ fn german_speech_is_transcribed_in_german_without_choosing_a_language() {
         heard.text
     );
     assert!(heard.slowest_finalising_push < DECODE_BUDGET);
+}
+
+#[test]
+#[ignore = "needs the downloaded Parakeet model; run manually in release mode"]
+fn two_lanes_sharing_one_loaded_model_each_transcribe_their_own_speech() {
+    let model = ParakeetModel::load(&models_dir()).unwrap();
+    let my_lane = ParakeetTranscriber::sharing(model.clone(), &models_dir()).unwrap();
+    let their_lane = ParakeetTranscriber::sharing(model, &models_dir()).unwrap();
+
+    let mine = transcribe_with(my_lane, &fixture("english.wav"));
+    let theirs = transcribe_with(their_lane, &fixture("german.wav"));
+
+    assert!(
+        mine.text.to_lowercase().contains("weather"),
+        "{}",
+        mine.text
+    );
+    assert!(
+        theirs.text.to_lowercase().contains("wetter"),
+        "{}",
+        theirs.text
+    );
 }
