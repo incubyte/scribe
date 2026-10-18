@@ -25,6 +25,7 @@ build_macos() {
 }
 
 build_windows() {
+  bash "$tray/scripts/fetch-vc-redist.sh"
   bash "$tray/scripts/stage-sidecar.sh" "$windows_target"
   (cd "$tray" && npx tauri build --runner cargo-xwin --target "$windows_target" --bundles nsis \
     --config src-tauri/tauri.ci.conf.json)

@@ -54,6 +54,9 @@ jobs:
       - name: Stage the MCP server the tray bundles as a sidecar
         shell: bash
         run: apps/scribe-tray/scripts/stage-sidecar.sh
+      - name: Fetch the Visual C++ runtime the installer bundles
+        shell: bash
+        run: apps/scribe-tray/scripts/fetch-vc-redist.sh
       - uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

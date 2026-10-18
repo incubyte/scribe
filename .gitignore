@@ -4,3 +4,4 @@ dist/
 apps/scribe-tray/src-tauri/gen/
 .DS_Store
 apps/scribe-tray/src-tauri/binaries/
+apps/scribe-tray/src-tauri/resources/

@@ -97,6 +97,9 @@ jobs:
       - name: Stage the MCP server the tray bundles as a sidecar
         shell: bash
         run: apps/scribe-tray/scripts/stage-sidecar.sh
+      - name: Fetch the Visual C++ runtime the installer bundles
+        shell: bash
+        run: apps/scribe-tray/scripts/fetch-vc-redist.sh
       - run: cargo clippy -p scribe-tray -p audio-windows -p audio-mic --all-targets -- -D warnings
 
   mutation:
