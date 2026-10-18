@@ -42,15 +42,13 @@ function backend(
   recent: readonly SessionSummary[] = FIVE_SESSIONS,
   modelDownload: ModelDownload = READY,
 ) {
-  const handler = vi.fn((command: string) => {
-    if (command === "recorder_snapshot") {
-      return snapshot;
-    }
-    if (command === "model_download_status") {
-      return modelDownload;
-    }
-    return command === "recent_sessions" ? recent : undefined;
-  });
+  const responses: Readonly<Record<string, unknown>> = {
+    recorder_snapshot: snapshot,
+    model_download_status: modelDownload,
+    recent_sessions: recent,
+    claude_desktop_status: "not_connected",
+  };
+  const handler = vi.fn((command: string) => responses[command]);
   mockIPC(handler, { shouldMockEvents: true });
   return handler;
 }
