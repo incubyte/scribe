@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { expecting, isClaudeDesktopStatus, isModelDownload, isRecorderSnapshot, isSessionSummaries } from "./guards";
+import { expecting, isClaudeDesktopStatus, isFolderChange, isString, isModelDownload, isRecorderSnapshot, isSessionSummaries } from "./guards";
 
 const RECENT_SESSION_COUNT = 5;
 
@@ -33,3 +33,9 @@ export const fetchClaudeDesktopStatus = () =>
 export const copyMcpConfig = () => invoke("copy_mcp_config");
 
 export const openTranscriptsFolder = () => invoke("open_transcripts_folder");
+
+export const fetchTranscriptsFolder = () =>
+  invoke<unknown>("transcripts_folder").then(expecting(isString, "transcripts folder"));
+
+export const changeTranscriptsFolder = () =>
+  invoke<unknown>("change_transcripts_folder").then(expecting(isFolderChange, "folder change"));

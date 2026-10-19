@@ -15,6 +15,7 @@ describe("the popover's quick actions", () => {
         onConnectClaudeDesktop={onConnectClaudeDesktop}
         onCopyMcpConfig={noop}
         onOpenFolder={noop}
+        onOpenSettings={noop}
       />,
     );
 
@@ -33,6 +34,7 @@ describe("the popover's quick actions", () => {
         onConnectClaudeDesktop={noop}
         onCopyMcpConfig={onCopyMcpConfig}
         onOpenFolder={noop}
+        onOpenSettings={noop}
       />,
     );
 
@@ -51,6 +53,7 @@ describe("the popover's quick actions", () => {
         onConnectClaudeDesktop={noop}
         onCopyMcpConfig={noop}
         onOpenFolder={onOpenFolder}
+        onOpenSettings={noop}
       />,
     );
 
@@ -61,6 +64,23 @@ describe("the popover's quick actions", () => {
     expect(onOpenFolder).toHaveBeenCalledOnce();
   });
 
+  it("opens settings from the popover", async () => {
+    const onOpenSettings = vi.fn();
+    render(
+      <PopoverActions
+        claudeStatus="not_connected"
+        onConnectClaudeDesktop={noop}
+        onCopyMcpConfig={noop}
+        onOpenFolder={noop}
+        onOpenSettings={onOpenSettings}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Settings" }));
+
+    expect(onOpenSettings).toHaveBeenCalledOnce();
+  });
+
   it("is reachable as a labelled group with no accessibility violations", async () => {
     const { container } = render(
       <PopoverActions
@@ -68,6 +88,7 @@ describe("the popover's quick actions", () => {
         onConnectClaudeDesktop={noop}
         onCopyMcpConfig={noop}
         onOpenFolder={noop}
+        onOpenSettings={noop}
       />,
     );
 
@@ -84,6 +105,7 @@ describe("the popover's quick actions", () => {
         onConnectClaudeDesktop={noop}
         onCopyMcpConfig={noop}
         onOpenFolder={noop}
+        onOpenSettings={noop}
       />,
     );
 
@@ -101,6 +123,7 @@ describe("the popover's quick actions", () => {
         onConnectClaudeDesktop={onConnectClaudeDesktop}
         onCopyMcpConfig={noop}
         onOpenFolder={noop}
+        onOpenSettings={noop}
       />,
     );
 

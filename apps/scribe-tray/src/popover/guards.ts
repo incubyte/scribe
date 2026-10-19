@@ -1,5 +1,6 @@
 import type {
   ClaudeDesktopStatus,
+  FolderChange,
   ModelDownload,
   RecorderPhase,
   RecorderSnapshot,
@@ -30,7 +31,7 @@ function isOneOf<T extends string>(allowed: readonly string[]): Guard<T> {
   return (value: unknown): value is T => typeof value === "string" && allowed.includes(value);
 }
 
-function isString(value: unknown): value is string {
+export function isString(value: unknown): value is string {
   return typeof value === "string";
 }
 
@@ -131,3 +132,16 @@ export function expecting<T>(guard: Guard<T>, what: string): (value: unknown) =>
 const CLAUDE_DESKTOP_STATUSES: readonly string[] = ["not_installed", "not_connected", "outdated", "connected"];
 
 export const isClaudeDesktopStatus: Guard<ClaudeDesktopStatus> = isOneOf(CLAUDE_DESKTOP_STATUSES);
+
+export function isFolderChange(value: unknown): value is FolderChange {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const checks: Readonly<Record<string, () => boolean>> = {
+    cancelled: () => true,
+    unchanged: () => true,
+    recording: () => true,
+    changed: () => hasFields(value, { folder: isString, moved: isNumber, kept: isNumber }),
+  };
+  return isString(value.outcome) && (checks[value.outcome]?.() ?? false);
+}

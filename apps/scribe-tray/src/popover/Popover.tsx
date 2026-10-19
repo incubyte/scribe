@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   copyMcpConfig,
   hidePopover,
@@ -11,10 +12,12 @@ import { LiveTranscript } from "./LiveTranscript";
 import { ModelDownloadPanel } from "./ModelDownloadPanel";
 import { PopoverActions } from "./PopoverActions";
 import { RecentSessions } from "./RecentSessions";
+import { SettingsPanel } from "./SettingsPanel";
 import { StatusBar } from "./StatusBar";
 import { useClaudeDesktopStatus } from "./useClaudeDesktopStatus";
 import { useModelDownload } from "./useModelDownload";
 import { useRecordingFeed } from "./useRecordingFeed";
+import { useTranscriptsFolder } from "./useTranscriptsFolder";
 
 function useEscapeToHide() {
   useEffect(() => {
@@ -32,7 +35,29 @@ export function Popover() {
   const { feed, recent } = useRecordingFeed();
   const { download, retry } = useModelDownload();
   const claudeDesktop = useClaudeDesktopStatus();
+  const transcriptsFolder = useTranscriptsFolder();
+  const [view, setView] = useState<"main" | "settings">("main");
+  const settingsButton = useRef<HTMLButtonElement>(null);
   useEscapeToHide();
+
+  const leaveSettings = () => {
+    flushSync(() => setView("main"));
+    settingsButton.current?.focus();
+  };
+
+  if (view === "settings") {
+    return (
+      <main className="popover">
+        <h1 className="visually-hidden">Scribe</h1>
+        <SettingsPanel
+          folder={transcriptsFolder.folder}
+          isRecording={feed.phase === "recording"}
+          onChangeFolder={() => void transcriptsFolder.change()}
+          onBack={leaveSettings}
+        />
+      </main>
+    );
+  }
 
   return (
     <main className="popover">
@@ -56,6 +81,8 @@ export function Popover() {
         onConnectClaudeDesktop={claudeDesktop.connect}
         onCopyMcpConfig={() => void copyMcpConfig()}
         onOpenFolder={() => void openTranscriptsFolder()}
+        onOpenSettings={() => setView("settings")}
+        settingsButtonRef={settingsButton}
       />
     </main>
   );

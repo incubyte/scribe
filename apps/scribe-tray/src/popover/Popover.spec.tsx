@@ -27,6 +27,10 @@ const FIVE_SESSIONS = [
   session(13, 600),
 ];
 
+const INITIAL_FOLDER = "/Users/me/Documents/Scribe";
+const CHANGED_FOLDER = "/Users/me/Notes/Calls";
+let currentFolder = INITIAL_FOLDER;
+
 const READY: ModelDownload = { state: "ready" };
 
 const idle: RecorderSnapshot = { state: "idle", started_at: null, lines: [] };
@@ -47,13 +51,22 @@ function backend(
     model_download_status: modelDownload,
     recent_sessions: recent,
     claude_desktop_status: "not_connected",
+    transcripts_folder: () => currentFolder,
+    change_transcripts_folder: () => {
+      currentFolder = CHANGED_FOLDER;
+      return { outcome: "changed", folder: CHANGED_FOLDER, moved: 0, kept: 0 };
+    },
   };
-  const handler = vi.fn((command: string) => responses[command]);
+  const handler = vi.fn((command: string) => {
+    const response = responses[command];
+    return typeof response === "function" ? response() : response;
+  });
   mockIPC(handler, { shouldMockEvents: true });
   return handler;
 }
 
 beforeEach(() => {
+  currentFolder = INITIAL_FOLDER;
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
 });
@@ -331,5 +344,40 @@ describe("the idle popover accessibility", () => {
     const { violations } = await axe(container);
 
     expect(violations).toEqual([]);
+  });
+});
+
+describe("the popover settings", () => {
+  async function openSettings() {
+    await userEvent.click(await screen.findByRole("button", { name: "Settings" }));
+  }
+
+  it("shows the current transcripts folder", async () => {
+    backend(idle);
+    render(<Popover />);
+
+    await openSettings();
+
+    expect(await screen.findByText(INITIAL_FOLDER, { exact: false })).toBeInTheDocument();
+  });
+
+  it("shows the new folder after it is changed", async () => {
+    backend(idle);
+    render(<Popover />);
+    await openSettings();
+
+    await userEvent.click(screen.getByRole("button", { name: "Change Transcripts Folder" }));
+
+    expect(await screen.findByText(CHANGED_FOLDER, { exact: false })).toBeInTheDocument();
+  });
+
+  it("returns focus to the settings button when going back", async () => {
+    backend(idle);
+    render(<Popover />);
+    await openSettings();
+
+    await userEvent.click(screen.getByRole("button", { name: "Back" }));
+
+    expect(screen.getByRole("button", { name: "Settings" })).toHaveFocus();
   });
 });
