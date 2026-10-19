@@ -296,6 +296,11 @@
   background: var(--surface-hover);
 }
 
+.actions__primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .actions__secondary {
   display: flex;
   justify-content: space-between;
@@ -318,8 +323,57 @@
   color: var(--text);
 }
 
+.actions__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.actions__icon:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.settings__heading {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.settings__heading:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.settings__folder {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.settings__status,
+.settings__reason {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
 .actions__primary:focus-visible,
-.actions__link:focus-visible {
+.actions__link:focus-visible,
+.actions__icon:focus-visible {
   outline: var(--focus-ring);
   outline-offset: var(--focus-ring-offset);
 }

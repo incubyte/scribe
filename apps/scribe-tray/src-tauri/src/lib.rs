@@ -13,9 +13,10 @@ pub mod other_side_alert;
 mod popover;
 mod power;
 mod privacy;
-mod recording;
+pub mod recording;
 pub mod recording_label;
 pub mod start_failure;
+pub mod transcripts_location;
 mod tray;
 mod tray_listener;
 mod webview;
@@ -46,6 +47,8 @@ fn with_commands<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         commands::claude_desktop_status,
         commands::copy_mcp_config,
         commands::open_transcripts_folder,
+        commands::change_transcripts_folder,
+        commands::transcripts_folder,
         popover::hide_popover,
     ])
 }
@@ -53,6 +56,7 @@ fn with_commands<R: Runtime>(builder: Builder<R>) -> Builder<R> {
 fn with_plugins<R: Runtime>(builder: Builder<R>) -> Builder<R> {
     builder
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_clipboard_manager::init())

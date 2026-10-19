@@ -17,7 +17,13 @@ fn store_in(parent: &Path) -> MarkdownTranscriptStore {
 }
 
 fn transcript_text(parent: &Path, id: &SessionId) -> String {
-    fs::read_to_string(parent.join("Scribe").join(format!("{id}.md"))).unwrap()
+    fs::read_to_string(
+        parent
+            .join("Scribe")
+            .join(id.month())
+            .join(format!("{id}.md")),
+    )
+    .unwrap()
 }
 
 fn my_line(start_secs: u64, text: &str) -> Segment {
@@ -120,7 +126,7 @@ fn finishing_a_session_leaves_no_temporary_file_behind() {
 
     store.finalise(&id, ended_at()).unwrap();
 
-    let names: Vec<_> = fs::read_dir(parent.path().join("Scribe"))
+    let names: Vec<_> = fs::read_dir(parent.path().join("Scribe").join("2026-10"))
         .unwrap()
         .map(|entry| entry.unwrap().file_name())
         .collect();
@@ -195,7 +201,11 @@ fn transcript_files_are_private_to_the_user() {
     let parent = tempfile::tempdir().unwrap();
     let store = store_in(parent.path());
     let id = store.create(&call_header()).unwrap();
-    let path = parent.path().join("Scribe").join(format!("{id}.md"));
+    let path = parent
+        .path()
+        .join("Scribe")
+        .join("2026-10")
+        .join(format!("{id}.md"));
     let created_mode = fs::metadata(&path).unwrap().permissions().mode();
 
     store.finalise(&id, ended_at()).unwrap();

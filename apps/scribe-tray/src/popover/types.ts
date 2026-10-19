@@ -29,4 +29,10 @@ export type ModelDownload =
   | { readonly state: "downloading"; readonly percent: number | null }
   | { readonly state: "failed"; readonly reason_kind: string };
 
+export type FolderChange =
+  | { readonly outcome: "cancelled" }
+  | { readonly outcome: "unchanged" }
+  | { readonly outcome: "recording" }
+  | { readonly outcome: "changed"; readonly folder: string; readonly moved: number; readonly kept: number };
+
 export type ClaudeDesktopStatus = "not_installed" | "not_connected" | "outdated" | "connected";

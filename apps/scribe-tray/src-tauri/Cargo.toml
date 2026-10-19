@@ -32,6 +32,7 @@ audio-mic.workspace = true
 tracing.workspace = true
 thiserror.workspace = true
 dirs.workspace = true
+tauri-plugin-dialog = "2"
 
 [target.'cfg(windows)'.dependencies]
 stt-parakeet.workspace = true
@@ -49,6 +50,7 @@ block2 = "0.6"
 objc2 = "0.6"
 
 [dev-dependencies]
+scribe-core = { workspace = true, features = ["testing"] }
 tempfile.workspace = true
 
 [lints]

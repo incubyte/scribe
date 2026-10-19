@@ -5,7 +5,7 @@ const STATEMENTS = [
   "Speech is transcribed on-device.",
   "Audio is never saved.",
   "Nothing — audio or text — is sent to any server.",
-  "Transcripts are saved as text files in Documents/Scribe.",
+  "Transcripts are saved as text files in your transcripts folder, Documents/Scribe unless you change it in Settings.",
 ] as const;
 
 export function PrivacyStatement() {

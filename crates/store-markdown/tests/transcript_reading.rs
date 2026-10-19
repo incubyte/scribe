@@ -100,7 +100,9 @@ fn reading_a_file_without_a_transcript_header_reports_it_by_file_name() {
     let folder = tempfile::tempdir().unwrap();
     let store = store_in(folder.path());
     let id = SessionId::parse("2026-10-15-090000").unwrap();
-    fs::write(store.path_for(&id), "just some notes\n").unwrap();
+    let path = store.path_for(&id);
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(path, "just some notes\n").unwrap();
 
     let error = store.read(&id).unwrap_err();
 

@@ -1,10 +1,10 @@
 use serde_json::json;
+use store_markdown::SETTINGS_FILE_NAME;
 use tauri::{AppHandle, Manager, Runtime, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_store::StoreExt;
 
 use crate::recording::{self, RecordingController};
 
-const SETTINGS_FILE: &str = "settings.json";
 const ACKNOWLEDGED_KEY: &str = "privacy_acknowledged";
 const WINDOW_LABEL: &str = "privacy";
 const WINDOW_ROUTE: &str = "index.html#privacy";
@@ -12,7 +12,7 @@ const WINDOW_TITLE: &str = "Privacy";
 const WINDOW_SIZE: (f64, f64) = (420.0, 300.0);
 
 pub fn is_acknowledged<R: Runtime>(app: &AppHandle<R>) -> bool {
-    app.store(SETTINGS_FILE)
+    app.store(SETTINGS_FILE_NAME)
         .ok()
         .and_then(|store| store.get(ACKNOWLEDGED_KEY))
         .and_then(|value| value.as_bool())
@@ -20,7 +20,7 @@ pub fn is_acknowledged<R: Runtime>(app: &AppHandle<R>) -> bool {
 }
 
 pub fn acknowledge<R: Runtime>(app: &AppHandle<R>) -> tauri_plugin_store::Result<()> {
-    let store = app.store(SETTINGS_FILE)?;
+    let store = app.store(SETTINGS_FILE_NAME)?;
     store.set(ACKNOWLEDGED_KEY, json!(true));
     store.save()
 }

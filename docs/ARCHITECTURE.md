@@ -18,7 +18,7 @@ Scribe is the same product on macOS and Windows, but almost every edge differs b
 | Mic capture | `cpal` | Cross-platform input |
 | System audio | macOS Core Audio process tap (`cidre`); Windows WASAPI loopback (`wasapi`) | Audio-only permission on macOS; no permission needed on Windows |
 | STT | macOS Apple SpeechAnalyzer (Swift bridge, English); Windows Parakeet (`parakeet-rs` / ONNX Runtime, auto language) | Best on-device engine per OS, behind one port |
-| Storage | One Markdown file per session in `Documents/Scribe` | Human-readable; no schema or migrations |
+| Storage | One Markdown file per session in `<transcripts folder>/YYYY-MM/` (default `Documents/Scribe`; configurable, stored in the app's `settings.json`) | Human-readable; no schema or migrations |
 | MCP | `rmcp` stdio server, separate `scribe-mcp` binary | Official Rust SDK; read-only; local, so no auth |
 | CI | GitHub Actions, macOS + Windows runners, mutation testing | Org test-integrity standards |
 
