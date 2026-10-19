@@ -12,6 +12,14 @@ Architecture: see `docs/ARCHITECTURE.md` (hexagonal; ports in `scribe-core`, ada
 - Test (frontend): `npm test` in `apps/scribe-tray`
 - Mutation: `cargo mutants --in-diff <diff>` and `npm run mutate` in `apps/scribe-tray`
 
+## CI
+
+CI layout and its reasons are ADR 2 and ADR 3 in `docs/ARCHITECTURE.md`.
+
+- `portable` (ubuntu) checks the platform-neutral crates and the frontend, `macos` checks the Mac-only crates, and `windows` only runs clippy on the Windows-only crates. A new crate goes into `PORTABLE_CRATES` in `.github/workflows/ci.yml` unless it needs macOS or Windows APIs.
+- CI pins Rust 1.93.1. Raise it only together with the local toolchain.
+- Check the exit code of `npm test`, not only the passed count. An unhandled promise rejection fails the run even when every test passes, so test backends built with `mockIPC` must answer every command the popover invokes.
+
 ## Releasing
 
 Releases are built on this Mac (no CI minutes):
@@ -20,4 +28,4 @@ Releases are built on this Mac (no CI minutes):
 2. Run `scripts/release.sh`. It builds the macOS `.dmg` and cross-compiles the Windows installer (needs `cargo install cargo-xwin` and `brew install llvm lld nsis`), tags `v<version>`, and uploads both to a draft GitHub Release.
 3. Review the draft on GitHub and publish it.
 
-`.github/workflows/release.yml` is a manual fallback that builds the Windows installer on GitHub for an existing tag. Builds are ad-hoc signed (macOS) and unsigned (Windows) until signing certificates exist.
+`.github/workflows/release.yml` is a manual fallback that builds the Windows installer on GitHub for an existing tag. Builds are ad-hoc signed (macOS) and unsigned (Windows) until signing certificates exist. Keep `src-tauri/Entitlements.plist` with the audio-input entitlement whenever signing changes, or the microphone stops working. Decisions behind this are ADR 4 to ADR 6 in `docs/ARCHITECTURE.md`.
