@@ -1,44 +1,62 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useId, useRef } from "react";
+import { RECORDING_REASON } from "./folderChangeMessage";
 
 interface SettingsPanelProps {
   readonly folder: string | null;
+  readonly status: string | null;
   readonly isRecording: boolean;
   readonly onChangeFolder: () => void;
   readonly onBack: () => void;
 }
 
-const CHANGE_LABEL = "Change Transcripts Folder";
-const RECORDING_REASON = "Stop recording to change the folder.";
+export const CHANGE_LABEL = "Change Transcripts Folder";
+const LOADING_TEXT = "Loading…";
 
-export function SettingsPanel({ folder, isRecording, onChangeFolder, onBack }: SettingsPanelProps) {
+export function SettingsPanel({
+  folder,
+  status,
+  isRecording,
+  onChangeFolder,
+  onBack,
+}: SettingsPanelProps) {
   const heading = useRef<HTMLHeadingElement>(null);
+  const headingId = useId();
+  const reasonId = useId();
 
   useEffect(() => {
     heading.current?.focus();
   }, []);
 
   return (
-    <section className="settings" aria-labelledby="settings-heading">
-      <h2 id="settings-heading" className="settings__heading" ref={heading} tabIndex={-1}>
+    <section className="settings" aria-labelledby={headingId}>
+      <h2
+        id={headingId}
+        className="settings__heading"
+        ref={heading}
+        tabIndex={-1}
+      >
         Settings
       </h2>
       <p className="settings__folder">
-        Transcripts folder: {folder}
+        {folder === null ? LOADING_TEXT : `Transcripts folder: ${folder}`}
       </p>
       <button
         className="actions__primary"
         type="button"
         disabled={isRecording}
-        aria-describedby={isRecording ? "settings-reason" : undefined}
+        aria-describedby={isRecording ? reasonId : undefined}
         onClick={onChangeFolder}
       >
         {CHANGE_LABEL}
       </button>
       {isRecording ? (
-        <p id="settings-reason" className="settings__reason">
+        <p id={reasonId} className="settings__reason">
           {RECORDING_REASON}
         </p>
       ) : null}
+      <p role="status" className="settings__status">
+        {status}
+      </p>
       <button className="actions__link" type="button" onClick={onBack}>
         Back
       </button>

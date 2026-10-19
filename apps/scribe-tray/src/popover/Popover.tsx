@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from "react";
-import { flushSync } from "react-dom";
+import { useEffect } from "react";
 import {
   copyMcpConfig,
   hidePopover,
@@ -12,12 +11,12 @@ import { LiveTranscript } from "./LiveTranscript";
 import { ModelDownloadPanel } from "./ModelDownloadPanel";
 import { PopoverActions } from "./PopoverActions";
 import { RecentSessions } from "./RecentSessions";
-import { SettingsPanel } from "./SettingsPanel";
+import { SettingsView } from "./SettingsView";
 import { StatusBar } from "./StatusBar";
 import { useClaudeDesktopStatus } from "./useClaudeDesktopStatus";
 import { useModelDownload } from "./useModelDownload";
 import { useRecordingFeed } from "./useRecordingFeed";
-import { useTranscriptsFolder } from "./useTranscriptsFolder";
+import { usePopoverView, VIEWS } from "./usePopoverView";
 
 function useEscapeToHide() {
   useEffect(() => {
@@ -35,24 +34,16 @@ export function Popover() {
   const { feed, recent } = useRecordingFeed();
   const { download, retry } = useModelDownload();
   const claudeDesktop = useClaudeDesktopStatus();
-  const transcriptsFolder = useTranscriptsFolder();
-  const [view, setView] = useState<"main" | "settings">("main");
-  const settingsButton = useRef<HTMLButtonElement>(null);
+  const { view, openSettings, leaveSettings, settingsButton } =
+    usePopoverView();
   useEscapeToHide();
 
-  const leaveSettings = () => {
-    flushSync(() => setView("main"));
-    settingsButton.current?.focus();
-  };
-
-  if (view === "settings") {
+  if (view === VIEWS.settings) {
     return (
       <main className="popover">
         <h1 className="visually-hidden">Scribe</h1>
-        <SettingsPanel
-          folder={transcriptsFolder.folder}
+        <SettingsView
           isRecording={feed.phase === "recording"}
-          onChangeFolder={() => void transcriptsFolder.change()}
           onBack={leaveSettings}
         />
       </main>
@@ -74,14 +65,17 @@ export function Popover() {
         <LiveTranscript lines={feed.lines} partials={feed.partials} />
       ) : null}
       {recent === null ? null : (
-        <RecentSessions sessions={recent} onOpen={(id) => void openSession(id)} />
+        <RecentSessions
+          sessions={recent}
+          onOpen={(id) => void openSession(id)}
+        />
       )}
       <PopoverActions
         claudeStatus={claudeDesktop.status}
         onConnectClaudeDesktop={claudeDesktop.connect}
         onCopyMcpConfig={() => void copyMcpConfig()}
         onOpenFolder={() => void openTranscriptsFolder()}
-        onOpenSettings={() => setView("settings")}
+        onOpenSettings={openSettings}
         settingsButtonRef={settingsButton}
       />
     </main>

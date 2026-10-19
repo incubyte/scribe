@@ -1,6 +1,13 @@
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
 import { emit } from "@tauri-apps/api/event";
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { axe } from "vitest-axe";
@@ -30,11 +37,20 @@ const FIVE_SESSIONS = [
 const INITIAL_FOLDER = "/Users/me/Documents/Scribe";
 const CHANGED_FOLDER = "/Users/me/Notes/Calls";
 let currentFolder = INITIAL_FOLDER;
+let changeFolder: () => unknown = () => {
+  currentFolder = CHANGED_FOLDER;
+  return { outcome: "changed", folder: CHANGED_FOLDER, moved: 0, kept: 0 };
+};
+const defaultChangeFolder = changeFolder;
 
 const READY: ModelDownload = { state: "ready" };
 
 const idle: RecorderSnapshot = { state: "idle", started_at: null, lines: [] };
-const locked: RecorderSnapshot = { state: "locked", started_at: null, lines: [] };
+const locked: RecorderSnapshot = {
+  state: "locked",
+  started_at: null,
+  lines: [],
+};
 const recordingForSixtyFiveSeconds: RecorderSnapshot = {
   state: "recording",
   started_at: new Date(NOW - 65_000).toISOString(),
@@ -52,10 +68,7 @@ function backend(
     recent_sessions: recent,
     claude_desktop_status: "not_connected",
     transcripts_folder: () => currentFolder,
-    change_transcripts_folder: () => {
-      currentFolder = CHANGED_FOLDER;
-      return { outcome: "changed", folder: CHANGED_FOLDER, moved: 0, kept: 0 };
-    },
+    change_transcripts_folder: () => changeFolder(),
   };
   const handler = vi.fn((command: string) => {
     const response = responses[command];
@@ -67,6 +80,7 @@ function backend(
 
 beforeEach(() => {
   currentFolder = INITIAL_FOLDER;
+  changeFolder = defaultChangeFolder;
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
 });
@@ -83,11 +97,17 @@ describe("the popover while nothing is recording", () => {
     backend(idle);
     render(<Popover />);
 
-    const sessions = await screen.findByRole("list", { name: "Recent sessions" });
+    const sessions = await screen.findByRole("list", {
+      name: "Recent sessions",
+    });
 
-    expect(screen.getByRole("button", { name: "Start recording" })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Start recording" }),
+    ).toBeEnabled();
     expect(within(sessions).getAllByRole("button")).toHaveLength(5);
-    expect(within(sessions).getByText("Call 2026-10-17 12:00")).toBeInTheDocument();
+    expect(
+      within(sessions).getByText("Call 2026-10-17 12:00"),
+    ).toBeInTheDocument();
     expect(within(sessions).getByText(/Oct 17/)).toBeInTheDocument();
     expect(within(sessions).getByText("32 min")).toBeInTheDocument();
   });
@@ -96,16 +116,22 @@ describe("the popover while nothing is recording", () => {
     const handler = backend(idle);
     render(<Popover />);
 
-    await userEvent.click(await screen.findByRole("button", { name: /Call 2026-10-16 12:00/ }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: /Call 2026-10-16 12:00/ }),
+    );
 
-    expect(handler).toHaveBeenCalledWith("open_session", { id: "2026-10-16-120000" });
+    expect(handler).toHaveBeenCalledWith("open_session", {
+      id: "2026-10-16-120000",
+    });
   });
 
   it("starts a recording when Start is pressed", async () => {
     const handler = backend(idle);
     render(<Popover />);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Start recording" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Start recording" }),
+    );
 
     expect(handler).toHaveBeenCalledWith("start_recording", {});
   });
@@ -116,7 +142,9 @@ describe("the popover while nothing is recording", () => {
 
     await screen.findByRole("list", { name: "Recent sessions" });
 
-    expect(screen.getByRole("button", { name: "Start recording" })).toBeDisabled();
+    expect(
+      screen.getByRole("button", { name: "Start recording" }),
+    ).toBeDisabled();
   });
 
   it("enables Start once the app becomes ready to record", async () => {
@@ -127,7 +155,9 @@ describe("the popover while nothing is recording", () => {
     await act(() => emit("recorder://state", { state: "idle" }));
 
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Start recording" })).toBeEnabled(),
+      expect(
+        screen.getByRole("button", { name: "Start recording" }),
+      ).toBeEnabled(),
     );
   });
 
@@ -140,10 +170,12 @@ describe("the popover while nothing is recording", () => {
     await act(() => emit("recorder://state", { state: "recording" }));
     await act(() => emit("recording://started", { id: "2026-10-17-091000" }));
 
-    expect(await screen.findByRole("button", { name: "Stop recording" })).toHaveFocus();
-    expect(screen.getByRole("status", { name: "Recording status" })).toHaveTextContent(
-      "Recording started",
-    );
+    expect(
+      await screen.findByRole("button", { name: "Stop recording" }),
+    ).toHaveFocus();
+    expect(
+      screen.getByRole("status", { name: "Recording status" }),
+    ).toHaveTextContent("Recording started");
   });
 
   it("says why a recording could not start", async () => {
@@ -151,9 +183,13 @@ describe("the popover while nothing is recording", () => {
     render(<Popover />);
     await screen.findByRole("list", { name: "Recent sessions" });
 
-    await act(() => emit("recording://start-failed", { reason_kind: "microphone_denied" }));
+    await act(() =>
+      emit("recording://start-failed", { reason_kind: "microphone_denied" }),
+    );
 
-    expect(await screen.findByText("Scribe can't use the microphone.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Scribe can't use the microphone."),
+    ).toBeInTheDocument();
   });
 
   it("says so when there are no sessions yet", async () => {
@@ -169,10 +205,14 @@ describe("the popover while nothing is recording", () => {
     await screen.findByRole("list", { name: "Recent sessions" });
 
     await userEvent.tab();
-    expect(screen.getByRole("button", { name: "Start recording" })).toHaveFocus();
+    expect(
+      screen.getByRole("button", { name: "Start recording" }),
+    ).toHaveFocus();
 
     await userEvent.tab();
-    expect(screen.getByRole("button", { name: /Call 2026-10-17 12:00/ })).toHaveFocus();
+    expect(
+      screen.getByRole("button", { name: /Call 2026-10-17 12:00/ }),
+    ).toHaveFocus();
   });
 });
 
@@ -182,14 +222,18 @@ describe("the popover while recording", () => {
     render(<Popover />);
 
     expect(await screen.findByText("01:05")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Stop recording" })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Stop recording" }),
+    ).toBeEnabled();
   });
 
   it("stops the recording when Stop is pressed", async () => {
     const handler = backend(recordingForSixtyFiveSeconds);
     render(<Popover />);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Stop recording" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Stop recording" }),
+    );
 
     expect(handler).toHaveBeenCalledWith("stop_recording", {});
   });
@@ -208,14 +252,22 @@ describe("the popover while recording", () => {
     render(<Popover />);
     await screen.findByText("Good morning");
 
-    await act(() => emit("recording://partial", { speaker: "Me", text: "hello wor" }));
+    await act(() =>
+      emit("recording://partial", { speaker: "Me", text: "hello wor" }),
+    );
     expect(await screen.findByText("hello wor")).toBeInTheDocument();
 
     await act(() =>
-      emit("recording://segment", { speaker: "Me", start_ms: 900, text: "hello world" }),
+      emit("recording://segment", {
+        speaker: "Me",
+        start_ms: 900,
+        text: "hello world",
+      }),
     );
 
-    await waitFor(() => expect(screen.queryByText("hello wor")).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByText("hello wor")).not.toBeInTheDocument(),
+    );
     expect(screen.getAllByText("hello world").length).toBeGreaterThan(0);
   });
 
@@ -224,10 +276,16 @@ describe("the popover while recording", () => {
     render(<Popover />);
     await screen.findByText("Good morning");
 
-    await act(() => emit("recording://partial", { speaker: "Me", text: "still talk" }));
+    await act(() =>
+      emit("recording://partial", { speaker: "Me", text: "still talk" }),
+    );
     const partialLine = await screen.findByText("still talk");
     await act(() =>
-      emit("recording://segment", { speaker: "Them", start_ms: 900, text: "All done" }),
+      emit("recording://segment", {
+        speaker: "Them",
+        start_ms: 900,
+        text: "All done",
+      }),
     );
 
     const transcript = screen.getByRole("region", { name: "Live transcript" });
@@ -241,15 +299,21 @@ describe("the popover while recording", () => {
     const handler = backend(recordingForSixtyFiveSeconds);
     render(<Popover />);
     await screen.findByRole("button", { name: "Stop recording" });
-    const callsBefore = handler.mock.calls.filter(([c]) => c === "recent_sessions").length;
+    const callsBefore = handler.mock.calls.filter(
+      ([c]) => c === "recent_sessions",
+    ).length;
 
     await act(() => emit("recording://stopped", { id: "2026-10-17-091000" }));
 
-    expect(await screen.findByRole("button", { name: "Start recording" })).toBeInTheDocument();
-    expect(screen.getByRole("status", { name: "Recording status" })).toHaveTextContent(
-      "Recording stopped",
-    );
-    const callsAfter = handler.mock.calls.filter(([c]) => c === "recent_sessions").length;
+    expect(
+      await screen.findByRole("button", { name: "Start recording" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("status", { name: "Recording status" }),
+    ).toHaveTextContent("Recording stopped");
+    const callsAfter = handler.mock.calls.filter(
+      ([c]) => c === "recent_sessions",
+    ).length;
     expect(callsAfter).toBeGreaterThan(callsBefore);
   });
 
@@ -259,10 +323,14 @@ describe("the popover while recording", () => {
     await screen.findByText("Good morning");
 
     await userEvent.tab();
-    expect(screen.getByRole("button", { name: "Stop recording" })).toHaveFocus();
+    expect(
+      screen.getByRole("button", { name: "Stop recording" }),
+    ).toHaveFocus();
 
     await userEvent.tab();
-    expect(screen.getByRole("region", { name: "Live transcript" })).toHaveFocus();
+    expect(
+      screen.getByRole("region", { name: "Live transcript" }),
+    ).toHaveFocus();
   });
 
   it("has no accessibility violations", async () => {
@@ -281,11 +349,12 @@ describe("the popover while the speech model downloads", () => {
     backend(locked, FIVE_SESSIONS, { state: "downloading", percent: 42 });
     render(<Popover />);
 
-    expect(await screen.findByRole("progressbar", { name: "Speech model download" })).toHaveAttribute(
-      "value",
-      "42",
-    );
-    expect(screen.getByRole("button", { name: "Start recording" })).toBeDisabled();
+    expect(
+      await screen.findByRole("progressbar", { name: "Speech model download" }),
+    ).toHaveAttribute("value", "42");
+    expect(
+      screen.getByRole("button", { name: "Start recording" }),
+    ).toBeDisabled();
   });
 
   it("follows the progress as the download advances", async () => {
@@ -293,18 +362,25 @@ describe("the popover while the speech model downloads", () => {
     render(<Popover />);
     await screen.findByRole("progressbar", { name: "Speech model download" });
 
-    await act(() => emit("model-download://progressed", { state: "downloading", percent: 43 }));
+    await act(() =>
+      emit("model-download://progressed", {
+        state: "downloading",
+        percent: 43,
+      }),
+    );
 
     await waitFor(() =>
-      expect(screen.getByRole("progressbar", { name: "Speech model download" })).toHaveAttribute(
-        "value",
-        "43",
-      ),
+      expect(
+        screen.getByRole("progressbar", { name: "Speech model download" }),
+      ).toHaveAttribute("value", "43"),
     );
   });
 
   it("offers Retry after a failure and asks the app to download again", async () => {
-    const handler = backend(locked, FIVE_SESSIONS, { state: "failed", reason_kind: "network" });
+    const handler = backend(locked, FIVE_SESSIONS, {
+      state: "failed",
+      reason_kind: "network",
+    });
     render(<Popover />);
 
     await userEvent.click(await screen.findByRole("button", { name: "Retry" }));
@@ -319,7 +395,9 @@ describe("the popover while the speech model downloads", () => {
 
     await act(() => emit("model-download://completed", { state: "ready" }));
 
-    await waitFor(() => expect(screen.queryByRole("progressbar")).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByRole("progressbar")).not.toBeInTheDocument(),
+    );
   });
 });
 
@@ -349,7 +427,9 @@ describe("the idle popover accessibility", () => {
 
 describe("the popover settings", () => {
   async function openSettings() {
-    await userEvent.click(await screen.findByRole("button", { name: "Settings" }));
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Settings" }),
+    );
   }
 
   it("shows the current transcripts folder", async () => {
@@ -358,7 +438,9 @@ describe("the popover settings", () => {
 
     await openSettings();
 
-    expect(await screen.findByText(INITIAL_FOLDER, { exact: false })).toBeInTheDocument();
+    expect(
+      await screen.findByText(INITIAL_FOLDER, { exact: false }),
+    ).toBeInTheDocument();
   });
 
   it("shows the new folder after it is changed", async () => {
@@ -366,9 +448,107 @@ describe("the popover settings", () => {
     render(<Popover />);
     await openSettings();
 
-    await userEvent.click(screen.getByRole("button", { name: "Change Transcripts Folder" }));
+    await userEvent.click(
+      screen.getByRole("button", { name: "Change Transcripts Folder" }),
+    );
 
-    expect(await screen.findByText(CHANGED_FOLDER, { exact: false })).toBeInTheDocument();
+    expect(
+      await screen.findByText(`Transcripts folder: ${CHANGED_FOLDER}`),
+    ).toBeInTheDocument();
+  });
+
+  async function changeFolderAndReadStatus(outcome: () => unknown) {
+    backend(idle);
+    changeFolder = outcome;
+    render(<Popover />);
+    await openSettings();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Change Transcripts Folder" }),
+    );
+    return screen.getByRole("status");
+  }
+
+  it("announces the new folder and how many transcripts moved", async () => {
+    const status = await changeFolderAndReadStatus(() => ({
+      outcome: "changed",
+      folder: CHANGED_FOLDER,
+      moved: 3,
+      kept: 0,
+    }));
+
+    await waitFor(() =>
+      expect(status).toHaveTextContent(
+        `Transcripts will be saved in ${CHANGED_FOLDER}. Moved 3 transcripts.`,
+      ),
+    );
+  });
+
+  it("uses the singular when one transcript moved", async () => {
+    const status = await changeFolderAndReadStatus(() => ({
+      outcome: "changed",
+      folder: CHANGED_FOLDER,
+      moved: 1,
+      kept: 0,
+    }));
+
+    await waitFor(() =>
+      expect(status).toHaveTextContent("Moved 1 transcript."),
+    );
+  });
+
+  it("announces only the new folder when nothing moved", async () => {
+    const status = await changeFolderAndReadStatus(() => ({
+      outcome: "changed",
+      folder: CHANGED_FOLDER,
+      moved: 0,
+      kept: 0,
+    }));
+
+    await waitFor(() =>
+      expect(status).toHaveTextContent(/^Transcripts will be saved in \S+\.$/),
+    );
+  });
+
+  it("tells the user to stop recording when the backend refuses the change", async () => {
+    const status = await changeFolderAndReadStatus(() => ({
+      outcome: "recording",
+    }));
+
+    await waitFor(() =>
+      expect(status).toHaveTextContent("Stop recording to change the folder."),
+    );
+  });
+
+  it("announces a failure when the folder could not be changed", async () => {
+    const status = await changeFolderAndReadStatus(() => {
+      throw "disk full";
+    });
+
+    await waitFor(() =>
+      expect(status).toHaveTextContent("The folder could not be changed."),
+    );
+  });
+
+  it("says nothing when the folder picker is cancelled", async () => {
+    const status = await changeFolderAndReadStatus(() => ({
+      outcome: "cancelled",
+    }));
+
+    await waitFor(() => expect(status).toBeEmptyDOMElement());
+  });
+
+  it("clears the previous message when a later change is cancelled", async () => {
+    const status = await changeFolderAndReadStatus(() => ({
+      outcome: "recording",
+    }));
+    await waitFor(() => expect(status).toHaveTextContent("Stop recording"));
+    changeFolder = () => ({ outcome: "unchanged" });
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Change Transcripts Folder" }),
+    );
+
+    await waitFor(() => expect(status).toBeEmptyDOMElement());
   });
 
   it("returns focus to the settings button when going back", async () => {
