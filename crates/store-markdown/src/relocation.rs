@@ -76,13 +76,29 @@ fn rename_unless_present(source: &Path, destination: &Path) -> io::Result<MoveOu
 
 fn copy_across_volumes(source: &Path, destination: &Path) -> io::Result<MoveOutcome> {
     let partial = partial_copy_path(destination);
-    let installed = fs::copy(source, &partial).and_then(|_| fs::hard_link(&partial, destination));
+    let installed = fs::copy(source, &partial).and_then(|_| install(&partial, destination));
     let _ = fs::remove_file(&partial);
     match installed {
         Ok(()) => fs::remove_file(source).map(|()| MoveOutcome::Moved),
         Err(error) if error.kind() == ErrorKind::AlreadyExists => Ok(MoveOutcome::Kept),
         Err(error) => Err(error),
     }
+}
+
+fn install(partial: &Path, destination: &Path) -> io::Result<()> {
+    match fs::hard_link(partial, destination) {
+        Err(error) if error.kind() == ErrorKind::Unsupported => {
+            rename_into_free_destination(partial, destination)
+        }
+        linked => linked,
+    }
+}
+
+fn rename_into_free_destination(partial: &Path, destination: &Path) -> io::Result<()> {
+    if destination.symlink_metadata().is_ok() {
+        return Err(io::Error::from(ErrorKind::AlreadyExists));
+    }
+    fs::rename(partial, destination)
 }
 
 fn partial_copy_path(destination: &Path) -> PathBuf {
