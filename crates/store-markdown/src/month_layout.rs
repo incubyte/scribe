@@ -40,6 +40,17 @@ pub(crate) fn transcript_paths_in(folder: &Path) -> Result<Vec<PathBuf>, StoreEr
     Ok(paths)
 }
 
+pub(crate) fn session_files_in(folder: &Path) -> Result<Vec<(SessionId, PathBuf)>, StoreError> {
+    Ok(transcript_paths_in(folder)?
+        .into_iter()
+        .filter_map(|path| Some((session_id_of(&path)?, path)))
+        .collect())
+}
+
+fn session_id_of(path: &Path) -> Option<SessionId> {
+    SessionId::parse(path.file_stem()?.to_str()?).ok()
+}
+
 fn transcript_file_name(id: &SessionId) -> String {
     format!("{id}.{TRANSCRIPT_EXTENSION}")
 }
