@@ -7,7 +7,7 @@ Scribe is a small tray app for macOS and Windows that transcribes your calls wit
 - **Records any call.** Scribe captures your microphone as "Me" and the computer's audio output as "Them", so it works with Zoom, Teams, Google Meet in a browser, or anything else that plays sound. No bot joins the call.
 - **Transcribes on your computer.** macOS uses Apple's SpeechAnalyzer (English). Windows uses NVIDIA Parakeet, which detects the spoken language automatically.
 - **Shows the transcript live.** Click the tray icon to open a popover with the running transcript, a timer, and your recent calls.
-- **Saves plain text.** Each call becomes one Markdown file in `Documents/Scribe`, with a timestamp and speaker on every line.
+- **Saves plain text.** Each call becomes one Markdown file, with a timestamp and speaker on every line. Files are grouped into month folders such as `2026-10/` inside your transcripts folder, which is `Documents/Scribe` by default.
 - **Connects to AI apps.** The bundled `scribe-mcp` server gives AI apps three tools: `list_transcripts`, `get_transcript`, and `search_transcripts`. The tray can connect Scribe to Claude Desktop in one click.
 
 ## Privacy
@@ -34,7 +34,9 @@ Builds are not signed with a developer certificate yet, so each platform asks yo
 
 1. Click the Scribe icon in the menu bar or notification area to open the popover.
 2. Click the round record button to start. The button turns red and shows a stop square while Scribe is recording.
-3. Click it again to stop. The transcript is saved in `Documents/Scribe`.
+3. Click it again to stop. The transcript is saved in this month's folder inside your transcripts folder.
+
+To keep transcripts somewhere else, open **Settings** from the popover and choose **Change Transcripts Folder**. Scribe moves your existing transcripts into the new folder, and it never overwrites a file that is already there. The folder cannot be changed while a call is being recorded.
 
 Right-click the tray icon for the menu, which has the same actions plus **Privacy** and **Quit Scribe**.
 
