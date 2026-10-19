@@ -4,17 +4,34 @@ use std::path::{Path, PathBuf};
 use scribe_core::ports::StoreError;
 use scribe_core::recording::SessionId;
 
+use crate::settings_file;
+
 const FOLDER_NAME: &str = "Scribe";
 
 #[cfg(unix)]
 const OWNER_ONLY_MODE: u32 = 0o700;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TranscriptsFolder(PathBuf);
 
 impl TranscriptsFolder {
     pub fn default_location() -> Result<TranscriptsFolder, StoreError> {
         let documents = dirs::document_dir().ok_or(StoreError::DocumentsFolderUnavailable)?;
         Ok(TranscriptsFolder::at(documents.join(FOLDER_NAME)))
+    }
+
+    pub fn configured_in(settings_path: &Path) -> Result<TranscriptsFolder, StoreError> {
+        match settings_file::configured_folder_path(settings_path) {
+            Some(path) => Ok(TranscriptsFolder::at(path)),
+            None => TranscriptsFolder::default_location(),
+        }
+    }
+
+    pub fn configured() -> Result<TranscriptsFolder, StoreError> {
+        match settings_file::default_settings_path() {
+            Some(settings_path) => TranscriptsFolder::configured_in(&settings_path),
+            None => TranscriptsFolder::default_location(),
+        }
     }
 
     #[must_use]

@@ -1,7 +1,8 @@
+use std::sync::Arc;
 use std::time::Duration;
 
 use scribe_core::recording::RecorderState;
-use store_markdown::{StoreError, TranscriptsFolder};
+use store_markdown::{MarkdownTranscriptStore, StoreError};
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
@@ -243,7 +244,7 @@ pub(crate) fn open_transcripts_folder<R: Runtime>(app: &AppHandle<R>) {
 }
 
 fn try_open_transcripts_folder<R: Runtime>(app: &AppHandle<R>) -> Result<(), OpenFolderError> {
-    let folder = TranscriptsFolder::default_location()?;
+    let folder = app.state::<Arc<MarkdownTranscriptStore>>().folder();
     let path = folder.ensure_exists()?;
     app.opener()
         .open_path(path.to_string_lossy(), None::<&str>)?;

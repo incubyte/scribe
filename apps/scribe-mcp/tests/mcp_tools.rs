@@ -10,6 +10,7 @@ use rmcp::{RoleClient, ServiceExt};
 use scribe_core::library::TranscriptLibrary;
 use scribe_core::ports::TranscriptStore;
 use scribe_core::recording::{Segment, SessionHeader, SessionId, Speaker};
+use scribe_mcp::following_store::SettingsFollowingStore;
 use scribe_mcp::server::ScribeServer;
 use serde_json::{Value, json};
 use store_markdown::{MarkdownTranscriptStore, TranscriptsFolder};
@@ -56,6 +57,29 @@ async fn connect_to(folder: &Path) -> RunningService<RoleClient, ()> {
         anyhow::Ok(())
     });
     ().serve(client_side).await.unwrap()
+}
+
+async fn connect_following(settings_path: &Path) -> RunningService<RoleClient, ()> {
+    let store = SettingsFollowingStore::new(settings_path.to_path_buf()).unwrap();
+    let library = TranscriptLibrary::new(Arc::new(store));
+    let (server_side, client_side) = tokio::io::duplex(DUPLEX_BUFFER_BYTES);
+    tokio::spawn(async move {
+        ScribeServer::new(library)
+            .serve(server_side)
+            .await?
+            .waiting()
+            .await?;
+        anyhow::Ok(())
+    });
+    ().serve(client_side).await.unwrap()
+}
+
+fn point_settings_at(settings_path: &Path, folder: &Path) {
+    fs::write(
+        settings_path,
+        json!({ "transcripts_folder": folder.to_str().unwrap() }).to_string(),
+    )
+    .unwrap();
 }
 
 async fn call(
@@ -502,4 +526,23 @@ async fn the_transcripts_folder_is_byte_identical_after_a_full_session_of_tool_c
     use_every_tool_every_way(&client, &id).await;
 
     assert_eq!(folder_contents(folder.path()), before);
+}
+
+#[tokio::test]
+async fn the_mcp_server_follows_a_folder_change_without_restarting() {
+    let settings = tempfile::tempdir().unwrap();
+    let settings_path = settings.path().join("settings.json");
+    let folder_a = tempfile::tempdir().unwrap();
+    let folder_b = tempfile::tempdir().unwrap();
+    let id_in_a = save_call(&store_in(folder_a.path()), "2026-10-19T10:00:00+00:00");
+    let id_in_b = save_call(&store_in(folder_b.path()), "2026-10-20T10:00:00+00:00");
+    point_settings_at(&settings_path, folder_a.path());
+    let client = connect_following(&settings_path).await;
+
+    let before = call(&client, "list_transcripts", json!({})).await;
+    point_settings_at(&settings_path, folder_b.path());
+    let after = call(&client, "list_transcripts", json!({})).await;
+
+    assert_eq!(listed_ids(&before), [id_in_a.to_string()]);
+    assert_eq!(listed_ids(&after), [id_in_b.to_string()]);
 }

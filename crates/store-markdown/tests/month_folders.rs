@@ -195,3 +195,29 @@ fn the_path_of_a_transcript_that_does_not_exist_points_into_its_month_folder() {
         folder.path().join("2026-10").join("2026-10-19-114521.md")
     );
 }
+
+#[test]
+fn after_relocating_the_store_new_transcripts_are_saved_in_the_new_folder_and_old_ones_are_not_listed()
+ {
+    let old_folder = tempfile::tempdir().unwrap();
+    let new_folder = tempfile::tempdir().unwrap();
+    let store = store_in(old_folder.path());
+    store
+        .create(&header_at("2026-10-19T11:45:21+00:00"))
+        .unwrap();
+
+    store.relocate(TranscriptsFolder::at(new_folder.path().to_path_buf()));
+    let id = store
+        .create(&header_at("2026-10-20T09:00:00+00:00"))
+        .unwrap();
+
+    assert!(
+        new_folder
+            .path()
+            .join("2026-10")
+            .join(format!("{id}.md"))
+            .is_file()
+    );
+    assert_eq!(listed_ids(&store), [id.to_string()]);
+    assert_eq!(store.folder().path(), new_folder.path());
+}

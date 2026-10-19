@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
+use std::sync::{PoisonError, RwLock};
 
 use chrono::{DateTime, FixedOffset};
 use scribe_core::ports::{StoreError, TranscriptStore};
@@ -16,26 +17,40 @@ use crate::store_error::{file_name, io_error, malformed};
 use crate::transcripts_folder::TranscriptsFolder;
 
 pub struct MarkdownTranscriptStore {
-    folder: TranscriptsFolder,
+    folder: RwLock<TranscriptsFolder>,
 }
 
 impl MarkdownTranscriptStore {
     #[must_use]
     pub fn new(folder: TranscriptsFolder) -> MarkdownTranscriptStore {
-        MarkdownTranscriptStore { folder }
+        MarkdownTranscriptStore {
+            folder: RwLock::new(folder),
+        }
+    }
+
+    pub fn relocate(&self, folder: TranscriptsFolder) {
+        *self.folder.write().unwrap_or_else(PoisonError::into_inner) = folder;
+    }
+
+    #[must_use]
+    pub fn folder(&self) -> TranscriptsFolder {
+        self.folder
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
     }
 
     #[must_use]
     pub fn path_for(&self, id: &SessionId) -> PathBuf {
-        month_layout::existing_path(self.folder.path(), id)
+        month_layout::existing_path(self.folder().path(), id)
     }
 
     fn try_create(
-        &self,
+        folder: &TranscriptsFolder,
         header: &SessionHeader,
         id: SessionId,
     ) -> Result<Option<SessionId>, StoreError> {
-        let path = month_layout::month_path(self.folder.path(), &id);
+        let path = month_layout::month_path(folder.path(), &id);
         let header = header.clone().with_id(id.clone());
         match private_file::create_new(&path, &render_header(&header)) {
             Ok(()) => Ok(Some(id)),
@@ -45,16 +60,17 @@ impl MarkdownTranscriptStore {
     }
 
     fn transcript_paths(&self) -> Result<Vec<PathBuf>, StoreError> {
-        month_layout::transcript_paths_in(self.folder.path())
+        month_layout::transcript_paths_in(self.folder().path())
     }
 }
 
 impl TranscriptStore for MarkdownTranscriptStore {
     fn create(&self, header: &SessionHeader) -> Result<SessionId, StoreError> {
-        self.folder.ensure_exists()?;
-        self.folder.ensure_month_exists(&header.id)?;
+        let folder = self.folder();
+        folder.ensure_exists()?;
+        folder.ensure_month_exists(&header.id)?;
         for candidate in header.id.collision_candidates() {
-            if let Some(id) = self.try_create(header, candidate)? {
+            if let Some(id) = Self::try_create(&folder, header, candidate)? {
                 return Ok(id);
             }
         }
