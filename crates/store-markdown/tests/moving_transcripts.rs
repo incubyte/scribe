@@ -156,3 +156,42 @@ fn moved_transcripts_stay_private_to_the_user() {
         .mode();
     assert_eq!(mode & 0o777, 0o600);
 }
+
+#[test]
+fn a_transcript_whose_month_folder_cannot_be_created_in_the_new_folder_is_kept_in_the_old_folder() {
+    let parent = tempfile::tempdir().unwrap();
+    let old = folder_in(parent.path(), "old");
+    let new = folder_in(parent.path(), "new");
+    write_in_month(&old, OCTOBER_ID, "october");
+    fs::write(new.path().join(&OCTOBER_ID[..7]), "in the way").unwrap();
+
+    let report = move_transcripts(&old, &new).unwrap();
+
+    assert_eq!(report, MoveReport { moved: 0, kept: 1 });
+    assert_eq!(
+        fs::read_to_string(month_file(&old, OCTOBER_ID)).unwrap(),
+        "october"
+    );
+}
+
+#[cfg(unix)]
+#[test]
+fn a_dangling_link_already_at_the_destination_is_never_replaced() {
+    let parent = tempfile::tempdir().unwrap();
+    let old = folder_in(parent.path(), "old");
+    let new = folder_in(parent.path(), "new");
+    write_in_month(&old, OCTOBER_ID, "october");
+    let destination = month_file(&new, OCTOBER_ID);
+    fs::create_dir_all(destination.parent().unwrap()).unwrap();
+    let missing_target = parent.path().join("nowhere");
+    std::os::unix::fs::symlink(&missing_target, &destination).unwrap();
+
+    let report = move_transcripts(&old, &new).unwrap();
+
+    assert_eq!(report, MoveReport { moved: 0, kept: 1 });
+    assert_eq!(
+        fs::read_to_string(month_file(&old, OCTOBER_ID)).unwrap(),
+        "october"
+    );
+    assert_eq!(fs::read_link(&destination).unwrap(), missing_target);
+}

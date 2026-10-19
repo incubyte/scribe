@@ -1,10 +1,12 @@
 use std::path::Path;
 
+use store_markdown::MoveReport;
 use tauri::{AppHandle, Runtime};
 use tauri_plugin_notification::NotificationExt;
 
 use crate::claude_desktop::ConnectOutcome;
 use crate::start_failure::StartFailureKind;
+use crate::transcripts_location::folder_changed_message;
 
 const MICROPHONE_DENIED_TITLE: &str = "Scribe can't use the microphone";
 #[cfg(not(windows))]
@@ -21,6 +23,8 @@ const TRANSCRIPTS_FOLDER_CHANGED_TITLE: &str = "Transcripts folder changed";
 const TRANSCRIPTS_FOLDER_NOT_CHANGED_TITLE: &str = "Could not change the transcripts folder";
 const TRANSCRIPTS_FOLDER_NOT_CHANGED_BODY: &str =
     "Scribe will keep saving transcripts in the current folder.";
+
+const TRANSCRIPTS_NOT_MOVED_BODY: &str = "The folder was changed, but your existing transcripts could not be moved. They are still in the old folder.";
 
 const MCP_CONFIG_COPIED_TITLE: &str = "MCP config copied";
 const MCP_CONFIG_COPIED_BODY: &str =
@@ -72,18 +76,22 @@ pub fn notify_mcp_config_not_copied<R: Runtime>(app: &AppHandle<R>) {
 pub fn notify_transcripts_folder_changed<R: Runtime>(
     app: &AppHandle<R>,
     folder: &Path,
-    moved: usize,
+    report: MoveReport,
 ) {
     let name = folder.file_name().map_or_else(
         || folder.to_string_lossy(),
         |last_component| last_component.to_string_lossy(),
     );
-    let body = match moved {
-        0 => format!("New transcripts will be saved in {name}."),
-        1 => format!("New transcripts will be saved in {name}. Moved 1 transcript."),
-        count => format!("New transcripts will be saved in {name}. Moved {count} transcripts."),
-    };
+    let body = folder_changed_message(&name, report.moved, report.kept);
     show_plain(app, TRANSCRIPTS_FOLDER_CHANGED_TITLE, &body);
+}
+
+pub fn notify_transcripts_not_moved<R: Runtime>(app: &AppHandle<R>) {
+    show_plain(
+        app,
+        TRANSCRIPTS_FOLDER_CHANGED_TITLE,
+        TRANSCRIPTS_NOT_MOVED_BODY,
+    );
 }
 
 pub fn notify_transcripts_folder_not_changed<R: Runtime>(app: &AppHandle<R>) {

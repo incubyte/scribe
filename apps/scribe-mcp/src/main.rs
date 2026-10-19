@@ -27,7 +27,7 @@ fn build_store() -> anyhow::Result<Arc<dyn TranscriptStore>> {
     Ok(match default_settings_path() {
         Some(settings_path) => Arc::new(SettingsFollowingStore::new(settings_path)?),
         None => Arc::new(MarkdownTranscriptStore::new(
-            TranscriptsFolder::default_location()?,
+            TranscriptsFolder::configured_by(None)?,
         )),
     })
 }

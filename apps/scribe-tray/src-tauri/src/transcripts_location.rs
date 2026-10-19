@@ -45,31 +45,58 @@ pub enum FolderChangeError {
 
 struct FolderSwitch {
     previous: TranscriptsFolder,
-    new: TranscriptsFolder,
-    new_text: String,
+    new_folder: TranscriptsFolder,
+    new_folder_text: String,
+}
+
+struct MoveFailed;
+
+enum Preflight {
+    Proceed(FolderSwitch),
+    Stop(FolderChange),
 }
 
 pub fn change<R: Runtime>(app: &AppHandle<R>) -> Result<FolderChange, FolderChangeError> {
+    match preflight(app)? {
+        Preflight::Proceed(switch) => switch_folder(app, &switch),
+        Preflight::Stop(outcome) => Ok(outcome),
+    }
+}
+
+fn preflight<R: Runtime>(app: &AppHandle<R>) -> Result<Preflight, FolderChangeError> {
     if app.state::<RecordingController>().state() == RecorderState::Recording {
-        return Ok(FolderChange::Recording);
+        return Ok(Preflight::Stop(FolderChange::Recording));
     }
     let previous = app.state::<Arc<MarkdownTranscriptStore>>().folder();
     let Some(picked) = pick_folder(app, previous.path())? else {
-        return Ok(FolderChange::Cancelled);
+        return Ok(Preflight::Stop(FolderChange::Cancelled));
     };
-    let new = TranscriptsFolder::at(picked);
-    if new == previous {
-        return Ok(FolderChange::Unchanged);
+    let new_folder = TranscriptsFolder::at(picked);
+    if new_folder == previous {
+        return Ok(Preflight::Stop(FolderChange::Unchanged));
     }
-    let new_text = utf8(new.path())?;
-    switch_folder(
-        app,
-        &FolderSwitch {
-            previous,
-            new,
-            new_text,
-        },
-    )
+    let new_folder_text = path_as_utf8(new_folder.path())?;
+    Ok(Preflight::Proceed(FolderSwitch {
+        previous,
+        new_folder,
+        new_folder_text,
+    }))
+}
+
+#[must_use]
+pub fn folder_changed_message(folder_name: &str, moved: usize, kept: usize) -> String {
+    let saved = format!("New transcripts will be saved in {folder_name}.");
+    let moved_note = match moved {
+        0 => String::new(),
+        1 => " Moved 1 transcript.".to_owned(),
+        count => format!(" Moved {count} transcripts."),
+    };
+    let kept_note = match kept {
+        0 => String::new(),
+        1 => " 1 transcript was left in the old folder.".to_owned(),
+        count => format!(" {count} transcripts were left in the old folder."),
+    };
+    format!("{saved}{moved_note}{kept_note}")
 }
 
 fn switch_folder<R: Runtime>(
@@ -91,8 +118,8 @@ fn relocate_and_persist<R: Runtime>(
 ) -> Result<(), FolderChangeError> {
     let controller = app.state::<RecordingController>();
     let store = app.state::<Arc<MarkdownTranscriptStore>>();
-    controller.relocate_store(&store, switch.new.clone())?;
-    persist_folder(app, &switch.new_text).inspect_err(|_| {
+    controller.relocate_store(&store, switch.new_folder.clone())?;
+    persist_folder(app, &switch.new_folder_text).inspect_err(|_| {
         if let Err(error) = controller.relocate_store(&store, switch.previous.clone()) {
             tracing::error!(%error, "could not restore the previous transcripts folder");
         }
@@ -100,10 +127,15 @@ fn relocate_and_persist<R: Runtime>(
 }
 
 fn finish<R: Runtime>(app: &AppHandle<R>, switch: &FolderSwitch) -> FolderChange {
-    let report = offer_to_move(app, &switch.previous, &switch.new);
-    notifications::notify_transcripts_folder_changed(app, switch.new.path(), report.moved);
+    let report = if let Ok(report) = offer_to_move(app, &switch.previous, &switch.new_folder) {
+        notifications::notify_transcripts_folder_changed(app, switch.new_folder.path(), report);
+        report
+    } else {
+        notifications::notify_transcripts_not_moved(app);
+        MoveReport::default()
+    };
     FolderChange::Changed {
-        folder: switch.new_text.clone(),
+        folder: switch.new_folder_text.clone(),
         moved: report.moved,
         kept: report.kept,
     }
@@ -114,7 +146,7 @@ pub fn current_folder<R: Runtime>(app: &AppHandle<R>) -> String {
     folder.path().to_string_lossy().into_owned()
 }
 
-fn utf8(path: &Path) -> Result<String, FolderChangeError> {
+fn path_as_utf8(path: &Path) -> Result<String, FolderChangeError> {
     path.to_str()
         .map(str::to_owned)
         .ok_or(FolderChangeError::UnsupportedPath)
@@ -147,15 +179,15 @@ fn offer_to_move<R: Runtime>(
     app: &AppHandle<R>,
     from: &TranscriptsFolder,
     to: &TranscriptsFolder,
-) -> MoveReport {
+) -> Result<MoveReport, MoveFailed> {
     let outcome = match count_transcripts(from) {
         Ok(count) if count > 0 && ask_to_move(app, count) => move_transcripts(from, to),
         Ok(_) => Ok(MoveReport::default()),
         Err(error) => Err(error),
     };
-    outcome.unwrap_or_else(|error| {
-        tracing::error!(%error, "could not move the existing transcripts");
-        MoveReport::default()
+    outcome.map_err(|_| {
+        tracing::error!("could not move the existing transcripts");
+        MoveFailed
     })
 }
 

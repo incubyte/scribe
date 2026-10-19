@@ -163,7 +163,9 @@ fn report_start_failure<R: Runtime>(app: &AppHandle<R>, error: &StartError) {
 }
 
 pub fn install<R: Runtime>(app: &AppHandle<R>) -> Result<(), StoreError> {
-    let store = Arc::new(MarkdownTranscriptStore::new(configured_folder(app)?));
+    let store = Arc::new(MarkdownTranscriptStore::new(
+        TranscriptsFolder::configured_by(settings_path(app).as_deref())?,
+    ));
     mark_abandoned_sessions(&store);
     app.manage(LiveFeed::default());
     let listener: Arc<dyn RecordingListener> = Arc::new(TrayRecordingListener::spawn(app.clone()));
@@ -177,13 +179,6 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) -> Result<(), StoreError> {
     model_setup::install(app);
     stop_before_sleep(app);
     Ok(())
-}
-
-fn configured_folder<R: Runtime>(app: &AppHandle<R>) -> Result<TranscriptsFolder, StoreError> {
-    match settings_path(app) {
-        Some(path) => TranscriptsFolder::configured_in(&path),
-        None => TranscriptsFolder::default_location(),
-    }
 }
 
 fn settings_path<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {

@@ -27,9 +27,9 @@ impl TranscriptsFolder {
         }
     }
 
-    pub fn configured() -> Result<TranscriptsFolder, StoreError> {
-        match settings_file::default_settings_path() {
-            Some(settings_path) => TranscriptsFolder::configured_in(&settings_path),
+    pub fn configured_by(settings_path: Option<&Path>) -> Result<TranscriptsFolder, StoreError> {
+        match settings_path {
+            Some(path) => TranscriptsFolder::configured_in(path),
             None => TranscriptsFolder::default_location(),
         }
     }
