@@ -76,6 +76,20 @@ impl RecordingController {
         self.update_readiness(|readiness| readiness.model_ready = true);
     }
 
+    pub fn relocate_store(
+        &self,
+        store: &MarkdownTranscriptStore,
+        folder: TranscriptsFolder,
+    ) -> Result<(), RecorderError> {
+        let recorder = self.recorder();
+        if recorder.state() == RecorderState::Recording {
+            return Err(RecorderError::AlreadyRecording);
+        }
+        store.relocate(folder);
+        drop(recorder);
+        Ok(())
+    }
+
     fn update_readiness(&self, change: impl FnOnce(&mut Readiness)) {
         let mut recorder = self.recorder();
         let mut readiness = recorder.readiness();

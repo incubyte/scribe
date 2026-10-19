@@ -10,7 +10,9 @@ use tauri_plugin_opener::OpenerExt;
 use crate::claude_desktop::ConnectionStatus;
 use crate::live_feed::{LiveFeed, RecorderSnapshot};
 use crate::model_setup::{self, ModelDownloadView};
+use crate::notifications;
 use crate::recording::{self, RecordingController};
+use crate::transcripts_location::{self, FolderChange};
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
@@ -94,4 +96,20 @@ pub fn copy_mcp_config<R: Runtime>(app: AppHandle<R>) {
 #[allow(clippy::needless_pass_by_value)]
 pub fn open_transcripts_folder<R: Runtime>(app: AppHandle<R>) {
     crate::tray::open_transcripts_folder(&app);
+}
+
+#[tauri::command]
+pub async fn change_transcripts_folder<R: Runtime>(
+    app: AppHandle<R>,
+) -> Result<FolderChange, String> {
+    transcripts_location::change(&app).map_err(|error| {
+        notifications::notify_transcripts_folder_not_changed(&app);
+        error.to_string()
+    })
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn transcripts_folder<R: Runtime>(app: AppHandle<R>) -> String {
+    transcripts_location::current_folder(&app)
 }
