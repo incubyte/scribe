@@ -40,6 +40,16 @@ pub fn hide_popover<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     window.hide().map_err(|error| error.to_string())
 }
 
+pub fn keep_open_during<R: Runtime, T>(app: &AppHandle<R>, show_dialog: impl FnOnce() -> T) -> T {
+    with_guard(app, BlurGuard::dialog_opened);
+    let answer = show_dialog();
+    with_guard(app, BlurGuard::dialog_closed);
+    if let Ok(window) = popover_window(app) {
+        log_failure(window.set_focus(), "could not refocus the popover");
+    }
+    answer
+}
+
 fn show<R: Runtime>(app: &AppHandle<R>, window: &WebviewWindow<R>) -> tauri::Result<()> {
     window.move_window_constrained(Position::TrayCenter)?;
     window.show()?;

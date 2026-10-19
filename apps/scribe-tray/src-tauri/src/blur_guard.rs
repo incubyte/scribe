@@ -6,6 +6,7 @@ const SETTLE: Duration = Duration::from_millis(300);
 pub struct BlurGuard {
     shown_at: Option<Instant>,
     hidden_by_blur_at: Option<Instant>,
+    dialog_open: bool,
 }
 
 impl BlurGuard {
@@ -13,8 +14,16 @@ impl BlurGuard {
         self.shown_at = Some(now);
     }
 
+    pub fn dialog_opened(&mut self) {
+        self.dialog_open = true;
+    }
+
+    pub fn dialog_closed(&mut self) {
+        self.dialog_open = false;
+    }
+
     pub fn blur_should_hide(&mut self, now: Instant) -> bool {
-        let settled = Self::has_settled(self.shown_at, now);
+        let settled = !self.dialog_open && Self::has_settled(self.shown_at, now);
         if settled {
             self.hidden_by_blur_at = Some(now);
         }

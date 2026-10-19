@@ -48,3 +48,24 @@ fn a_later_tray_click_reopens_the_popover() {
 fn the_first_tray_click_opens_the_popover() {
     assert!(BlurGuard::default().click_may_show(Instant::now()));
 }
+
+#[test]
+fn a_folder_picker_taking_focus_does_not_hide_the_popover() {
+    let opened = Instant::now();
+    let mut guard = BlurGuard::default();
+    guard.shown(opened);
+    guard.dialog_opened();
+
+    assert!(!guard.blur_should_hide(opened + Duration::from_secs(5)));
+}
+
+#[test]
+fn losing_focus_after_the_folder_picker_closes_hides_the_popover_again() {
+    let opened = Instant::now();
+    let mut guard = BlurGuard::default();
+    guard.shown(opened);
+    guard.dialog_opened();
+    guard.dialog_closed();
+
+    assert!(guard.blur_should_hide(opened + Duration::from_secs(5)));
+}

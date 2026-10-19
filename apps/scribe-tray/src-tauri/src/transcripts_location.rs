@@ -13,6 +13,7 @@ use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
 use tauri_plugin_store::StoreExt;
 
 use crate::notifications;
+use crate::popover;
 use crate::recording::RecordingController;
 
 const PICKER_TITLE: &str = "Choose where Scribe saves transcripts";
@@ -156,17 +157,19 @@ fn pick_folder<R: Runtime>(
     app: &AppHandle<R>,
     starting_at: &Path,
 ) -> Result<Option<PathBuf>, FolderChangeError> {
-    app.dialog()
-        .file()
-        .set_title(PICKER_TITLE)
-        .set_directory(starting_at)
-        .blocking_pick_folder()
-        .map(|picked| {
-            picked
-                .into_path()
-                .map_err(|_| FolderChangeError::UnsupportedPath)
-        })
-        .transpose()
+    popover::keep_open_during(app, || {
+        app.dialog()
+            .file()
+            .set_title(PICKER_TITLE)
+            .set_directory(starting_at)
+            .blocking_pick_folder()
+    })
+    .map(|picked| {
+        picked
+            .into_path()
+            .map_err(|_| FolderChangeError::UnsupportedPath)
+    })
+    .transpose()
 }
 
 fn persist_folder<R: Runtime>(app: &AppHandle<R>, folder: &str) -> Result<(), FolderChangeError> {
@@ -192,12 +195,14 @@ fn offer_to_move<R: Runtime>(
 }
 
 fn ask_to_move<R: Runtime>(app: &AppHandle<R>, count: usize) -> bool {
-    app.dialog()
-        .message(format!("Move {count} transcripts to the new folder?"))
-        .title(MOVE_PROMPT_TITLE)
-        .buttons(MessageDialogButtons::OkCancelCustom(
-            MOVE_LABEL.to_owned(),
-            KEEP_LABEL.to_owned(),
-        ))
-        .blocking_show()
+    popover::keep_open_during(app, || {
+        app.dialog()
+            .message(format!("Move {count} transcripts to the new folder?"))
+            .title(MOVE_PROMPT_TITLE)
+            .buttons(MessageDialogButtons::OkCancelCustom(
+                MOVE_LABEL.to_owned(),
+                KEEP_LABEL.to_owned(),
+            ))
+            .blocking_show()
+    })
 }
