@@ -61,6 +61,11 @@ impl RecordingController {
         log_unclean_finish(self.recorder().stop_session(id));
     }
 
+    pub fn stop_if_recording(&self, id: &SessionId) -> bool {
+        let mut recorder = self.recorder();
+        recorder.is_recording_session(id) && finished_cleanly(recorder.stop())
+    }
+
     pub fn state(&self) -> RecorderState {
         self.recorder().state()
     }
@@ -100,6 +105,12 @@ impl RecordingController {
     fn recorder(&self) -> MutexGuard<'_, Recorder> {
         self.recorder.lock().unwrap_or_else(PoisonError::into_inner)
     }
+}
+
+fn finished_cleanly(outcome: Result<(), RecorderError>) -> bool {
+    let clean = outcome.is_ok();
+    log_unclean_finish(outcome);
+    clean
 }
 
 fn log_unclean_finish(outcome: Result<(), RecorderError>) {

@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use scribe_core::recording::AUTO_STOP_AFTER_QUIET;
 use store_markdown::MoveReport;
 use tauri::{AppHandle, Runtime};
 use tauri_plugin_notification::NotificationExt;
@@ -18,6 +19,8 @@ const OTHER_SIDE_SILENT_BODY: &str =
     "Allow Scribe in System Settings > Privacy & Security > Screen & System Audio Recording.";
 
 const RECORDING_NOT_STARTED_TITLE: &str = "Scribe couldn't start recording";
+const RECORDING_AUTO_STOPPED_TITLE: &str = "Recording auto-stopped";
+const SECONDS_PER_MINUTE: u64 = 60;
 
 const TRANSCRIPTS_FOLDER_CHANGED_TITLE: &str = "Transcripts folder changed";
 const TRANSCRIPTS_FOLDER_NOT_CHANGED_TITLE: &str = "Could not change the transcripts folder";
@@ -107,6 +110,14 @@ pub fn notify_recording_not_started<R: Runtime>(app: &AppHandle<R>, kind: StartF
         StartFailureKind::MicrophoneDenied => notify_microphone_denied(app),
         other => show_plain(app, RECORDING_NOT_STARTED_TITLE, other.advice()),
     }
+}
+
+pub fn notify_recording_auto_stopped<R: Runtime>(app: &AppHandle<R>) {
+    let minutes = AUTO_STOP_AFTER_QUIET.as_secs() / SECONDS_PER_MINUTE;
+    let body = format!(
+        "No one spoke for {minutes} minutes, so Scribe stopped recording. The transcript is saved."
+    );
+    show_plain(app, RECORDING_AUTO_STOPPED_TITLE, &body);
 }
 
 #[cfg(not(windows))]

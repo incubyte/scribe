@@ -7,6 +7,7 @@ Scribe is a small tray app for macOS and Windows that transcribes your calls wit
 - **Records any call.** Scribe captures your microphone as "Me" and the computer's audio output as "Them", so it works with Zoom, Teams, Google Meet in a browser, or anything else that plays sound. No bot joins the call.
 - **Transcribes on your computer.** macOS uses Apple's SpeechAnalyzer (English). Windows uses NVIDIA Parakeet, which detects the spoken language automatically.
 - **Shows the transcript live.** Click the tray icon to open a popover with the running transcript, a timer, and your recent calls.
+- **Stops when the conversation goes quiet.** A recording stops automatically after 5 minutes without speech, and a notification tells you the transcript is saved.
 - **Saves plain text.** Each call becomes one Markdown file, with a timestamp and speaker on every line. Files are grouped into month folders such as `2026-10/` inside your transcripts folder, which is `Documents/Scribe` by default.
 - **Connects to AI apps.** The bundled `scribe-mcp` server gives AI apps three tools: `list_transcripts`, `get_transcript`, and `search_transcripts`. The tray can connect Scribe to Claude Desktop in one click.
 

@@ -1,12 +1,13 @@
 use std::sync::Arc;
 use std::sync::mpsc::Receiver;
+use std::time::Duration;
 
 use chrono::{DateTime, FixedOffset, TimeDelta};
 
 use crate::ports::{RecordingListener, StoreError, TranscriptStore};
 use crate::recording::lane_worker::{LaneMessage, LaneProgress};
 use crate::recording::{
-    RecordingEvent, Segment, SegmentSequencer, SessionClock, SessionId, Speaker,
+    QuietWatch, RecordingEvent, Segment, SegmentSequencer, SessionClock, SessionId, Speaker,
 };
 
 pub(crate) struct SessionWriter {
@@ -17,6 +18,7 @@ pub(crate) struct SessionWriter {
     pub(crate) clock: SessionClock,
     pub(crate) sequencer: SegmentSequencer,
     pub(crate) open_lanes: usize,
+    pub(crate) quiet_watch: QuietWatch,
 }
 
 pub(crate) fn run_writer(
@@ -33,12 +35,10 @@ pub(crate) fn run_writer(
 impl SessionWriter {
     fn handle(&mut self, message: LaneMessage) {
         match message {
-            LaneMessage::Final(segment) => self.sequencer.accept(segment),
+            LaneMessage::Final(segment) => self.accept_final(segment),
             LaneMessage::Transcribing(speaker) => self.sequencer.start_transcribing(speaker),
             LaneMessage::Progress(progress) => self.advance(&progress),
-            LaneMessage::Partial(speaker, text) => self
-                .listener
-                .on_event(RecordingEvent::PartialSegmentUpdated { speaker, text }),
+            LaneMessage::Partial(speaker, text) => self.show_partial(speaker, text),
             LaneMessage::Silenced(speaker) => self
                 .listener
                 .on_event(RecordingEvent::CaptureSilenced { speaker }),
@@ -48,12 +48,39 @@ impl SessionWriter {
         self.write_all(ready);
     }
 
+    fn accept_final(&mut self, segment: Segment) {
+        self.quiet_watch.hear_speech();
+        self.sequencer.accept(segment);
+    }
+
+    fn show_partial(&mut self, speaker: Speaker, text: String) {
+        self.quiet_watch.hear_speech();
+        self.listener
+            .on_event(RecordingEvent::PartialSegmentUpdated { speaker, text });
+    }
+
     fn advance(&mut self, progress: &LaneProgress) {
         self.sequencer
             .advance(progress.speaker, progress.finalised_through);
         self.sequencer
             .hear(progress.speaker, progress.heard_through);
         self.sequencer.finish_transcribing(progress.speaker);
+        self.watch_for_quiet(progress.heard_through);
+    }
+
+    fn watch_for_quiet(&mut self, heard_through: Duration) {
+        self.quiet_watch.hear_through(heard_through);
+        if self.quiet_watch.is_report_due() {
+            self.announce_quiet();
+        }
+    }
+
+    fn announce_quiet(&mut self) {
+        self.listener
+            .on_event(RecordingEvent::ConversationWentQuiet {
+                id: self.id.clone(),
+            });
+        self.quiet_watch.mark_reported();
     }
 
     fn end_lane(&mut self, speaker: Speaker) {

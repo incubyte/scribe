@@ -116,6 +116,13 @@ fn silence_warnings(events: Vec<RecordingEvent>) -> Vec<RecordingEvent> {
         .collect()
 }
 
+fn quiet_announcements(events: Vec<RecordingEvent>) -> Vec<RecordingEvent> {
+    events
+        .into_iter()
+        .filter(|event| matches!(event, RecordingEvent::ConversationWentQuiet { .. }))
+        .collect()
+}
+
 fn silent_mic_lane() -> Lane {
     lane(Speaker::Me, ScriptedTranscriber::new(vec![]))
 }
@@ -535,6 +542,29 @@ fn the_end_of_an_earlier_session_leaves_the_current_recording_running() {
 }
 
 #[test]
+fn a_recording_is_known_by_its_own_id_while_it_runs() {
+    let mut call = Call::ready();
+    let earlier = call.record(vec![silent_mic_lane()]);
+    let current = call.start(vec![silent_mic_lane()]).unwrap();
+
+    let knows_current = call.recorder.is_recording_session(&current);
+    let knows_earlier = call.recorder.is_recording_session(&earlier);
+
+    assert!(knows_current);
+    assert!(!knows_earlier);
+    call.recorder.stop().unwrap();
+}
+
+#[test]
+fn a_stopped_recording_is_no_longer_known_as_running() {
+    let mut call = Call::ready();
+
+    let id = call.record(vec![silent_mic_lane()]);
+
+    assert!(!call.recorder.is_recording_session(&id));
+}
+
+#[test]
 fn the_current_session_can_be_stopped_by_its_id() {
     let mut call = Call::ready();
     let id = call.start(vec![silent_mic_lane()]).unwrap();
@@ -723,5 +753,82 @@ fn a_side_waiting_on_a_slow_transcription_is_not_mistaken_for_a_stalled_one() {
             line(Speaker::Me, (1_000, 1_500), "Hello"),
             line(Speaker::Them, (2_000, 2_500), "How are you"),
         ]
+    );
+}
+
+const THREE_MINUTES_OF_PUSHES: usize = 1_800;
+
+fn a_mute_lane_lasting(speaker: Speaker, end_ms: u64) -> Lane {
+    lane_lasting(speaker, end_ms, ScriptedTranscriber::new(vec![]))
+}
+
+#[test]
+fn a_call_where_nobody_speaks_for_five_minutes_is_announced_as_gone_quiet_once() {
+    let mut call = Call::ready();
+
+    call.record(vec![
+        a_mute_lane_lasting(Speaker::Me, 600_000),
+        a_mute_lane_lasting(Speaker::Them, 600_000),
+    ]);
+
+    assert_eq!(quiet_announcements(call.listener.events()).len(), 1);
+}
+
+#[test]
+fn a_call_shorter_than_five_minutes_is_never_announced_as_gone_quiet() {
+    let mut call = Call::ready();
+
+    call.record(vec![
+        a_mute_lane_lasting(Speaker::Me, 299_000),
+        a_mute_lane_lasting(Speaker::Them, 299_000),
+    ]);
+
+    assert!(quiet_announcements(call.listener.events()).is_empty());
+}
+
+#[test]
+fn a_line_on_the_other_sides_lane_restarts_the_quiet_period() {
+    let mut call = Call::ready();
+    let speaks_late = speaking_until(
+        THREE_MINUTES_OF_PUSHES,
+        utterance(0, 900, "Sorry, I was on mute"),
+    );
+
+    call.record(vec![
+        a_mute_lane_lasting(Speaker::Me, 290_000),
+        lane_lasting(Speaker::Them, 450_000, speaks_late),
+    ]);
+
+    assert!(quiet_announcements(call.listener.events()).is_empty());
+}
+
+#[test]
+fn wording_in_progress_on_my_lane_restarts_the_quiet_period() {
+    let mut call = Call::ready();
+    let starts_late = speaking_until(THREE_MINUTES_OF_PUSHES, vec![partial("Hello")]);
+
+    call.record(vec![lane_lasting(Speaker::Me, 450_000, starts_late)]);
+
+    assert!(quiet_announcements(call.listener.events()).is_empty());
+}
+
+#[test]
+fn a_call_with_only_my_microphone_is_announced_as_gone_quiet() {
+    let mut call = Call::ready();
+
+    call.record(vec![a_mute_lane_lasting(Speaker::Me, 301_000)]);
+
+    assert_eq!(quiet_announcements(call.listener.events()).len(), 1);
+}
+
+#[test]
+fn the_quiet_announcement_names_the_session_that_went_quiet() {
+    let mut call = Call::ready();
+
+    let id = call.record(vec![a_mute_lane_lasting(Speaker::Me, 301_000)]);
+
+    assert_eq!(
+        quiet_announcements(call.listener.events()),
+        vec![RecordingEvent::ConversationWentQuiet { id }]
     );
 }

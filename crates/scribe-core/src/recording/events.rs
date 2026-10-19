@@ -9,4 +9,5 @@ pub enum RecordingEvent {
     CaptureSilenced { speaker: Speaker },
     CaptureUnavailable { speaker: Speaker },
     OutputDeviceChanged,
+    ConversationWentQuiet { id: SessionId },
 }

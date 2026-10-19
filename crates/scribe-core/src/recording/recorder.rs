@@ -8,8 +8,8 @@ use crate::ports::{
 use crate::recording::lane_worker::{LaneMessage, LaneWorker, run_lane};
 use crate::recording::writer::{SessionWriter, run_writer};
 use crate::recording::{
-    AudioChunk, Readiness, RecorderState, RecordingEvent, SegmentSequencer, SessionClock,
-    SessionHeader, SessionId, Speaker, recorder_state,
+    AUTO_STOP_AFTER_QUIET, AudioChunk, QuietWatch, Readiness, RecorderState, RecordingEvent,
+    SegmentSequencer, SessionClock, SessionHeader, SessionId, Speaker, recorder_state,
 };
 
 pub struct Lane {
@@ -103,14 +103,17 @@ impl Recorder {
     }
 
     pub fn stop_session(&mut self, id: &SessionId) -> Result<(), RecorderError> {
-        if self
-            .active
-            .as_ref()
-            .is_some_and(|session| session.id == *id)
-        {
+        if self.is_recording_session(id) {
             return self.stop();
         }
         Ok(())
+    }
+
+    #[must_use]
+    pub fn is_recording_session(&self, id: &SessionId) -> bool {
+        self.active
+            .as_ref()
+            .is_some_and(|session| session.id == *id)
     }
 
     pub fn ensure_idle(&self) -> Result<(), RecorderError> {
@@ -160,6 +163,7 @@ impl Recorder {
             clock: context.clock,
             sequencer,
             open_lanes: speakers.len(),
+            quiet_watch: QuietWatch::new(AUTO_STOP_AFTER_QUIET),
         }
     }
 }

@@ -82,6 +82,17 @@ impl<R: Runtime> TrayUpdater<R> {
             RecordingEvent::OutputDeviceChanged => {
                 tracing::info!("the output device changed; the other side is being captured again");
             }
+            RecordingEvent::ConversationWentQuiet { id } => self.went_quiet(&id),
+        }
+    }
+
+    fn went_quiet(&self, id: &SessionId) {
+        if self
+            .app
+            .state::<RecordingController>()
+            .stop_if_recording(id)
+        {
+            notifications::notify_recording_auto_stopped(&self.app);
         }
     }
 
