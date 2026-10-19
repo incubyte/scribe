@@ -2,6 +2,7 @@ use std::fs::DirBuilder;
 use std::path::{Path, PathBuf};
 
 use scribe_core::ports::StoreError;
+use scribe_core::recording::SessionId;
 
 const FOLDER_NAME: &str = "Scribe";
 
@@ -29,6 +30,17 @@ impl TranscriptsFolder {
                 source,
             })?;
         Ok(&self.0)
+    }
+
+    pub(crate) fn ensure_month_exists(&self, id: &SessionId) -> Result<PathBuf, StoreError> {
+        let month_folder = self.0.join(id.month());
+        private_dir_builder()
+            .create(&month_folder)
+            .map_err(|source| StoreError::CreateFolder {
+                path: month_folder.clone(),
+                source,
+            })?;
+        Ok(month_folder)
     }
 
     #[must_use]

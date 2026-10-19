@@ -18,6 +18,8 @@ pub struct SessionId(String);
 #[error("not a valid session id")]
 pub struct InvalidSessionId;
 
+const MONTH_LENGTH: usize = "0000-00".len();
+
 impl SessionId {
     pub fn parse(raw: &str) -> Result<SessionId, InvalidSessionId> {
         let parts: Vec<&str> = raw.split('-').collect();
@@ -42,6 +44,11 @@ impl SessionId {
     pub fn collision_candidates(&self) -> impl Iterator<Item = SessionId> + '_ {
         std::iter::once(self.clone())
             .chain((2..=MAX_COLLISION_SUFFIX).map(|suffix| self.with_collision_suffix(suffix)))
+    }
+
+    #[must_use]
+    pub fn month(&self) -> &str {
+        &self.0[..MONTH_LENGTH]
     }
 
     #[must_use]

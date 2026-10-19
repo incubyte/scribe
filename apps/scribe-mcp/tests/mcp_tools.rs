@@ -86,18 +86,25 @@ fn is_tool_error(result: &Value) -> bool {
 }
 
 fn folder_contents(folder: &Path) -> Vec<(String, Vec<u8>)> {
-    let mut files: Vec<(String, Vec<u8>)> = fs::read_dir(folder)
-        .unwrap()
-        .map(|entry| {
-            let path = entry.unwrap().path();
-            (
-                path.file_name().unwrap().to_string_lossy().into_owned(),
-                fs::read(path).unwrap(),
-            )
-        })
-        .collect();
+    let mut files = Vec::new();
+    collect_files(folder, folder, &mut files);
     files.sort();
     files
+}
+
+fn collect_files(root: &Path, folder: &Path, files: &mut Vec<(String, Vec<u8>)>) {
+    for entry in fs::read_dir(folder).unwrap() {
+        let path = entry.unwrap().path();
+        if path.is_dir() {
+            collect_files(root, &path, files);
+        } else {
+            let relative = path.strip_prefix(root).unwrap();
+            files.push((
+                relative.to_string_lossy().into_owned(),
+                fs::read(&path).unwrap(),
+            ));
+        }
+    }
 }
 
 #[tokio::test]

@@ -75,3 +75,17 @@ fn a_new_session_header_describes_a_recording_in_progress() {
         }
     );
 }
+
+#[test]
+fn a_session_id_knows_the_month_it_started_in() {
+    let id = SessionId::parse("2026-10-19-114521").unwrap();
+
+    assert_eq!(id.month(), "2026-10");
+}
+
+#[test]
+fn a_collision_suffixed_id_keeps_its_month() {
+    let id = SessionId::parse("2026-10-19-114521").unwrap();
+
+    assert_eq!(id.with_collision_suffix(2).month(), "2026-10");
+}

@@ -9,12 +9,11 @@ use scribe_core::recording::{
 };
 
 use crate::format::{parse_header, render_header, render_segment, split_front_matter};
+use crate::month_layout;
 use crate::private_file;
 use crate::reader;
 use crate::store_error::{file_name, io_error, malformed};
 use crate::transcripts_folder::TranscriptsFolder;
-
-const TRANSCRIPT_EXTENSION: &str = "md";
 
 pub struct MarkdownTranscriptStore {
     folder: TranscriptsFolder,
@@ -28,9 +27,7 @@ impl MarkdownTranscriptStore {
 
     #[must_use]
     pub fn path_for(&self, id: &SessionId) -> PathBuf {
-        self.folder
-            .path()
-            .join(format!("{id}.{TRANSCRIPT_EXTENSION}"))
+        month_layout::existing_path(self.folder.path(), id)
     }
 
     fn try_create(
@@ -38,7 +35,7 @@ impl MarkdownTranscriptStore {
         header: &SessionHeader,
         id: SessionId,
     ) -> Result<Option<SessionId>, StoreError> {
-        let path = self.path_for(&id);
+        let path = month_layout::month_path(self.folder.path(), &id);
         let header = header.clone().with_id(id.clone());
         match private_file::create_new(&path, &render_header(&header)) {
             Ok(()) => Ok(Some(id)),
@@ -48,22 +45,14 @@ impl MarkdownTranscriptStore {
     }
 
     fn transcript_paths(&self) -> Result<Vec<PathBuf>, StoreError> {
-        let entries = match fs::read_dir(self.folder.path()) {
-            Ok(entries) => entries,
-            Err(error) if error.kind() == ErrorKind::NotFound => return Ok(Vec::new()),
-            Err(source) => return Err(io_error(self.folder.path(), source)),
-        };
-        Ok(entries
-            .filter_map(Result::ok)
-            .map(|entry| entry.path())
-            .filter(|path| is_transcript(path))
-            .collect())
+        month_layout::transcript_paths_in(self.folder.path())
     }
 }
 
 impl TranscriptStore for MarkdownTranscriptStore {
     fn create(&self, header: &SessionHeader) -> Result<SessionId, StoreError> {
         self.folder.ensure_exists()?;
+        self.folder.ensure_month_exists(&header.id)?;
         for candidate in header.id.collision_candidates() {
             if let Some(id) = self.try_create(header, candidate)? {
                 return Ok(id);
@@ -149,11 +138,4 @@ fn replace_header(path: &Path, raw: &str, header: &SessionHeader) -> Result<(), 
     let (_, body) = split_front_matter(raw).map_err(|_| malformed(path))?;
     let rewritten = render_header(header) + body;
     private_file::replace_atomically(path, &rewritten).map_err(|source| io_error(path, source))
-}
-
-fn is_transcript(path: &Path) -> bool {
-    path.is_file()
-        && path
-            .extension()
-            .is_some_and(|extension| extension == TRANSCRIPT_EXTENSION)
 }
