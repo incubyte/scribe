@@ -412,3 +412,7 @@ On any `Err`, the command maps the error to `String` and calls `notify_transcrip
 
 ## Escalation log
 
+
+## Deferred follow-ups
+
+- **Cross-volume move paths have no automated test** (review F8/F21, medium). `copy_across_volumes`, the `.part` cleanup and the no-hard-link rename fallback in `crates/store-markdown/src/relocation.rs` only run when the destination is on another volume or a file system without hard links, which a tempdir cannot produce. Verify by hand: change the folder to a USB drive (exFAT) and to a second APFS volume, accept the move, and confirm every transcript arrives and none is left half-copied.

@@ -37,6 +37,8 @@ const FIVE_SESSIONS = [
 const INITIAL_FOLDER = "/Users/me/Documents/Scribe";
 const CHANGED_FOLDER = "/Users/me/Notes/Calls";
 let currentFolder = INITIAL_FOLDER;
+let readFolder: () => unknown = () => currentFolder;
+const defaultReadFolder = readFolder;
 let changeFolder: () => unknown = () => {
   currentFolder = CHANGED_FOLDER;
   return { outcome: "changed", folder: CHANGED_FOLDER, moved: 0, kept: 0 };
@@ -67,7 +69,7 @@ function backend(
     model_download_status: modelDownload,
     recent_sessions: recent,
     claude_desktop_status: "not_connected",
-    transcripts_folder: () => currentFolder,
+    transcripts_folder: () => readFolder(),
     change_transcripts_folder: () => changeFolder(),
   };
   const handler = vi.fn((command: string) => {
@@ -80,6 +82,7 @@ function backend(
 
 beforeEach(() => {
   currentFolder = INITIAL_FOLDER;
+  readFolder = defaultReadFolder;
   changeFolder = defaultChangeFolder;
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(NOW);
@@ -455,6 +458,22 @@ describe("the popover settings", () => {
     expect(
       await screen.findByText(`Transcripts folder: ${CHANGED_FOLDER}`),
     ).toBeInTheDocument();
+  });
+
+  it("announces when the transcripts folder cannot be read", async () => {
+    backend(idle);
+    readFolder = () => {
+      throw "settings unreadable";
+    };
+    render(<Popover />);
+
+    await openSettings();
+
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Scribe could not read the transcripts folder setting.",
+      ),
+    );
   });
 
   async function changeFolderAndReadStatus(outcome: () => unknown) {
