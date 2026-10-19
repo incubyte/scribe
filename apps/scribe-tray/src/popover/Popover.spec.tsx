@@ -12,6 +12,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { Popover } from "./Popover";
+import { CHANGE_LABEL } from "./SettingsPanel";
 import type { ModelDownload, RecorderSnapshot, SessionSummary } from "./types";
 
 const NOW = Date.parse("2026-10-17T09:10:00+00:00");
@@ -452,7 +453,7 @@ describe("the popover settings", () => {
     await openSettings();
 
     await userEvent.click(
-      screen.getByRole("button", { name: "Change Transcripts Folder" }),
+      screen.getByRole("button", { name: CHANGE_LABEL }),
     );
 
     expect(
@@ -482,7 +483,7 @@ describe("the popover settings", () => {
     render(<Popover />);
     await openSettings();
     await userEvent.click(
-      screen.getByRole("button", { name: "Change Transcripts Folder" }),
+      screen.getByRole("button", { name: CHANGE_LABEL }),
     );
     return screen.getByRole("status");
   }
@@ -564,7 +565,7 @@ describe("the popover settings", () => {
     changeFolder = () => ({ outcome: "unchanged" });
 
     await userEvent.click(
-      screen.getByRole("button", { name: "Change Transcripts Folder" }),
+      screen.getByRole("button", { name: CHANGE_LABEL }),
     );
 
     await waitFor(() => expect(status).toBeEmptyDOMElement());
