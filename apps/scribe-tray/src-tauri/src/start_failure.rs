@@ -83,7 +83,7 @@ impl StartFailureKind {
                 "The audio device could not be opened. Try again, or pick another device."
             }
             StartFailureKind::TranscriptsFolder => {
-                "The transcript could not be created in Documents/Scribe. Check the folder and try again."
+                "The transcript could not be created in your transcripts folder. Check the folder in Settings and try again."
             }
             StartFailureKind::SpeechEngine => {
                 "The on-device speech engine could not start. Try again in a moment."

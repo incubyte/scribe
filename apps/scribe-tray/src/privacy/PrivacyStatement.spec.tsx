@@ -22,7 +22,9 @@ describe("the privacy statement window", () => {
       screen.getByText("Nothing — audio or text — is sent to any server."),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("Transcripts are saved as text files in Documents/Scribe."),
+      screen.getByText(
+        "Transcripts are saved as text files in your transcripts folder, Documents/Scribe unless you change it in Settings.",
+      ),
     ).toBeInTheDocument();
     expect(screen.getAllByRole("button")).toHaveLength(1);
   });
@@ -39,7 +41,9 @@ describe("the privacy statement window", () => {
     const button = screen.getByRole("button", { name: "I understand" });
 
     expect(button).toHaveAccessibleDescription(/Speech is transcribed on-device\./);
-    expect(button).toHaveAccessibleDescription(/Transcripts are saved as text files in Documents\/Scribe\./);
+    expect(button).toHaveAccessibleDescription(
+      /Transcripts are saved as text files in your transcripts folder, Documents\/Scribe unless you change it in Settings\./,
+    );
   });
 
   it("acknowledges the statement when Enter is pressed", async () => {
