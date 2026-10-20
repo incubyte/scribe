@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { cancelRegion, completeRegion } from "./commands";
-import { isLargeEnough, rectBetween, toFramePoint } from "./selection";
-import type { ClientPoint, FramePoint, PixelRect, Size } from "./types";
+import { hasDraggedPastThreshold, isLargeEnough, rectBetween, toFramePoint } from "./selection";
+import type { ClientPoint, FramePoint, FrozenFrame, PixelRect, Size } from "./types";
+import { topmostOutlineAt } from "./windowHitTest";
 
 const PRIMARY_BUTTON = 0;
 
@@ -9,9 +10,11 @@ const viewport = (): Size => ({ width: window.innerWidth, height: window.innerHe
 
 const pointIn = (frame: Size, pointer: ClientPoint) => toFramePoint(pointer, viewport(), frame);
 
-export function useRegionDrag(frame: Size | undefined) {
+export function useRegionDrag(frame: FrozenFrame | undefined) {
   const [anchor, setAnchor] = useState<FramePoint>();
   const [selection, setSelection] = useState<PixelRect>();
+  const [highlight, setHighlight] = useState<PixelRect>();
+  const pressedAt = useRef<ClientPoint>({ clientX: 0, clientY: 0 });
 
   const submit = (area: PixelRect) => {
     if (!isLargeEnough(area)) {
@@ -32,14 +35,20 @@ export function useRegionDrag(frame: Size | undefined) {
     if (!frame || event.button !== PRIMARY_BUTTON) {
       return;
     }
-    const point = pointIn(frame, event);
-    setAnchor(point);
-    setSelection(rectBetween(point, point));
+    pressedAt.current = { clientX: event.clientX, clientY: event.clientY };
+    setAnchor(pointIn(frame, event));
   };
 
   const extend = (event: React.PointerEvent) => {
-    if (frame && anchor) {
-      setSelection(rectBetween(anchor, pointIn(frame, event)));
+    if (!frame) {
+      return;
+    }
+    const point = pointIn(frame, event);
+    if (!anchor) {
+      setHighlight(topmostOutlineAt(point, frame.outlines));
+    } else if (selection || hasDraggedPastThreshold(pressedAt.current, event)) {
+      setHighlight(undefined);
+      setSelection(rectBetween(anchor, point));
     }
   };
 
@@ -48,8 +57,15 @@ export function useRegionDrag(frame: Size | undefined) {
       return;
     }
     setAnchor(undefined);
-    submit(rectBetween(anchor, pointIn(frame, event)));
+    if (selection) {
+      submit(rectBetween(anchor, pointIn(frame, event)));
+      return;
+    }
+    const clicked = topmostOutlineAt(anchor, frame.outlines);
+    if (clicked) {
+      submit(clicked);
+    }
   };
 
-  return { selection, start, extend, release };
+  return { area: selection ?? highlight, start, extend, release };
 }

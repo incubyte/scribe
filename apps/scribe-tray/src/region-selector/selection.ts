@@ -1,6 +1,7 @@
 import type { ClientPoint, FramePoint, PixelRect, Size } from "./types";
 
 export const MIN_SELECTION_EDGE_PX = 4;
+export const DRAG_THRESHOLD_PX = 4;
 
 const clamp = (value: number, lowest: number, highest: number) =>
   Math.min(Math.max(value, lowest), highest);
@@ -28,3 +29,7 @@ export const isLargeEnough = (rect: PixelRect) =>
   rect.width >= MIN_SELECTION_EDGE_PX && rect.height >= MIN_SELECTION_EDGE_PX;
 
 export const sizeLabel = (rect: PixelRect) => `${rect.width} × ${rect.height}`;
+
+export const hasDraggedPastThreshold = (origin: ClientPoint, current: ClientPoint) =>
+  Math.hypot(current.clientX - origin.clientX, current.clientY - origin.clientY) >
+  DRAG_THRESHOLD_PX;

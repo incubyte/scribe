@@ -1,6 +1,9 @@
 #![allow(unsafe_code)]
 
-use scribe_core::capture::{Frame, MonitorPlacement, MonitorShot, PlacementUnits};
+use crate::outlines::window_candidates;
+use scribe_core::capture::{
+    Frame, MonitorPlacement, MonitorShot, PlacementUnits, visible_outlines,
+};
 use scribe_core::ports::{CaptureAccess, ScreenCaptureError, ScreenCapturer};
 use windows::Win32::Foundation::POINT;
 use windows::Win32::UI::WindowsAndMessaging::GetCursorPos;
@@ -27,13 +30,15 @@ impl ScreenCapturer for DesktopCapturer {
         let pointer = pointer_location()?;
         let monitor = Monitor::from_point(pointer.x, pointer.y)
             .map_err(|_| ScreenCaptureError::NoMonitorUnderPointer)?;
+        let windows = window_candidates(std::process::id());
         let image = monitor.capture_image().map_err(failed)?;
         let frame = Frame::new(image.width(), image.height(), image.into_raw())
             .map_err(|error| ScreenCaptureError::Failed(error.to_string()))?;
+        let placement = placement_of(&monitor)?;
         Ok(MonitorShot {
+            outlines: visible_outlines(&windows, &placement, frame.width(), frame.height()),
             frame,
-            outlines: Vec::new(),
-            placement: placement_of(&monitor)?,
+            placement,
         })
     }
 }

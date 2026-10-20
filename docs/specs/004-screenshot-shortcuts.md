@@ -318,12 +318,12 @@ In the region selector, moving the pointer highlights the window under it and sh
 
 **Acceptance criteria**
 
-- [ ] **5.7.1** In the selector, the topmost visible app window under the pointer on that monitor is outlined, with its `W × H` in output pixels.
-- [ ] **5.7.2** Clicking without dragging captures the highlighted window's visible rectangle, clipped to the monitor. It goes to the same destinations as a dragged region.
-- [ ] **5.7.3** Starting a drag clears the highlight and selects a free region, as in 5.6.
-- [ ] **5.7.4** The desktop wallpaper, the menu bar, Dock or taskbar, Scribe's own windows, and windows on other monitors are never highlighted.
-- [ ] **5.7.5** Clicking where no window is highlighted captures nothing and leaves the selector open.
-- [ ] **5.7.6** Window outlines are taken at the same instant as the Frame. A window that moves after the press does not shift its highlight.
+- [x] **5.7.1** In the selector, the topmost visible app window under the pointer on that monitor is outlined, with its `W × H` in output pixels.
+- [x] **5.7.2** Clicking without dragging captures the highlighted window's visible rectangle, clipped to the monitor. It goes to the same destinations as a dragged region.
+- [x] **5.7.3** Starting a drag clears the highlight and selects a free region, as in 5.6.
+- [x] **5.7.4** The desktop wallpaper, the menu bar, Dock or taskbar, Scribe's own windows, and windows on other monitors are never highlighted.
+- [x] **5.7.5** Clicking where no window is highlighted captures nothing and leaves the selector open.
+- [x] **5.7.6** Window outlines are taken at the same instant as the Frame. A window that moves after the press does not shift its highlight.
 
 ### 5.8 Rebind the screenshot shortcuts in Settings
 

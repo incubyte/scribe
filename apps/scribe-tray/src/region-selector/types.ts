@@ -10,6 +10,10 @@ export interface FramePoint {
 
 export interface PixelRect extends FramePoint, Size {}
 
+export interface FrozenFrame extends Size {
+  readonly outlines: readonly PixelRect[];
+}
+
 export interface ClientPoint {
   readonly clientX: number;
   readonly clientY: number;

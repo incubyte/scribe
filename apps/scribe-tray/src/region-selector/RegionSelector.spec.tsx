@@ -4,15 +4,17 @@ import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { RegionSelector } from "./RegionSelector";
-import type { RegionCompletion } from "./types";
+import type { PixelRect, RegionCompletion } from "./types";
 
 const INSTRUCTION = "Region capture. Drag to select, Escape to cancel.";
 const TWICE_THE_VIEWPORT = { frame_width: 2048, frame_height: 1536, outlines: [] };
 const CAPTURED: RegionCompletion = { outcome: "captured" };
 
-function backend(completion: RegionCompletion = CAPTURED) {
+const BROWSER_WINDOW: PixelRect = { x: 200, y: 100, width: 600, height: 400 };
+
+function backend(completion: RegionCompletion = CAPTURED, outlines: PixelRect[] = []) {
   const responses: Readonly<Record<string, unknown>> = {
-    region_context: TWICE_THE_VIEWPORT,
+    region_context: { ...TWICE_THE_VIEWPORT, outlines },
     region_frame: new ArrayBuffer(16),
     complete_region: completion,
     cancel_region: null,
@@ -126,6 +128,64 @@ describe("the region selector", () => {
 
     await waitFor(() => expect(screen.queryByText("200 × 100")).not.toBeInTheDocument());
     expect(handler).not.toHaveBeenCalledWith("cancel_region", expect.anything());
+  });
+
+  it("outlines the window under the pointer with its size in output pixels", async () => {
+    backend(CAPTURED, [BROWSER_WINDOW]);
+    const selector = await renderWithFrame();
+
+    fireEvent.pointerMove(selector, { clientX: 200, clientY: 100 });
+
+    expect(screen.getByText("600 × 400")).toBeInTheDocument();
+  });
+
+  it("captures the highlighted window's rectangle when clicked without dragging", async () => {
+    const handler = backend(CAPTURED, [BROWSER_WINDOW]);
+    const selector = await renderWithFrame();
+
+    fireEvent.pointerMove(selector, { clientX: 200, clientY: 100 });
+    drag(selector, [200, 100], [200, 100]);
+
+    await waitFor(() => {
+      expect(handler).toHaveBeenCalledWith("complete_region", { area: BROWSER_WINDOW });
+    });
+  });
+
+  it("clears the highlight and selects a free region once a drag starts", async () => {
+    const handler = backend(CAPTURED, [BROWSER_WINDOW]);
+    const selector = await renderWithFrame();
+
+    fireEvent.pointerMove(selector, { clientX: 200, clientY: 100 });
+    drag(selector, [200, 100], [250, 150]);
+
+    expect(screen.queryByText("600 × 400")).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(handler).toHaveBeenCalledWith("complete_region", {
+        area: { x: 400, y: 200, width: 100, height: 100 },
+      });
+    });
+  });
+
+  it("captures nothing and stays open when clicking where no window is highlighted", async () => {
+    const handler = backend(CAPTURED, [BROWSER_WINDOW]);
+    const selector = await renderWithFrame();
+
+    drag(selector, [10, 20], [10, 20]);
+
+    expect(handler).not.toHaveBeenCalledWith("complete_region", expect.anything());
+    expect(handler).not.toHaveBeenCalledWith("cancel_region", expect.anything());
+  });
+
+  it("fetches the window outlines once so later pointer moves cannot shift them", async () => {
+    const handler = backend(CAPTURED, [BROWSER_WINDOW]);
+    const selector = await renderWithFrame();
+
+    fireEvent.pointerMove(selector, { clientX: 200, clientY: 100 });
+    fireEvent.pointerMove(selector, { clientX: 300, clientY: 150 });
+
+    const contextFetches = handler.mock.calls.filter(([command]) => command === "region_context");
+    expect(contextFetches).toHaveLength(1);
+    expect(screen.getByText("600 × 400")).toBeInTheDocument();
   });
 
   it("has no accessibility violations", async () => {

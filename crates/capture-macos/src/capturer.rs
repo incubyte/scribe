@@ -2,12 +2,20 @@ use std::sync::mpsc::{self, SyncSender};
 use std::time::Duration;
 
 use cidre::{arc, blocks, cg, ns, sc};
-use scribe_core::capture::{MonitorPlacement, MonitorShot, PlacementUnits};
+use scribe_core::capture::{
+    MonitorPlacement, MonitorShot, PlacementUnits, WindowCandidate, visible_outlines,
+};
 use scribe_core::ports::{CaptureAccess, ScreenCaptureError, ScreenCapturer};
 
+use crate::outlines::window_candidates;
 use crate::rgba::rgba_of;
 
 const CAPTURE_TIMEOUT: Duration = Duration::from_secs(5);
+
+struct CaptureTarget {
+    display: arc::R<sc::Display>,
+    windows: Vec<WindowCandidate>,
+}
 
 type ShotDelivery = SyncSender<Result<MonitorShot, ScreenCaptureError>>;
 
@@ -39,10 +47,10 @@ impl ScreenCapturer for ScreenCaptureKitCapturer {
         let pointer = pointer_location()?;
         let (delivery, delivered) = mpsc::sync_channel(1);
         sc::ShareableContent::current_with_ch(move |content, error| {
-            let display = content
+            let target = content
                 .ok_or_else(|| capture_error(error))
-                .and_then(|content| display_under(content, pointer));
-            capture_or_report(display, &delivery);
+                .and_then(|content| target_under(content, pointer));
+            capture_or_report(target, &delivery);
         });
         delivered
             .recv_timeout(CAPTURE_TIMEOUT)
@@ -56,31 +64,33 @@ fn pointer_location() -> Result<cg::Point, ScreenCaptureError> {
         .ok_or_else(|| failed("the pointer location is unavailable"))
 }
 
-fn capture_or_report(
-    display: Result<arc::R<sc::Display>, ScreenCaptureError>,
-    delivery: &ShotDelivery,
-) {
-    match display {
-        Ok(display) => capture_display(&display, delivery.clone()),
+fn capture_or_report(target: Result<CaptureTarget, ScreenCaptureError>, delivery: &ShotDelivery) {
+    match target {
+        Ok(target) => capture_display(&target.display, target.windows, delivery.clone()),
         Err(error) => {
             let _ = delivery.send(Err(error));
         }
     }
 }
 
-fn display_under(
+fn target_under(
     content: &sc::ShareableContent,
     pointer: cg::Point,
-) -> Result<arc::R<sc::Display>, ScreenCaptureError> {
-    content
+) -> Result<CaptureTarget, ScreenCaptureError> {
+    let display = content
         .displays()
         .iter()
         .find(|display| display.frame().contains_point(&pointer))
         .map(sc::Display::retained)
-        .ok_or(ScreenCaptureError::NoMonitorUnderPointer)
+        .ok_or(ScreenCaptureError::NoMonitorUnderPointer)?;
+    let own_pid = i32::try_from(std::process::id()).unwrap_or_default();
+    Ok(CaptureTarget {
+        display,
+        windows: window_candidates(content, own_pid),
+    })
 }
 
-fn capture_display(display: &sc::Display, delivery: ShotDelivery) {
+fn capture_display(display: &sc::Display, windows: Vec<WindowCandidate>, delivery: ShotDelivery) {
     let placement = placement_of(display.frame());
     let filter = sc::ContentFilter::with_display_excluding_windows(display, &ns::Array::new());
     let config = native_size_config(&filter);
@@ -90,8 +100,8 @@ fn capture_display(display: &sc::Display, delivery: ShotDelivery) {
                 .ok_or_else(|| capture_error(error))
                 .and_then(rgba_of)
                 .map(|frame| MonitorShot {
+                    outlines: visible_outlines(&windows, &placement, frame.width(), frame.height()),
                     frame,
-                    outlines: Vec::new(),
                     placement,
                 });
             let _ = delivery.send(shot);

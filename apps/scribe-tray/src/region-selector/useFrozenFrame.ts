@@ -1,6 +1,6 @@
 import { type RefObject, useEffect, useState } from "react";
 import { cancelRegion, fetchRegionContext, fetchRegionFrame } from "./commands";
-import type { Size } from "./types";
+import type { FrozenFrame, Size } from "./types";
 
 function paintFrame(canvas: HTMLCanvasElement | null, rgba: ArrayBuffer, frame: Size) {
   const context = canvas?.getContext("2d");
@@ -13,8 +13,8 @@ function paintFrame(canvas: HTMLCanvasElement | null, rgba: ArrayBuffer, frame: 
   context.putImageData(pixels, 0, 0);
 }
 
-export function useFrozenFrame(canvas: RefObject<HTMLCanvasElement | null>): Size | undefined {
-  const [frame, setFrame] = useState<Size>();
+export function useFrozenFrame(canvas: RefObject<HTMLCanvasElement | null>): FrozenFrame | undefined {
+  const [frame, setFrame] = useState<FrozenFrame>();
 
   useEffect(() => {
     let mounted = true;
@@ -23,7 +23,7 @@ export function useFrozenFrame(canvas: RefObject<HTMLCanvasElement | null>): Siz
         const size = { width: context.frame_width, height: context.frame_height };
         if (mounted) {
           paintFrame(canvas.current, rgba, size);
-          setFrame(size);
+          setFrame({ ...size, outlines: context.outlines });
         }
       })
       .catch(() => void cancelRegion());

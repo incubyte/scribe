@@ -55,7 +55,7 @@ function SelectedArea({ area, frame }: Readonly<{ area: PixelRect; frame: Size }
 export function RegionSelector() {
   const canvas = useRef<HTMLCanvasElement>(null);
   const frame = useFrozenFrame(canvas);
-  const { selection, start, extend, release } = useRegionDrag(frame);
+  const { area, start, extend, release } = useRegionDrag(frame);
   const announcement = useAnnouncementOnMount(INSTRUCTION);
   useEscapeToCancel();
 
@@ -74,8 +74,8 @@ export function RegionSelector() {
       onContextMenu={cancelOnRightClick}
     >
       <canvas ref={canvas} className="region-selector__frame" aria-hidden="true" />
-      {selection && frame ? (
-        <SelectedArea area={selection} frame={frame} />
+      {area && frame ? (
+        <SelectedArea area={area} frame={frame} />
       ) : (
         <div className="region-selector__dim" />
       )}
