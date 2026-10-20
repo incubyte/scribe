@@ -1,4 +1,4 @@
-use scribe_core::capture::ScreenshotReference;
+use scribe_core::capture::{ScreenshotReference, ServedImage};
 
 const SESSION: &str = "2026-10-20-143005";
 
@@ -43,4 +43,29 @@ fn a_name_that_is_not_a_png_screenshot_name_is_rejected() {
     assert!(ScreenshotReference::parse("2026-10-20-143005/00-12-34").is_err());
     assert!(ScreenshotReference::parse("2026-10-20-143005/2026-10-20-143005.md").is_err());
     assert!(ScreenshotReference::parse("2026-10-20-143005/").is_err());
+}
+
+fn served(width: u32, height: u32, original: (u32, u32)) -> ServedImage {
+    ServedImage {
+        png: Vec::new(),
+        width,
+        height,
+        original_width: original.0,
+        original_height: original.1,
+    }
+}
+
+#[test]
+fn an_image_served_at_its_original_size_was_not_scaled() {
+    assert!(!served(800, 600, (800, 600)).was_scaled());
+}
+
+#[test]
+fn an_image_served_smaller_than_the_original_was_scaled() {
+    assert!(served(400, 300, (800, 600)).was_scaled());
+}
+
+#[test]
+fn an_image_whose_height_alone_differs_was_scaled() {
+    assert!(served(800, 300, (800, 600)).was_scaled());
 }

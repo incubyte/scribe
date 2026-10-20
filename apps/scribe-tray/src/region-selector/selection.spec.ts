@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { isLargeEnough, rectBetween, sizeLabel, sizeLabelAnchor, toFramePoint } from "./selection";
+import {
+  hasDraggedPastThreshold,
+  isLargeEnough,
+  rectBetween,
+  sizeLabel,
+  sizeLabelAnchor,
+  toFramePoint,
+} from "./selection";
 
 const RETINA_VIEWPORT = { width: 1440, height: 900 };
 const RETINA_FRAME = { width: 2880, height: 1800 };
@@ -35,11 +42,25 @@ describe("a dragged selection", () => {
   it("is too small to capture below 4 by 4 pixels", () => {
     expect(isLargeEnough({ x: 0, y: 0, width: 3, height: 3 })).toBe(false);
     expect(isLargeEnough({ x: 0, y: 0, width: 4, height: 3 })).toBe(false);
+    expect(isLargeEnough({ x: 0, y: 0, width: 3, height: 4 })).toBe(false);
     expect(isLargeEnough({ x: 0, y: 0, width: 4, height: 4 })).toBe(true);
   });
 
   it("reads out its size as width by height in output pixels", () => {
     expect(sizeLabel({ x: 10, y: 20, width: 1240, height: 680 })).toBe("1240 × 680");
+  });
+});
+
+describe("telling a click from a drag", () => {
+  const pressed = { clientX: 10, clientY: 10 };
+
+  it("is still a click while the pointer stays within 4 pixels", () => {
+    expect(hasDraggedPastThreshold(pressed, { clientX: 14, clientY: 10 })).toBe(false);
+  });
+
+  it("is a drag once the pointer moves further than 4 pixels", () => {
+    expect(hasDraggedPastThreshold(pressed, { clientX: 15, clientY: 10 })).toBe(true);
+    expect(hasDraggedPastThreshold(pressed, { clientX: 10, clientY: 15 })).toBe(true);
   });
 });
 
@@ -83,5 +104,17 @@ describe("where the size readout sits next to a selection", () => {
 
     expect(anchor.x).toBeLessThan(1950);
     expect(anchor.x).toBeGreaterThan(1700);
+  });
+
+  it("opens below when the readout fits exactly above the bottom edge", () => {
+    const area = { x: 0, y: 0, width: 100, height: 936 };
+
+    expect(sizeLabelAnchor(area, frame, viewport)).toEqual({ x: 0, y: 936, opensUpward: false });
+  });
+
+  it("opens upward from the top edge when the selection starts exactly one clearance below the top", () => {
+    const area = { x: 0, y: 64, width: 100, height: 936 };
+
+    expect(sizeLabelAnchor(area, frame, viewport)).toEqual({ x: 0, y: 64, opensUpward: true });
   });
 });

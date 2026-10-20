@@ -21,4 +21,14 @@ describe("finding the window under the pointer", () => {
     expect(topmostOutlineAt({ x: 300, y: 150 }, [FRONT_WINDOW])).toBeUndefined();
     expect(topmostOutlineAt({ x: 150, y: 200 }, [FRONT_WINDOW])).toBeUndefined();
   });
+
+  it("treats the left and top edges as inside the window", () => {
+    expect(topmostOutlineAt({ x: 100, y: 150 }, [FRONT_WINDOW])).toBe(FRONT_WINDOW);
+    expect(topmostOutlineAt({ x: 150, y: 100 }, [FRONT_WINDOW])).toBe(FRONT_WINDOW);
+  });
+
+  it("finds nothing to the left of or above a window", () => {
+    expect(topmostOutlineAt({ x: 50, y: 150 }, [FRONT_WINDOW])).toBeUndefined();
+    expect(topmostOutlineAt({ x: 150, y: 50 }, [FRONT_WINDOW])).toBeUndefined();
+  });
 });

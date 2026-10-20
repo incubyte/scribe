@@ -179,9 +179,9 @@ fn parse_stored(raw: &Value) -> Result<ShortcutBinding, String> {
     let shortcut = text
         .parse::<Shortcut>()
         .map_err(|error| error.to_string())?;
-    let has_anchor_modifier = shortcut
-        .mods
-        .intersects(Modifiers::CONTROL | Modifiers::ALT | Modifiers::SUPER);
+    let has_anchor_modifier = [Modifiers::CONTROL, Modifiers::ALT, Modifiers::SUPER]
+        .into_iter()
+        .any(|modifier| shortcut.mods.contains(modifier));
     let keys = shortcut.into_string();
     let key = keys.rsplit('+').next().unwrap_or_default();
     if has_anchor_modifier && is_supported_key(key) {

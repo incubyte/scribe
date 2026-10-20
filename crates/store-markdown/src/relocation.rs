@@ -19,7 +19,7 @@ pub struct MoveReport {
     pub kept: usize,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 enum MoveOutcome {
     Moved,
     Kept,
@@ -68,12 +68,20 @@ fn move_folder(source: &Path, destination: &Path) -> io::Result<MoveOutcome> {
     if destination.symlink_metadata().is_ok() {
         return Ok(MoveOutcome::Kept);
     }
-    match fs::rename(source, destination) {
-        Ok(()) => Ok(MoveOutcome::Moved),
-        Err(error) if error.kind() == ErrorKind::CrossesDevices => {
-            copy_folder_across_volumes(source, destination)
-        }
-        Err(error) => Err(error),
+    fs::rename(source, destination)
+        .map(|()| MoveOutcome::Moved)
+        .or_else(|error| copy_folder_if_crossing_volumes(error, source, destination))
+}
+
+fn copy_folder_if_crossing_volumes(
+    refusal: io::Error,
+    source: &Path,
+    destination: &Path,
+) -> io::Result<MoveOutcome> {
+    if refusal.kind() == ErrorKind::CrossesDevices {
+        copy_folder_across_volumes(source, destination)
+    } else {
+        Err(refusal)
     }
 }
 
@@ -206,6 +214,40 @@ mod tests {
             (TRANSCRIPT_NAME.to_owned(), "transcript".to_owned()),
             ("00-00-04.png".to_owned(), "screenshot".to_owned()),
         ])
+    }
+
+    #[test]
+    fn a_rename_refused_for_crossing_volumes_is_retried_as_a_copy() {
+        let parent = tempfile::tempdir().unwrap();
+        let source = session_folder_with_screenshot(parent.path());
+        let destination = parent.path().join("copy");
+
+        let outcome = copy_folder_if_crossing_volumes(
+            io::Error::from(ErrorKind::CrossesDevices),
+            &source,
+            &destination,
+        )
+        .unwrap();
+
+        assert!(matches!(outcome, MoveOutcome::Moved));
+        assert_eq!(files_in(&destination), complete_session());
+    }
+
+    #[test]
+    fn a_rename_refused_for_any_other_reason_is_not_retried_as_a_copy() {
+        let parent = tempfile::tempdir().unwrap();
+        let source = session_folder_with_screenshot(parent.path());
+        let destination = parent.path().join("copy");
+
+        let outcome = copy_folder_if_crossing_volumes(
+            io::Error::from(ErrorKind::PermissionDenied),
+            &source,
+            &destination,
+        );
+
+        assert_eq!(outcome.unwrap_err().kind(), ErrorKind::PermissionDenied);
+        assert!(!destination.exists());
+        assert_eq!(files_in(&source), complete_session());
     }
 
     #[test]

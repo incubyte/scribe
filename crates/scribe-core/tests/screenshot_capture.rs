@@ -50,6 +50,26 @@ fn a_capture_while_recording_is_saved_into_that_session_at_the_offset_of_the_pre
         }
     );
     assert_eq!(store.screenshot(&session(), &name), Some(monitor()));
+    assert_eq!(store.saved_count(), 1);
+}
+
+#[test]
+fn a_capture_with_screen_access_captures_without_asking_for_access() {
+    let store = Arc::new(InMemoryScreenshotStore::default());
+    let capturer = Arc::new(FakeScreenCapturer::showing(shot_of(monitor())));
+    let taker = ScreenshotTaker::new(capturer.clone(), store);
+
+    taker.begin(None).unwrap();
+
+    assert_eq!(capturer.access_requests(), 0);
+    assert_eq!(capturer.captures_attempted(), 1);
+}
+
+#[test]
+fn a_frame_exposes_the_pixels_it_was_built_from() {
+    let frame = Frame::new(1, 1, vec![1, 2, 3, 4]).unwrap();
+
+    assert_eq!(frame.rgba(), [1, 2, 3, 4]);
 }
 
 #[test]

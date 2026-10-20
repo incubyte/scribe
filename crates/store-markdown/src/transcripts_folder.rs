@@ -102,3 +102,32 @@ fn restrict_to_owner(builder: &mut DirBuilder) {
 
 #[cfg(not(unix))]
 fn restrict_to_owner(_builder: &mut DirBuilder) {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_session_folder_cannot_be_made_where_its_month_folder_is_missing() {
+        let parent = tempfile::tempdir().unwrap();
+        let folder = TranscriptsFolder::at(parent.path().join("Scribe"));
+        let id = SessionId::parse("2026-10-20-143005").unwrap();
+
+        let result = folder.ensure_session_folder_exists(&id);
+
+        assert!(matches!(result, Err(StoreError::CreateFolder { .. })));
+    }
+
+    #[test]
+    fn a_session_folder_that_already_exists_is_reported_as_taken() {
+        let parent = tempfile::tempdir().unwrap();
+        let folder = TranscriptsFolder::at(parent.path().join("Scribe"));
+        let id = SessionId::parse("2026-10-20-143005").unwrap();
+        folder.ensure_month_exists(&id).unwrap();
+        folder.ensure_session_folder_exists(&id).unwrap();
+
+        let second = folder.ensure_session_folder_exists(&id).unwrap();
+
+        assert_eq!(second, None);
+    }
+}

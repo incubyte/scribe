@@ -215,6 +215,18 @@ fn a_session_with_no_screenshot_folder_lists_nothing() {
 }
 
 #[test]
+fn a_session_folder_that_cannot_be_read_is_an_error_not_an_empty_list() {
+    let parent = tempfile::tempdir().unwrap();
+    let recording = Recording::started_in(parent.path());
+    fs::remove_dir_all(&recording.session_folder).unwrap();
+    fs::write(&recording.session_folder, b"not a folder").unwrap();
+
+    let listed = ScreenshotStore::list_screenshots(&recording.store, &recording.id);
+
+    assert!(matches!(listed, Err(StoreError::Io { .. })));
+}
+
+#[test]
 fn only_files_named_like_screenshots_are_listed() {
     let parent = tempfile::tempdir().unwrap();
     let recording = Recording::started_in(parent.path());
@@ -246,6 +258,19 @@ fn a_screenshot_over_the_limit_is_served_scaled_to_the_limit_keeping_its_ratio()
         (5120, 2880)
     );
     assert_eq!(decoded_size(&served.png), (1568, 882));
+}
+
+#[test]
+fn a_scaled_edge_is_rounded_to_the_nearest_pixel() {
+    let parent = tempfile::tempdir().unwrap();
+    let recording = Recording::started_in(parent.path());
+    recording
+        .save_at(TWELVE_MINUTES_THIRTY_FOUR, &frame_filled(1000, 705, RED))
+        .unwrap();
+
+    let served = recording.serve("00-12-34.png", 100).unwrap();
+
+    assert_eq!((served.width, served.height), (100, 71));
 }
 
 #[test]

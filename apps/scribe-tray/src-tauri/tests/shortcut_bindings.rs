@@ -131,6 +131,29 @@ fn a_combination_needs_a_letter_digit_or_function_key() {
 }
 
 #[test]
+fn a_letter_or_digit_key_must_be_a_single_well_formed_key() {
+    for code in ["KeyAB", "Keya", "Key", "Digit12", "DigitX", "Digit"] {
+        assert_eq!(
+            ShortcutBinding::from_pressed(&with_control(code)),
+            Err(BindingProblem::NeedsModifier),
+            "{code} should not be accepted"
+        );
+    }
+}
+
+#[test]
+fn each_shortcut_kind_is_remembered_under_its_own_setting() {
+    assert_eq!(
+        ShortcutKind::FullScreen.storage_key(),
+        "screenshot_shortcut_full_screen"
+    );
+    assert_eq!(
+        ShortcutKind::Region.storage_key(),
+        "screenshot_shortcut_region"
+    );
+}
+
+#[test]
 fn a_combination_bound_to_the_other_row_is_a_duplicate_of_it() {
     let bindings = default_bindings(Platform::MacOs);
     let region_keys = bindings.get(ShortcutKind::Region).clone();

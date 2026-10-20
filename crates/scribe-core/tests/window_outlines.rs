@@ -128,3 +128,15 @@ fn never_outlines_scribes_own_windows_or_non_app_windows() {
 
     assert_eq!(bounds, [rect(400, 100, (200, 200))]);
 }
+
+#[test]
+fn drops_a_window_wholly_above_or_below_the_monitor() {
+    let candidates = [
+        window(100.0, 700.0, (300.0, 200.0)),
+        window(100.0, -300.0, (300.0, 200.0)),
+    ];
+
+    let bounds = bounds_of(&candidates, &MONITOR_POINTS, (1000, 600));
+
+    assert!(bounds.is_empty());
+}
