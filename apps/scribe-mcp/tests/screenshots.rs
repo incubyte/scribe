@@ -15,6 +15,7 @@ use scribe_core::ports::{ScreenshotStore, TranscriptStore};
 use scribe_core::recording::{SessionHeader, SessionId};
 use scribe_core::testing::frame_filled;
 use scribe_mcp::server::ScribeServer;
+use scribe_mcp::transcripts_location::TranscriptsLocation;
 use serde_json::{Value, json};
 use store_markdown::{MarkdownTranscriptStore, TranscriptsFolder};
 
@@ -67,9 +68,10 @@ impl Call {
 
     async fn connect(&self) -> RunningService<RoleClient, ()> {
         let library = TranscriptLibrary::new(self.store.clone(), self.store.clone());
+        let location = TranscriptsLocation::Fixed(TranscriptsFolder::at(self.folder.clone()));
         let (server_side, client_side) = tokio::io::duplex(DUPLEX_BUFFER_BYTES);
         tokio::spawn(async move {
-            ScribeServer::new(library)
+            ScribeServer::new(library, location)
                 .serve(server_side)
                 .await?
                 .waiting()

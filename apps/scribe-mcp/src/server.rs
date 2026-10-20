@@ -4,23 +4,26 @@ use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{CallToolResult, ContentBlock};
 use rmcp::{Json, ServerHandler, tool, tool_handler, tool_router};
 use scribe_core::library::{LibraryError, SearchQuery, TranscriptLibrary};
+use scribe_core::ports::StoreError;
 use scribe_core::recording::SessionId;
 
 use crate::requests::{
     GetScreenshotRequest, GetTranscriptRequest, ListTranscriptsRequest, SearchResults,
-    SearchTranscriptsRequest, TranscriptList,
+    SearchTranscriptsRequest, TranscriptList, TranscriptsFolderDto,
 };
 use crate::screenshot_listing::{MAX_SERVED_EDGE_PX, screenshots_section, served_label};
+use crate::transcripts_location::TranscriptsLocation;
 
 #[derive(Clone)]
 pub struct ScribeServer {
     library: TranscriptLibrary,
+    location: TranscriptsLocation,
 }
 
 impl ScribeServer {
     #[must_use]
-    pub fn new(library: TranscriptLibrary) -> ScribeServer {
-        ScribeServer { library }
+    pub fn new(library: TranscriptLibrary, location: TranscriptsLocation) -> ScribeServer {
+        ScribeServer { library, location }
     }
 }
 
@@ -89,6 +92,17 @@ impl ScribeServer {
             .map_err(|error| report(&error))?;
         Ok(Json(SearchResults::from(hits)))
     }
+
+    #[tool(
+        description = "Return the folder on this computer where Scribe saves call transcripts, as an absolute path. Useful only to an AI app that can read local files itself, such as Claude Code; to read a call, use get_transcript instead. The user can move this folder in Scribe's settings, so ask again rather than remembering it."
+    )]
+    async fn get_transcripts_folder(&self) -> Result<Json<TranscriptsFolderDto>, String> {
+        let folder = self
+            .location
+            .current()
+            .map_err(|error| report_location(&error))?;
+        Ok(Json(TranscriptsFolderDto::from(&folder)))
+    }
 }
 
 impl ScribeServer {
@@ -108,8 +122,13 @@ fn report(error: &LibraryError) -> String {
     error.to_string()
 }
 
+fn report_location(error: &StoreError) -> String {
+    tracing::warn!(%error, "the transcripts folder could not be located");
+    error.to_string()
+}
+
 #[tool_handler(
     name = "scribe",
-    instructions = "Scribe records the user's calls and meetings on this computer and saves each one as a transcript, with the user's lines marked Me and the other side marked Them. Use these tools when the user asks about their Scribe calls, their meetings, or what someone said on a call. Nothing here leaves the computer."
+    instructions = "Scribe records the user's calls and meetings on this computer and saves each one as a transcript, with the user's lines marked Me and the other side marked Them. Use these tools when the user asks about their Scribe calls, their meetings, or what someone said on a call. Transcripts stay on this computer until you read one with these tools."
 )]
 impl ServerHandler for ScribeServer {}

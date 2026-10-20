@@ -4,6 +4,7 @@ use rmcp::ServiceExt;
 use scribe_core::library::TranscriptLibrary;
 use scribe_mcp::following_store::SettingsFollowingStore;
 use scribe_mcp::server::ScribeServer;
+use scribe_mcp::transcripts_location::TranscriptsLocation;
 use scribe_mcp::transport::bounded_stdio;
 use store_markdown::{MarkdownTranscriptStore, TranscriptsFolder, default_settings_path};
 
@@ -13,7 +14,8 @@ async fn main() -> anyhow::Result<()> {
         .with_writer(std::io::stderr)
         .with_ansi(false)
         .init();
-    ScribeServer::new(build_library()?)
+    let location = locate_transcripts()?;
+    ScribeServer::new(build_library(&location)?, location)
         .serve(bounded_stdio())
         .await?
         .waiting()
@@ -21,14 +23,22 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn build_library() -> anyhow::Result<TranscriptLibrary> {
-    Ok(if let Some(settings_path) = default_settings_path() {
-        let store = Arc::new(SettingsFollowingStore::new(settings_path)?);
-        TranscriptLibrary::new(store.clone(), store)
-    } else {
-        let store = Arc::new(MarkdownTranscriptStore::new(
-            TranscriptsFolder::configured_by(None)?,
-        ));
-        TranscriptLibrary::new(store.clone(), store)
+fn locate_transcripts() -> anyhow::Result<TranscriptsLocation> {
+    Ok(match default_settings_path() {
+        Some(settings_path) => TranscriptsLocation::FollowingSettings(settings_path),
+        None => TranscriptsLocation::Fixed(TranscriptsFolder::configured_by(None)?),
+    })
+}
+
+fn build_library(location: &TranscriptsLocation) -> anyhow::Result<TranscriptLibrary> {
+    Ok(match location {
+        TranscriptsLocation::FollowingSettings(settings_path) => {
+            let store = Arc::new(SettingsFollowingStore::new(settings_path.clone())?);
+            TranscriptLibrary::new(store.clone(), store)
+        }
+        TranscriptsLocation::Fixed(folder) => {
+            let store = Arc::new(MarkdownTranscriptStore::new(folder.clone()));
+            TranscriptLibrary::new(store.clone(), store)
+        }
     })
 }

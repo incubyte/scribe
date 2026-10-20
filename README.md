@@ -9,7 +9,7 @@ Scribe is a small tray app for macOS and Windows that transcribes your calls wit
 - **Shows the transcript live.** Click the tray icon to open a popover with the running transcript, a timer, and your recent calls.
 - **Stops when the conversation goes quiet.** A recording stops automatically after 5 minutes without speech, and a notification tells you the transcript is saved.
 - **Saves plain text.** Each call becomes one Markdown file, with a timestamp and speaker on every line. Files are grouped into month folders such as `2026-10/` inside your transcripts folder, which is `Documents/Scribe` by default.
-- **Connects to AI apps.** The bundled `scribe-mcp` server gives AI apps three tools: `list_transcripts`, `get_transcript`, and `search_transcripts`. The tray can connect Scribe to Claude Desktop in one click.
+- **Connects to AI apps.** The bundled `scribe-mcp` server gives AI apps five tools: `list_transcripts`, `get_transcript`, `search_transcripts`, `get_screenshot`, and `get_transcripts_folder`, which tells apps that can read local files where transcripts are saved. The tray can connect Scribe to Claude Desktop in one click.
 
 ## Privacy
 

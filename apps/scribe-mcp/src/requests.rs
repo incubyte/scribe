@@ -4,6 +4,7 @@ use schemars::JsonSchema;
 use scribe_core::library::{Limit, ListQuery, SearchHit, SegmentMatch, SessionSummaryView};
 use scribe_core::recording::SessionSummary;
 use serde::{Deserialize, Serialize};
+use store_markdown::TranscriptsFolder;
 
 const DATE_FORMAT: &str = "%Y-%m-%d";
 
@@ -39,6 +40,11 @@ pub struct SearchTranscriptsRequest {
     pub query: String,
     #[schemars(description = "Maximum number of calls to return, from 1 to 100. Defaults to 20.")]
     pub limit: Option<u32>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct TranscriptsFolderDto {
+    pub path: String,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -99,6 +105,14 @@ fn clamped_limit(requested: Option<u32>) -> Limit {
 fn parse_since(raw: &str) -> Result<NaiveDate, String> {
     NaiveDate::parse_from_str(raw, DATE_FORMAT)
         .map_err(|_| format!("Invalid since date: {raw} (expected YYYY-MM-DD)"))
+}
+
+impl From<&TranscriptsFolder> for TranscriptsFolderDto {
+    fn from(folder: &TranscriptsFolder) -> TranscriptsFolderDto {
+        TranscriptsFolderDto {
+            path: folder.path().to_string_lossy().into_owned(),
+        }
+    }
 }
 
 impl From<SessionSummaryView> for TranscriptSummaryDto {

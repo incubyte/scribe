@@ -12,6 +12,7 @@ use scribe_core::ports::TranscriptStore;
 use scribe_core::recording::{Segment, SessionHeader, SessionId, Speaker};
 use scribe_mcp::following_store::SettingsFollowingStore;
 use scribe_mcp::server::ScribeServer;
+use scribe_mcp::transcripts_location::TranscriptsLocation;
 use serde_json::{Value, json};
 use store_markdown::{MarkdownTranscriptStore, TranscriptsFolder};
 
@@ -48,9 +49,10 @@ fn line(speaker: Speaker, text: &str) -> Segment {
 async fn connect_to(folder: &Path) -> RunningService<RoleClient, ()> {
     let store = Arc::new(store_in(folder));
     let library = TranscriptLibrary::new(store.clone(), store);
+    let location = TranscriptsLocation::Fixed(TranscriptsFolder::at(folder.to_path_buf()));
     let (server_side, client_side) = tokio::io::duplex(DUPLEX_BUFFER_BYTES);
     tokio::spawn(async move {
-        ScribeServer::new(library)
+        ScribeServer::new(library, location)
             .serve(server_side)
             .await?
             .waiting()
@@ -64,9 +66,10 @@ async fn connect_following(settings_path: &Path) -> RunningService<RoleClient, (
     let store = SettingsFollowingStore::new(settings_path.to_path_buf()).unwrap();
     let store = Arc::new(store);
     let library = TranscriptLibrary::new(store.clone(), store);
+    let location = TranscriptsLocation::FollowingSettings(settings_path.to_path_buf());
     let (server_side, client_side) = tokio::io::duplex(DUPLEX_BUFFER_BYTES);
     tokio::spawn(async move {
-        ScribeServer::new(library)
+        ScribeServer::new(library, location)
             .serve(server_side)
             .await?
             .waiting()
@@ -151,6 +154,7 @@ async fn an_ai_app_discovers_the_screenshot_list_read_and_search_tools_by_name()
         [
             "get_screenshot",
             "get_transcript",
+            "get_transcripts_folder",
             "list_transcripts",
             "search_transcripts"
         ]
@@ -163,10 +167,10 @@ async fn an_ai_app_is_told_what_each_tool_takes() {
 
     assert!(tools[0].input_schema["properties"]["name"].is_object());
     assert!(tools[1].input_schema["properties"]["id"].is_object());
-    assert!(tools[2].input_schema["properties"]["limit"].is_object());
-    assert!(tools[2].input_schema["properties"]["since"].is_object());
-    assert!(tools[3].input_schema["properties"]["query"].is_object());
     assert!(tools[3].input_schema["properties"]["limit"].is_object());
+    assert!(tools[3].input_schema["properties"]["since"].is_object());
+    assert!(tools[4].input_schema["properties"]["query"].is_object());
+    assert!(tools[4].input_schema["properties"]["limit"].is_object());
 }
 
 #[tokio::test]
@@ -550,6 +554,7 @@ async fn use_every_tool_every_way(client: &RunningService<RoleClient, ()>, id: &
     list_calls_every_way(client).await;
     read_calls_every_way(client, id).await;
     call(client, "search_transcripts", json!({ "query": "before" })).await;
+    call(client, "get_transcripts_folder", json!({})).await;
 }
 
 #[tokio::test]
@@ -581,4 +586,47 @@ async fn the_mcp_server_follows_a_folder_change_without_restarting() {
 
     assert_eq!(listed_ids(&before), [id_in_a.to_string()]);
     assert_eq!(listed_ids(&after), [id_in_b.to_string()]);
+}
+
+fn folder_path_in(result: &Value) -> &str {
+    result["structuredContent"]["path"].as_str().unwrap()
+}
+
+#[tokio::test]
+async fn an_ai_app_that_can_read_local_files_learns_where_transcripts_are_saved() {
+    let folder = tempfile::tempdir().unwrap();
+    let client = connect_to(folder.path()).await;
+
+    let result = call(&client, "get_transcripts_folder", json!({})).await;
+
+    assert_eq!(folder_path_in(&result), folder.path().to_str().unwrap());
+}
+
+#[tokio::test]
+async fn the_reported_folder_follows_a_folder_change_without_restarting() {
+    let settings = tempfile::tempdir().unwrap();
+    let settings_path = settings.path().join("settings.json");
+    let folder_a = tempfile::tempdir().unwrap();
+    let folder_b = tempfile::tempdir().unwrap();
+    point_settings_at(&settings_path, folder_a.path());
+    let client = connect_following(&settings_path).await;
+
+    let before = call(&client, "get_transcripts_folder", json!({})).await;
+    point_settings_at(&settings_path, folder_b.path());
+    let after = call(&client, "get_transcripts_folder", json!({})).await;
+
+    assert_eq!(folder_path_in(&before), folder_a.path().to_str().unwrap());
+    assert_eq!(folder_path_in(&after), folder_b.path().to_str().unwrap());
+}
+
+#[tokio::test]
+async fn a_folder_that_has_no_calls_yet_is_reported_without_being_created() {
+    let parent = tempfile::tempdir().unwrap();
+    let not_yet_created = parent.path().join("Scribe");
+    let client = connect_to(&not_yet_created).await;
+
+    let result = call(&client, "get_transcripts_folder", json!({})).await;
+
+    assert_eq!(folder_path_in(&result), not_yet_created.to_str().unwrap());
+    assert!(!not_yet_created.exists());
 }

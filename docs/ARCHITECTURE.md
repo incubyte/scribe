@@ -48,7 +48,7 @@ graph LR
 | Module | Responsibility |
 |---|---|
 | `apps/scribe-tray` | Tray, menu, popover, privacy window; per-OS adapter wiring |
-| `apps/scribe-mcp` | `list_transcripts`, `get_transcript`, `search_transcripts` over stdio |
+| `apps/scribe-mcp` | `list_transcripts`, `get_transcript`, `search_transcripts`, `get_screenshot`, `get_transcripts_folder` over stdio |
 | `crates/scribe-core` | `recording` (Recorder, Session, Segment, EchoFilter, LiveSessionSlot), `capture` (Frame, ScreenshotName, ScreenshotTaker) and `library` (list/get/search); ports `AudioSource`, `Transcriber`, `TranscriptStore`, `ScreenCapturer`, `ScreenshotStore` |
 | `crates/audio-mic` | Mic `AudioSource` |
 | `crates/audio-macos` | System-output `AudioSource` via process tap, excluding Scribe |
