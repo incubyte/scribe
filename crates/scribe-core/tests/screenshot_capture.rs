@@ -1,0 +1,177 @@
+use std::sync::Arc;
+use std::time::Duration;
+
+use scribe_core::capture::{
+    CaptureFailure, CaptureOutcome, Frame, InvalidFrame, InvalidSelection, PixelRect,
+    ScreenshotName, ScreenshotTaker, Selection,
+};
+use scribe_core::ports::ScreenCaptureError;
+use scribe_core::recording::SessionId;
+use scribe_core::testing::{
+    FakeScreenCapturer, InMemoryScreenshotStore, frame_filled, live_session_at, shot_of,
+};
+
+const RED: [u8; 4] = [255, 0, 0, 255];
+const FORTY_TWO_SECONDS: Duration = Duration::from_secs(42);
+
+fn session() -> SessionId {
+    SessionId::parse("2026-10-20-143005").unwrap()
+}
+
+fn monitor() -> Frame {
+    frame_filled(4, 2, RED)
+}
+
+fn taker_showing(frame: Frame, store: &Arc<InMemoryScreenshotStore>) -> ScreenshotTaker {
+    let capturer = Arc::new(FakeScreenCapturer::showing(shot_of(frame)));
+    ScreenshotTaker::new(capturer, store.clone())
+}
+
+fn three_by_two() -> Frame {
+    Frame::new(
+        3,
+        2,
+        vec![
+            1, 1, 1, 255, 2, 2, 2, 255, 3, 3, 3, 255, //
+            4, 4, 4, 255, 5, 5, 5, 255, 6, 6, 6, 255,
+        ],
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_capture_while_recording_is_saved_into_that_session_at_the_offset_of_the_press() {
+    let store = Arc::new(InMemoryScreenshotStore::default());
+    let taker = taker_showing(monitor(), &store);
+    let live = live_session_at(session(), FORTY_TWO_SECONDS);
+
+    let pending = taker.begin(Some(live)).unwrap();
+    let outcome = taker.finish(pending, Selection::WholeMonitor).unwrap();
+
+    let name = ScreenshotName::parse("00-00-42.png").unwrap();
+    assert_eq!(
+        outcome,
+        CaptureOutcome::SavedIntoSession {
+            screenshot: monitor(),
+            name: name.clone(),
+        }
+    );
+    assert_eq!(store.screenshot(&session(), &name), Some(monitor()));
+}
+
+#[test]
+fn a_screenshot_that_cannot_be_saved_is_still_handed_over_for_the_clipboard() {
+    let store = Arc::new(InMemoryScreenshotStore::refusing_saves());
+    let taker = taker_showing(monitor(), &store);
+    let live = live_session_at(session(), FORTY_TWO_SECONDS);
+
+    let pending = taker.begin(Some(live)).unwrap();
+    let outcome = taker.finish(pending, Selection::WholeMonitor).unwrap();
+
+    assert_eq!(
+        outcome,
+        CaptureOutcome::CopiedButNotSaved {
+            screenshot: monitor()
+        }
+    );
+}
+
+#[test]
+fn a_failed_capture_yields_no_screenshot_and_saves_nothing() {
+    let store = Arc::new(InMemoryScreenshotStore::default());
+    let capturer = Arc::new(FakeScreenCapturer::failing(ScreenCaptureError::Failed(
+        "the display went away".to_owned(),
+    )));
+    let taker = ScreenshotTaker::new(capturer, store.clone());
+    let live = live_session_at(session(), FORTY_TWO_SECONDS);
+
+    let started = taker.begin(Some(live));
+
+    assert_eq!(started.unwrap_err(), CaptureFailure::CaptureFailed);
+    assert_eq!(store.saved_count(), 0);
+}
+
+#[test]
+fn a_capture_with_nothing_recording_is_only_copied() {
+    let store = Arc::new(InMemoryScreenshotStore::default());
+    let taker = taker_showing(monitor(), &store);
+
+    let pending = taker.begin(None).unwrap();
+    let outcome = taker.finish(pending, Selection::WholeMonitor).unwrap();
+
+    assert_eq!(
+        outcome,
+        CaptureOutcome::CopiedOnly {
+            screenshot: monitor()
+        }
+    );
+    assert_eq!(store.saved_count(), 0);
+}
+
+#[test]
+fn a_selected_area_is_cut_from_the_frame_of_the_press() {
+    let store = Arc::new(InMemoryScreenshotStore::default());
+    let taker = taker_showing(three_by_two(), &store);
+    let area = PixelRect {
+        x: 1,
+        y: 0,
+        width: 2,
+        height: 2,
+    };
+
+    let pending = taker.begin(None).unwrap();
+    let outcome = taker.finish(pending, Selection::Area(area)).unwrap();
+
+    let expected = Frame::new(
+        2,
+        2,
+        vec![2, 2, 2, 255, 3, 3, 3, 255, 5, 5, 5, 255, 6, 6, 6, 255],
+    )
+    .unwrap();
+    assert_eq!(outcome.screenshot(), &expected);
+}
+
+#[test]
+fn an_area_reaching_past_the_monitor_edge_is_refused() {
+    let store = Arc::new(InMemoryScreenshotStore::default());
+    let taker = taker_showing(three_by_two(), &store);
+    let area = PixelRect {
+        x: 2,
+        y: 0,
+        width: 2,
+        height: 1,
+    };
+
+    let pending = taker.begin(None).unwrap();
+    let outcome = taker.finish(pending, Selection::Area(area));
+
+    assert_eq!(outcome.unwrap_err(), InvalidSelection);
+}
+
+#[test]
+fn an_empty_area_is_refused() {
+    let area = PixelRect {
+        x: 0,
+        y: 0,
+        width: 0,
+        height: 2,
+    };
+
+    let cropped = three_by_two().crop(area);
+
+    assert_eq!(cropped.unwrap_err(), InvalidSelection);
+}
+
+#[test]
+fn pixels_that_do_not_fill_the_frame_are_refused() {
+    let frame = Frame::new(2, 2, vec![0; 12]);
+
+    assert_eq!(frame.unwrap_err(), InvalidFrame);
+}
+
+#[test]
+fn a_frame_without_area_is_refused() {
+    let frame = Frame::new(0, 2, Vec::new());
+
+    assert_eq!(frame.unwrap_err(), InvalidFrame);
+}

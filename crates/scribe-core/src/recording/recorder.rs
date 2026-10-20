@@ -8,8 +8,9 @@ use crate::ports::{
 use crate::recording::lane_worker::{LaneMessage, LaneWorker, run_lane};
 use crate::recording::writer::{SessionWriter, run_writer};
 use crate::recording::{
-    AUTO_STOP_AFTER_QUIET, AudioChunk, QuietWatch, Readiness, RecorderState, RecordingEvent,
-    SegmentSequencer, SessionClock, SessionHeader, SessionId, Speaker, recorder_state,
+    AUTO_STOP_AFTER_QUIET, AudioChunk, LiveSession, LiveSessionSlot, QuietWatch, Readiness,
+    RecorderState, RecordingEvent, SegmentSequencer, SessionClock, SessionHeader, SessionId,
+    Speaker, recorder_state,
 };
 
 pub struct Lane {
@@ -37,6 +38,7 @@ pub struct Recorder {
     listener: Arc<dyn RecordingListener>,
     readiness: Readiness,
     active: Option<ActiveSession>,
+    live: LiveSessionSlot,
 }
 
 impl Recorder {
@@ -47,7 +49,13 @@ impl Recorder {
             listener,
             readiness: Readiness::default(),
             active: None,
+            live: LiveSessionSlot::default(),
         }
+    }
+
+    #[must_use]
+    pub fn live_session_slot(&self) -> LiveSessionSlot {
+        self.live.clone()
     }
 
     pub fn set_readiness(&mut self, readiness: Readiness) {
@@ -90,12 +98,15 @@ impl Recorder {
             header,
             clock: capturing.clock,
         };
+        self.live
+            .publish(LiveSession::new(id.clone(), capturing.clock));
         self.announce_start(&id, &capturing.unavailable);
         self.active = Some(self.spawn_session(capturing.take_lanes(), context));
         Ok(id)
     }
 
     pub fn stop(&mut self) -> Result<(), RecorderError> {
+        self.live.clear();
         match self.active.take() {
             Some(session) => session.stop(),
             None => Ok(()),

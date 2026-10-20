@@ -7,7 +7,14 @@ const OWNER_READ_WRITE: u32 = 0o600;
 
 pub(crate) fn create_new(path: &Path, contents: &str) -> io::Result<()> {
     let mut file = private_options().create_new(true).open(path)?;
-    write_durably(&mut file, contents)
+    write_durably(&mut file, contents.as_bytes())
+}
+
+pub(crate) fn create_new_bytes(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let mut file = private_options().create_new(true).open(path)?;
+    write_durably(&mut file, bytes).inspect_err(|_| {
+        let _ = fs::remove_file(path);
+    })
 }
 
 pub(crate) fn copy_new(source: &Path, destination: &Path) -> io::Result<()> {
@@ -19,7 +26,7 @@ pub(crate) fn copy_new(source: &Path, destination: &Path) -> io::Result<()> {
 
 pub(crate) fn append(path: &Path, line: &str) -> io::Result<()> {
     let mut file = OpenOptions::new().append(true).open(path)?;
-    write_durably(&mut file, line)
+    write_durably(&mut file, line.as_bytes())
 }
 
 pub(crate) fn replace_atomically(path: &Path, contents: &str) -> io::Result<()> {
@@ -28,12 +35,12 @@ pub(crate) fn replace_atomically(path: &Path, contents: &str) -> io::Result<()> 
         .create(true)
         .truncate(true)
         .open(&staging)?;
-    write_durably(&mut file, contents)?;
+    write_durably(&mut file, contents.as_bytes())?;
     fs::rename(&staging, path)
 }
 
-fn write_durably(file: &mut File, contents: &str) -> io::Result<()> {
-    file.write_all(contents.as_bytes())?;
+fn write_durably(file: &mut File, contents: &[u8]) -> io::Result<()> {
+    file.write_all(contents)?;
     file.sync_data()
 }
 

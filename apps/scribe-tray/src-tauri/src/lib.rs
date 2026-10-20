@@ -15,6 +15,7 @@ mod power;
 mod privacy;
 pub mod recording;
 pub mod recording_label;
+pub mod screenshots;
 pub mod start_failure;
 pub mod transcripts_location;
 mod tray;
@@ -61,11 +62,13 @@ fn with_plugins<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_positioner::init())
+        .plugin(screenshots::plugin())
 }
 
 fn start_scribe<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::error::Error>> {
     tray::install(app)?;
     recording::install(app)?;
+    screenshots::install(app);
     recording::publish_state(app);
     popover::install_blur_hide(app)?;
     privacy::show_statement_until_acknowledged(app)?;

@@ -55,10 +55,10 @@ jobs:
             echo "More than one ort version is linked: $versions"
             exit 1
           fi
-      - name: The MCP server stays free of audio and speech dependencies
+      - name: The MCP server stays free of audio, speech and screen capture dependencies
         shell: bash
         run: |
-          forbidden=$(cargo tree -p scribe-mcp -e normal --prefix none | grep -E '^(cidre|cpal|wasapi|swift-rs|parakeet-rs|audio-|stt-) ' || true)
+          forbidden=$(cargo tree -p scribe-mcp -e normal --prefix none | grep -E '^(cidre|cpal|wasapi|xcap|swift-rs|parakeet-rs|audio-|stt-|capture-) ' || true)
           if [ -n "$forbidden" ]; then
             echo "scribe-mcp depends on: $forbidden"
             exit 1
@@ -87,8 +87,8 @@ jobs:
       - name: Stage the MCP server the tray bundles as a sidecar
         shell: bash
         run: apps/scribe-tray/scripts/stage-sidecar.sh
-      - run: cargo clippy -p scribe-tray -p audio-macos -p audio-mic -p stt-speechanalyzer --all-targets -- -D warnings
-      - run: cargo test -p scribe-tray -p audio-macos -p audio-mic -p stt-speechanalyzer
+      - run: cargo clippy -p scribe-tray -p audio-macos -p capture-macos -p audio-mic -p stt-speechanalyzer --all-targets -- -D warnings
+      - run: cargo test -p scribe-tray -p audio-macos -p capture-macos -p audio-mic -p stt-speechanalyzer
 
   windows:
     if: github.event_name != 'schedule'
@@ -105,7 +105,7 @@ jobs:
       - name: Fetch the Visual C++ runtime the installer bundles
         shell: bash
         run: apps/scribe-tray/scripts/fetch-vc-redist.sh
-      - run: cargo clippy -p scribe-tray -p audio-windows -p audio-mic --all-targets -- -D warnings
+      - run: cargo clippy -p scribe-tray -p audio-windows -p capture-windows -p audio-mic --all-targets -- -D warnings
 
   mutation:
     if: github.event_name == 'pull_request'

@@ -152,7 +152,7 @@ pub fn notify_cannot_hear_other_side<R: Runtime>(_app: &AppHandle<R>) {
     tracing::info!("the other side has been silent since the recording started");
 }
 
-fn show_plain<R: Runtime>(app: &AppHandle<R>, title: &str, body: &str) {
+pub(crate) fn show_plain<R: Runtime>(app: &AppHandle<R>, title: &str, body: &str) {
     let shown = app.notification().builder().title(title).body(body).show();
     if let Err(error) = shown {
         tracing::warn!(%error, title, "could not show a notification");

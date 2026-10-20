@@ -173,16 +173,16 @@ sequenceDiagram
 **Acceptance criteria**
 
 - [ ] **5.2.1** At launch, Scribe registers the full-screen shortcut with its default: `⌃⌥⌘1` on macOS, `Ctrl+Shift+Alt+1` on Windows.
-- [ ] **5.2.2** Pressing the full-screen shortcut while recording saves one PNG of the monitor that contained the pointer at the press into the active session's folder.
+- [x] **5.2.2** Pressing the full-screen shortcut while recording saves one PNG of the monitor that contained the pointer at the press into the active session's folder.
 - [ ] **5.2.3** With two monitors and the pointer on the secondary one, the PNG's pixel size equals the secondary monitor's and contains nothing from the primary.
 - [ ] **5.2.4** On a 2× display of 1512 × 982 points, the PNG is 3024 × 1964 pixels.
-- [ ] **5.2.5** The file name is the offset from the session's start at the press, as `HH-MM-SS.png`. A second capture in the same second is saved as `HH-MM-SS-2.png`, then `-3`, and no existing file is ever overwritten.
+- [x] **5.2.5** The file name is the offset from the session's start at the press, as `HH-MM-SS.png`. A second capture in the same second is saved as `HH-MM-SS-2.png`, then `-3`, and no existing file is ever overwritten.
 - [ ] **5.2.6** The same image is on the system clipboard and pastes as an image into another app.
-- [ ] **5.2.7** A notification reads "Screenshot saved at 00:12:34 and copied to the clipboard", with the actual offset.
-- [ ] **5.2.8** If the save fails because the folder is missing or unwritable, or the disk is full, the image is still on the clipboard and the notification reads "Screenshot copied, but it couldn't be saved to this meeting". The log names the file only.
-- [ ] **5.2.9** If the capture itself fails, no file is written, the clipboard is untouched, and the notification reads "Couldn't take the screenshot. Try again."
+- [x] **5.2.7** A notification reads "Screenshot saved at 00:12:34 and copied to the clipboard", with the actual offset.
+- [x] **5.2.8** If the save fails because the folder is missing or unwritable, or the disk is full, the image is still on the clipboard and the notification reads "Screenshot copied, but it couldn't be saved to this meeting". The log names the file only.
+- [x] **5.2.9** If the capture itself fails, no file is written, the clipboard is untouched, and the notification reads "Couldn't take the screenshot. Try again."
 - [ ] **5.2.10** If the OS refuses to register the shortcut at launch, Scribe shows one notification naming the shortcut that is unavailable. Recording works as before.
-- [ ] **5.2.11** The saved PNG is user-only (`0600` on macOS). No temp file is written, and no log line contains image data.
+- [x] **5.2.11** The saved PNG is user-only (`0600` on macOS). No temp file is written, and no log line contains image data.
 
 ### 5.3 Let the AI client list and view a session's screenshots
 
