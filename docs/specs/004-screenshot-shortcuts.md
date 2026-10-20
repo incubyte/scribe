@@ -21,9 +21,9 @@
 
 **Who it is for.** The [Scribe user](#31-kinds-of-users) who wants a quick screenshot tool, and the [AI client](#31-kinds-of-users) that reads transcripts through `scribe-mcp` and should be able to see what was on screen at a given moment [1].
 
-**What this spec commits to.** One shortcut captures the whole monitor under the cursor, and another opens a region selector on that monitor, which can also snap to a window. While Scribe is recording, the image is saved into the session's own folder as `HH-MM-SS.png`, the offset into the meeting, so it lines up with the transcript line `[HH:MM:SS]`. Every capture is copied to the clipboard. `get_transcript` ends with the list of the session's screenshot paths, and both shortcuts can be rebound in Settings [1].
+**What this spec commits to.** One shortcut captures the whole monitor under the cursor, and another opens a region selector on that monitor, which can also snap to a window. While Scribe is recording, the image is saved into the session's own folder as `HH-MM-SS.png`, the offset into the meeting, so it lines up with the transcript line `[HH:MM:SS]`. Every capture is copied to the clipboard. `get_transcript` ends with the names of the session's screenshots, a new `get_screenshot` tool returns any of them as an image scaled to 1568 px on the long edge, and both shortcuts can be rebound in Settings [1].
 
-**Deliberately out of scope.** Saving a capture when nothing is recording, because it then goes to the clipboard only. Annotation and editing, scrolling capture, video, regions that span monitors, and sending image bytes over MCP are also out [1]. See [§9](#9-deferred-follow-ups-and-accepted-limits) for the limits this accepts.
+**Deliberately out of scope.** Saving a capture when nothing is recording, because it then goes to the clipboard only. Annotation and editing, scrolling capture, video, regions that span monitors, and serving full-resolution originals over MCP are also out [1]. See [§9](#9-deferred-follow-ups-and-accepted-limits) for the limits this accepts.
 
 ## 2. Sources
 
@@ -41,13 +41,15 @@
 | 10 | Public reports (forums.getdrafts.com/t/14001; shottr.cc/kb/startguide) | Web | 2026-10-20 | Shottr's region default `⌘⇧2` collides with another app's shortcut; shortcut screenshot tools let users rebind |
 | 11 | Fabric standards (`get_relevant_standards`, incubyte/scribe) | Fabric | 2026-10-20 | Rules from the four active packs cited in [§6](#6-nfrs--regulatory-compliance) |
 | 12 | Org Memory (search: "Scribe tray app screenshot screen capture global shortcut") | Fabric | 2026-10-20 | No prior Scribe screenshot work; confirms the frontend uses Vitest |
+| 13 | Public docs (platform.claude.com/docs/en/build-with-claude/vision) | Web | 2026-10-20 | Images larger than a model's limit are scaled down, keeping their aspect ratio. The standard tier's limit is 1568 px on the long edge (≈1568 visual tokens), and Claude 4.7+ accepts 2576 px. Images may be up to 10 MB base64 on the API and claude.ai, in PNG, JPEG, GIF or WebP |
+| 14 | Crate source (`rmcp` 3.5.1, `model/content.rs`) and `scribe-mcp/src/transport.rs` | Local registry / codebase | 2026-10-20 | `Content::image(base64, mime_type)` returns an MCP image block. `scribe-mcp`'s 1 MB message cap applies to incoming messages only |
 
 ## 3. Type ontology
 
 ### 3.1 Kinds of users
 
 - **Scribe user** — one person using Scribe on their own Mac (macOS 26+) or Windows PC, often during a call, who wants to grab what is on screen without leaving the call [1, 2].
-- **AI client** — an MCP client such as Claude Desktop that reads transcripts through `scribe-mcp`, and with this spec also learns where a session's screenshots are on disk [1].
+- **AI client** — an MCP client such as Claude Desktop that reads transcripts through `scribe-mcp`. With this spec it can also list a session's screenshots and fetch them as images. It cannot open local file paths itself [1].
 
 ### 3.2 Kinds of data
 
@@ -58,6 +60,8 @@ None of this data is regulated, but a screenshot can contain anything that was o
 - **Screenshot** — a rectangle cut from a Frame (the whole monitor, a region or a window), encoded as PNG [1].
 - **Session folder** — `<transcripts folder>/YYYY-MM/<session id>/`, holding `<session id>.md` and that session's Screenshots [1, 3].
 - **Screenshot name** — `HH-MM-SS.png`, the offset from the session's start at the moment the shortcut fired. A second capture in the same second becomes `HH-MM-SS-2.png`, then `-3`, and so on [1, 2].
+- **Screenshot reference** — `<session id>/<screenshot name>`, for example `2026-10-20-143005/00-12-34.png`. It is how the AI client names one screenshot, and it is unique across all sessions [1].
+- **Served image** — a Screenshot scaled down so its long edge is at most 1568 px, encoded as PNG for the AI client. It is made on demand and never stored [1, 13].
 - **Shortcut binding** — the key combination for one capture kind, stored in `settings.json` [1, 3].
 - **Idle notice preference** — whether the user ticked "Don't show this again" on the idle notice, stored in `settings.json` [1].
 
@@ -67,6 +71,7 @@ None of this data is regulated, but a screenshot can contain anything that was o
 - **Selection made** — in the region selector, the user finishes a drag or clicks a highlighted window [1].
 - **Selection cancelled** — the user presses Esc, right-clicks, or switches away from the region selector [1].
 - **Screenshot taken** — a Screenshot exists in memory and is about to reach its destinations [1].
+- **Screenshot fetched** — the AI client calls `get_screenshot` with a Screenshot reference [1].
 - **Shortcut rebound** — the user records a new combination, or resets to the default, in Settings [1].
 
 ### 3.4 Kinds of states
@@ -97,6 +102,8 @@ None of this data is regulated, but a screenshot can contain anything that was o
 
 **4.9 Screenshots are native resolution** — a Screenshot's pixel size is the selected size in screen points times that monitor's scale factor. Sources: [1].
 
+**4.10 The AI client gets a scaled copy, never the original** — `get_screenshot` never returns an image longer than 1568 px on its long edge, never upscales, and never changes or writes a file on disk. Sources: [1, 13].
+
 ## 5. Slices
 
 The order runs storage first, then the first capture, then the MCP payoff, the permission and idle paths, the region selector, and finally rebinding. Slices 5.2, 5.6 and 5.7 carry most of the OS risk.
@@ -105,7 +112,7 @@ The order runs storage first, then the first capture, then the MCP payoff, the p
 |---|---|---|---|---|
 | 5.1 | Keep each new session in its own folder | Find a new recording's transcript in its own folder, ready to hold screenshots | Start recording (existing popover control) | `root` |
 | 5.2 | Capture the full screen under the cursor into the recording | Press the full-screen shortcut mid-call and get `HH-MM-SS.png` in the session folder and on the clipboard | Full-screen shortcut (`⌃⌥⌘1` / `Ctrl+Shift+Alt+1`) | `root` |
-| 5.3 | List a session's screenshots at the end of `get_transcript` | Have Claude see which screenshots belong to a call and when each was taken | MCP `get_transcript` tool | `root` |
+| 5.3 | Let the AI client list and view a session's screenshots | Have Claude see which screenshots belong to a call, when each was taken, and what is in them | MCP `get_transcript` tool<br>MCP `get_screenshot` tool | `root` |
 | 5.4 | Guide the user to Screen Recording access on macOS | Get told how to grant access instead of a silent failure | Full-screen shortcut with access not granted | Full-screen shortcut (5.2) |
 | 5.5 | Copy to the clipboard when nothing is recording | Use the shortcut as a plain screenshot tool between calls | Full-screen shortcut while idle | Full-screen shortcut (5.2) |
 | 5.6 | Select a region on the monitor under the cursor | Drag out exactly the part of the screen to keep | Region shortcut (`⌃⌥⌘2` / `Ctrl+Shift+Alt+2`) → region selector | `root` |
@@ -177,32 +184,47 @@ sequenceDiagram
 - [ ] **5.2.10** If the OS refuses to register the shortcut at launch, Scribe shows one notification naming the shortcut that is unavailable. Recording works as before.
 - [ ] **5.2.11** The saved PNG is user-only (`0600` on macOS). No temp file is written, and no log line contains image data.
 
-### 5.3 List a session's screenshots at the end of `get_transcript`
+### 5.3 Let the AI client list and view a session's screenshots
 
-When an AI client calls `get_transcript` for a session that has screenshots, the response is the transcript exactly as before, followed by a short section that lists each screenshot's offset and absolute path. The client can open those files with its own file access. Image bytes are never sent over MCP [1].
+Claude Desktop cannot open local files, so the screenshots reach it through `scribe-mcp` in two steps. First, `get_transcript` ends with a short section naming each screenshot by its Screenshot reference and offset. Then a new `get_screenshot` tool takes one of those references and returns the image itself, scaled so its long edge is at most 1568 px. Originals on disk stay at native resolution and are never changed [1, 13, 14].
 
-*Types: Screenshot, Screenshot name, Session folder · Invariants: [4.3](#4-invariants), [4.6](#4-invariants).*
+*Types: Screenshot, Screenshot name, Screenshot reference, Served image, Session folder · Invariants: [4.3](#4-invariants), [4.6](#4-invariants), [4.10](#4-invariants).*
 
-Indicative tail of the response:
+Indicative tail of the `get_transcript` response:
 
 ```markdown
 ## Screenshots
 
-Screenshots taken during this call, as local PNG files. Each name is its offset into the call and matches the transcript's [HH:MM:SS] stamps.
+Screenshots taken during this call. Each name is its offset into the call and matches the transcript's [HH:MM:SS] stamps. Call get_screenshot with a name to see it.
 
-- [00:12:34] /Users/me/Documents/Scribe/2026-10/2026-10-20-143005/00-12-34.png
-- [00:12:34] /Users/me/Documents/Scribe/2026-10/2026-10-20-143005/00-12-34-2.png
-- [00:41:02] /Users/me/Documents/Scribe/2026-10/2026-10-20-143005/00-41-02.png
+- [00:12:34] 2026-10-20-143005/00-12-34.png
+- [00:12:34] 2026-10-20-143005/00-12-34-2.png
+- [00:41:02] 2026-10-20-143005/00-41-02.png
+```
+
+Indicative `get_screenshot` contract:
+
+```
+get_screenshot({ name: "2026-10-20-143005/00-12-34.png" })
+→ [ text  "[00:12:34] 2026-10-20-143005/00-12-34.png — 1568 × 882 (scaled from 5120 × 2880)",
+    image { mimeType: "image/png", data: <base64> } ]
 ```
 
 **Acceptance criteria**
 
-- [ ] **5.3.1** For a session with screenshots, `get_transcript` returns the transcript markdown unchanged, followed by a `## Screenshots` section that lists every screenshot in offset order as `[HH:MM:SS] <absolute path>`.
-- [ ] **5.3.2** For a session without screenshots, including every flat and month-file session, the response is byte-identical to today's.
+- [ ] **5.3.1** For a session with screenshots, `get_transcript` returns the transcript markdown unchanged, followed by a `## Screenshots` section. It lists every screenshot in offset order as `[HH:MM:SS] <screenshot reference>`, with no local paths.
+- [ ] **5.3.2** For a session without screenshots, including every flat and month-file session, the `get_transcript` response is byte-identical to today's.
 - [ ] **5.3.3** Only files whose names parse as screenshot names are listed. Any other file in the session folder is ignored.
 - [ ] **5.3.4** The session's `.md` file on disk is byte-identical before and after any number of `get_transcript` calls.
-- [ ] **5.3.5** The `get_transcript` tool description tells the client that screenshots, when present, are listed at the end as local file paths named by their offset.
-- [ ] **5.3.6** A screenshot added while Claude Desktop keeps `scribe-mcp` running is listed on the next `get_transcript` call, with no restart.
+- [ ] **5.3.5** `get_screenshot` with a listed reference returns a one-line text label (offset, reference, served and original size) followed by the image as a PNG image block.
+- [ ] **5.3.6** A screenshot whose long edge is over 1568 px is served scaled down, keeping its aspect ratio, so its long edge is exactly 1568 px. A 5120 × 2880 original is served at 1568 × 882.
+- [ ] **5.3.7** A screenshot whose long edge is 1568 px or less is served at its original size, never upscaled.
+- [ ] **5.3.8** Serving a screenshot changes no file on disk and writes no scaled copy anywhere.
+- [ ] **5.3.9** A reference that is not exactly `<valid session id>/<valid screenshot name>` is rejected with a tool error before any file is touched. This covers `..`, a backslash, an absolute path, extra segments and a non-`.png` name.
+- [ ] **5.3.10** A well-formed reference to a screenshot that does not exist, or a PNG that cannot be decoded, returns the tool error "No screenshot named <reference>". The server keeps running.
+- [ ] **5.3.11** Serving a 5120 × 2880 screenshot takes under one second on the machines Scribe supports.
+- [ ] **5.3.12** The tool descriptions tell the client that `get_transcript` lists screenshot names at the end, and that `get_screenshot` takes one of those names and returns the image.
+- [ ] **5.3.13** A screenshot added while Claude Desktop keeps `scribe-mcp` running is listed and served on the next call, with no restart.
 
 ### 5.4 Guide the user to Screen Recording access on macOS
 
@@ -343,7 +365,7 @@ No regulated packs are active. These NFRs come from the four general packs, plus
 
 ### 6.1 Clean Code
 
-**6.1.1 Validate at every boundary, then trust internally** — derived from rule: *Fail fast at boundaries*. Stored shortcut bindings, the stored idle preference, and the selection rectangle that comes back from the selector webview are validated in Rust before use. The rectangle must be positive-sized and inside the captured monitor, or it is rejected with a typed error. Sources: [11].
+**6.1.1 Validate at every boundary, then trust internally** — derived from rule: *Fail fast at boundaries*. Stored shortcut bindings, the stored idle preference, the `get_screenshot` reference, and the selection rectangle that comes back from the selector webview are validated in Rust before use. The reference is parsed into a typed session id and screenshot name, never joined into a path as raw text. The rectangle must be positive-sized and inside the captured monitor, or it is rejected with a typed error. Sources: [11].
 
 **6.1.2 Small, single-purpose functions** — derived from rule: *Small functions*. Naming, destination choice, logical-to-pixel mapping and window hit-testing are separate, independently tested units. Sources: [11].
 
@@ -367,7 +389,7 @@ No regulated packs are active. These NFRs come from the four general packs, plus
 
 ### 6.5 Project cross-cutting rules (ARCHITECTURE.md §5)
 
-**6.5.1 Local only** — capture adds no outbound traffic, and the AI client receives paths, never image bytes. Sources: [1, 2].
+**6.5.1 Local only** — Scribe itself makes no outbound traffic. A screenshot leaves `scribe-mcp` only when the AI client asks for it with `get_screenshot`, and only as the scaled copy. Sources: [1, 2].
 
 **6.5.2 Private files** — session folders and PNGs are user-only, and logs carry session ids and file names only. Sources: [2].
 
@@ -375,12 +397,12 @@ No regulated packs are active. These NFRs come from the four general packs, plus
 
 | Control | Pack | Slices | Evidence committed |
 |---|---|---|---|
-| Fail fast at boundaries | Clean Code | 5.6, 5.7, 5.8 | AC 5.6.8, 5.8.3, 5.8.9 |
-| Business-language tests, ZOMBIES | Incubyte Engineering Standards | 5.1, 5.2, 5.3 | AC 5.2.5, 5.3.1–5.3.3 |
+| Fail fast at boundaries | Clean Code | 5.3, 5.6, 5.7, 5.8 | AC 5.3.9, 5.6.8, 5.8.3, 5.8.9 |
+| Business-language tests, ZOMBIES | Incubyte Engineering Standards | 5.1, 5.2, 5.3 | AC 5.2.5, 5.3.1–5.3.3, 5.3.6–5.3.7 |
 | Complexity ≤ 5, mutation testing | Incubyte Engineering Standards | all | Gates in [6.2.3](#62-incubyte-engineering-standards) |
 | Sonar-clean TS, small unions | SonarJS | 5.5, 5.6, 5.7, 5.8 | `npm run lint` clean |
 | WCAG 2.2 AA (focus, contrast, names) | Design Standards: Global Component | 5.5, 5.6, 5.8 | AC 5.5.6, 5.6.13, 5.8.11 |
-| Local only, private files | ARCHITECTURE.md §5 | 5.1, 5.2, 5.3, 5.5 | AC 5.1.6, 5.2.11, 5.3.1, 5.5.1 |
+| Local only, private files | ARCHITECTURE.md §5 | 5.1, 5.2, 5.3, 5.5 | AC 5.1.6, 5.2.11, 5.3.8, 5.5.1 |
 
 ## 7. Architecture
 
@@ -394,6 +416,7 @@ Additions to the stack in `docs/ARCHITECTURE.md` §2. Everything else is unchang
 | macOS capture | ScreenCaptureKit through `cidre` (`sc`) | `CGWindowListCreateImage`, which `xcap` uses, is obsoleted in the macOS 15 SDK. Scribe targets macOS 26 and already depends on `cidre` [6, 7, 8] |
 | Windows capture | Win32 desktop capture and window enumeration | The plan picks the library (`windows` crate directly or `xcap`'s Windows backend) |
 | Clipboard | `tauri-plugin-clipboard-manager` `write_image` (already a dependency) | RGBA image to the system clipboard on both OSes [5] |
+| Serving screenshots to the AI client | `rmcp` image content, with PNG decode, downscale and encode in the store adapter | `Content::image` already exists in the `rmcp` version Scribe uses. 1568 px keeps a served image near 1568 visual tokens. The plan picks the image library and resampling filter [13, 14] |
 | Region selector and notice | Tauri webview windows with React and the existing theme | Same UI stack and tokens as the popover |
 | Settings | `settings.json` through `tauri-plugin-store` (existing) | Same file and resolver pattern as plan 003 [3] |
 
@@ -403,9 +426,9 @@ Additions to the stack in `docs/ARCHITECTURE.md` §2. Everything else is unchang
 
 **Why this style here:** Screen capture is another OS edge, like audio capture and speech recognition. It differs completely between macOS and Windows, while the rules around it are the same on both: which monitor, which destination, what name, which rectangle. Putting those rules in the core keeps them testable without a screen, and lets each OS plug in one adapter.
 
-**Dependency direction:** apps → `scribe-core` ← adapters. The core owns the capture rules and two new ports: one that grabs a monitor's Frame and Window outlines at a point, and one that saves and lists a session's Screenshots. Capture adapters implement the first. `store-markdown` implements the second, alongside the session-folder layout. The tray wires shortcuts, windows, clipboard and notifications.
+**Dependency direction:** apps → `scribe-core` ← adapters. The core owns the capture rules and two new ports: one that grabs a monitor's Frame and Window outlines at a point, and one that saves, lists and serves a session's Screenshots, with serving scaled to a maximum long edge. Capture adapters implement the first. `store-markdown` implements the second, alongside the session-folder layout. The tray wires shortcuts, windows, clipboard and notifications.
 
-**Anti-patterns the style forbids:** `#[cfg(target_os)]` in `scribe-core`. Tauri or image-codec types below `apps/`. `scribe-mcp` depending on a capture crate, since it reads screenshots only through `store-markdown`. A Frame written to disk. Image bytes over MCP.
+**Anti-patterns the style forbids:** `#[cfg(target_os)]` in `scribe-core`. Tauri types below `apps/`, and image-codec types in `scribe-core`. `scribe-mcp` depending on a capture crate, since it reads screenshots only through `store-markdown`. A Frame or a scaled copy written to disk. Full-resolution originals over MCP.
 
 ### 7.3 Module decomposition
 
@@ -413,7 +436,7 @@ Additions to the stack in `docs/ARCHITECTURE.md` §2. Everything else is unchang
 graph LR
   subgraph apps
     Tray[Tray app: shortcuts, selector & notice windows, clipboard, notifications, Settings]
-    MCP[scribe-mcp: get_transcript + screenshot list]
+    MCP[scribe-mcp: get_transcript + get_screenshot]
   end
   subgraph core
     Capture[Capture domain: destination, naming, rectangles]
@@ -462,7 +485,8 @@ sequenceDiagram
 ### 7.5 Threat model seed
 
 - **Sensitive pixels.** A Screenshot can contain passwords or other people's content. It is saved only during a recording, user-only, and never leaves the machine through Scribe.
-- **AI client access.** The client gets file paths. Whether it can open them is decided by the user's own client configuration, not by Scribe.
+- **AI client access.** Image content reaches the AI client, and through it the client's model provider, only when the client calls `get_screenshot`. The user controls that by choosing to connect Scribe to the client. The original never leaves the machine through Scribe.
+- **Path traversal through `get_screenshot`.** The reference is client-supplied input. It is parsed into a typed session id and screenshot name and rejected otherwise, so it can only ever resolve to a screenshot inside the transcripts folder (AC 5.3.9).
 - **Clipboard exposure.** Clipboard managers and other apps can read the clipboard. This is inherent to copying, and is accepted.
 - **Selector input.** The selector reads only pointer events and Esc. It never captures other keystrokes, and it closes as soon as it loses focus.
 
@@ -490,14 +514,17 @@ sequenceDiagram
 
 ## 10. Established behaviour — documented, not changed
 
-**10.1 The transcript file never mentions its screenshots.** The `## Screenshots` section exists only in the `get_transcript` response, worked out from the session folder at read time. Confirmed intended: Sapan Parikh, who wants paths returned as a note for the AI tool, not written into the note. Sources: [1].
+**10.1 The transcript file never mentions its screenshots.** The `## Screenshots` section exists only in the `get_transcript` response, worked out from the session folder at read time. Confirmed intended: Sapan Parikh, who wants the screenshot list returned as a note for the AI tool, not written into the note. Sources: [1].
 
-**10.2 Captures made while not recording are not saved anywhere.** They go to the clipboard only, with the notice from 5.5. Confirmed intended: Sapan Parikh. Sources: [1].
+**10.2 `get_screenshot` serves at most 1568 px on the long edge, even to models that accept more.** Claude 4.7 and later accept 2576 px, but 1568 px was chosen to cap image tokens and payload size. Fine text in a large region may be harder to read at that size. Confirmed intended: Sapan Parikh. Sources: [1, 13].
 
-**10.3 Old transcripts are not moved into session folders.** Flat and month-file sessions are read in place indefinitely. Confirmed intended: plan 003's never-migrate-automatically rule, carried forward. Sources: [3].
+**10.3 Captures made while not recording are not saved anywhere.** They go to the clipboard only, with the notice from 5.5. Confirmed intended: Sapan Parikh. Sources: [1].
+
+**10.4 Old transcripts are not moved into session folders.** Flat and month-file sessions are read in place indefinitely. Confirmed intended: plan 003's never-migrate-automatically rule, carried forward. Sources: [3].
 
 ---
 
 ## Changelog
 
 - 2026-10-20 — Sapan Parikh — Initial spec from a live spec-writing session [1].
+- 2026-10-20 — Sapan Parikh — Claude Desktop cannot read local paths. Slice 5.3 now lists Screenshot references instead of paths, and adds `get_screenshot`, which serves the image scaled to 1568 px on the long edge. Added invariant 4.10 and the Screenshot reference and Served image types, and updated §6.1.1, §6.5.1, §7.1, §7.2, §7.5 and §10 to match [1, 13, 14].
