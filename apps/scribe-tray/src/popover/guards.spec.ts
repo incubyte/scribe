@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { expecting } from "../shared/guards";
 import {
-  expecting,
   isModelDownload,
   isPartialPayload,
   isRecorderSnapshot,

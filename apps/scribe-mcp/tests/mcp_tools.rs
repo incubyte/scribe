@@ -133,13 +133,17 @@ fn collect_files(root: &Path, folder: &Path, files: &mut Vec<(String, Vec<u8>)>)
     }
 }
 
-#[tokio::test]
-async fn an_ai_app_discovers_the_list_and_read_tools_with_descriptions_and_input_schemas() {
+async fn tools_sorted_by_name() -> Vec<rmcp::model::Tool> {
     let folder = tempfile::tempdir().unwrap();
     let client = connect_to(folder.path()).await;
-
     let mut tools = client.list_all_tools().await.unwrap();
     tools.sort_by(|a, b| a.name.cmp(&b.name));
+    tools
+}
+
+#[tokio::test]
+async fn an_ai_app_discovers_the_screenshot_list_read_and_search_tools_by_name() {
+    let tools = tools_sorted_by_name().await;
 
     let names: Vec<&str> = tools.iter().map(|tool| tool.name.as_ref()).collect();
     assert_eq!(
@@ -151,13 +155,25 @@ async fn an_ai_app_discovers_the_list_and_read_tools_with_descriptions_and_input
             "search_transcripts"
         ]
     );
-    assert!(tools.iter().all(|tool| tool.description.is_some()));
+}
+
+#[tokio::test]
+async fn an_ai_app_is_told_what_each_tool_takes() {
+    let tools = tools_sorted_by_name().await;
+
     assert!(tools[0].input_schema["properties"]["name"].is_object());
     assert!(tools[1].input_schema["properties"]["id"].is_object());
     assert!(tools[2].input_schema["properties"]["limit"].is_object());
     assert!(tools[2].input_schema["properties"]["since"].is_object());
     assert!(tools[3].input_schema["properties"]["query"].is_object());
     assert!(tools[3].input_schema["properties"]["limit"].is_object());
+}
+
+#[tokio::test]
+async fn an_ai_app_is_told_what_each_tool_does_and_how_screenshots_are_reached() {
+    let tools = tools_sorted_by_name().await;
+
+    assert!(tools.iter().all(|tool| tool.description.is_some()));
     assert!(
         tools[0]
             .description

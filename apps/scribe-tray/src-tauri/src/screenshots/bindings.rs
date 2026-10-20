@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
-use tauri_plugin_global_shortcut::Shortcut;
+use serde_json::Value;
+use tauri_plugin_global_shortcut::{Modifiers, Shortcut};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -66,6 +67,13 @@ impl Platform {
         }
     }
 
+    fn needs_modifier_message(self) -> &'static str {
+        match self {
+            Platform::MacOs => "Use ⌘, ⌃ or ⌥ with a letter, number or function key",
+            Platform::Windows => "Use Ctrl or Alt with a letter, number or function key",
+        }
+    }
+
     fn default_keys(self, kind: ShortcutKind) -> &'static str {
         match (self, kind) {
             (Platform::MacOs, ShortcutKind::FullScreen) => "control+alt+super+Digit1",
@@ -77,6 +85,7 @@ impl Platform {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct PressedKeys {
     pub code: String,
     pub control: bool,
@@ -128,20 +137,16 @@ impl ShortcutBinding {
     #[must_use]
     pub fn from_stored(
         kind: ShortcutKind,
-        raw: Option<&str>,
+        raw: Option<&Value>,
         platform: Platform,
     ) -> ShortcutBinding {
         let Some(raw) = raw else {
             return ShortcutBinding::default_for(kind, platform);
         };
-        raw.parse::<Shortcut>()
-            .map(|shortcut| ShortcutBinding {
-                keys: shortcut.into_string(),
-            })
-            .unwrap_or_else(|error| {
-                tracing::warn!(%error, ?kind, "ignoring an unreadable stored screenshot shortcut");
-                ShortcutBinding::default_for(kind, platform)
-            })
+        parse_stored(raw).unwrap_or_else(|reason| {
+            tracing::warn!(%reason, ?kind, "ignoring an unusable stored screenshot shortcut");
+            ShortcutBinding::default_for(kind, platform)
+        })
     }
 
     #[must_use]
@@ -166,6 +171,23 @@ impl ShortcutBinding {
         let mut tokens = self.keys.split('+').collect::<Vec<_>>();
         let key = tokens.pop().unwrap_or_default();
         (key, tokens)
+    }
+}
+
+fn parse_stored(raw: &Value) -> Result<ShortcutBinding, String> {
+    let text = raw.as_str().ok_or("the stored value is not text")?;
+    let shortcut = text
+        .parse::<Shortcut>()
+        .map_err(|error| error.to_string())?;
+    let has_anchor_modifier = shortcut
+        .mods
+        .intersects(Modifiers::CONTROL | Modifiers::ALT | Modifiers::SUPER);
+    let keys = shortcut.into_string();
+    let key = keys.rsplit('+').next().unwrap_or_default();
+    if has_anchor_modifier && is_supported_key(key) {
+        Ok(ShortcutBinding { keys })
+    } else {
+        Err("the stored shortcut breaks the rules for a screenshot shortcut".to_owned())
     }
 }
 
@@ -194,6 +216,12 @@ fn is_function_key(code: &str) -> bool {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Assignment {
+    pub kind: ShortcutKind,
+    pub binding: ShortcutBinding,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Bindings {
     full_screen: ShortcutBinding,
     region: ShortcutBinding,
@@ -206,6 +234,23 @@ impl Bindings {
             full_screen,
             region,
         }
+    }
+
+    #[must_use]
+    pub fn from_stored(
+        full_screen: Option<&Value>,
+        region: Option<&Value>,
+        platform: Platform,
+    ) -> Bindings {
+        let full_screen =
+            ShortcutBinding::from_stored(ShortcutKind::FullScreen, full_screen, platform);
+        let region = ShortcutBinding::from_stored(ShortcutKind::Region, region, platform);
+        if full_screen == region {
+            tracing::warn!("ignoring a stored region shortcut that duplicates the full screen one");
+            let region = ShortcutBinding::default_for(ShortcutKind::Region, platform);
+            return Bindings::new(full_screen, region);
+        }
+        Bindings::new(full_screen, region)
     }
 
     #[must_use]
@@ -245,15 +290,18 @@ fn other_kind(kind: ShortcutKind) -> ShortcutKind {
 #[serde(tag = "outcome", rename_all = "snake_case")]
 pub enum RebindOutcome {
     Accepted { label: String },
-    NeedsModifier,
+    NeedsModifier { message: String },
     DuplicateOf { kind: ShortcutKind },
     InUseByAnotherApp,
 }
 
-impl From<BindingProblem> for RebindOutcome {
-    fn from(problem: BindingProblem) -> RebindOutcome {
+impl RebindOutcome {
+    #[must_use]
+    pub fn refused(problem: BindingProblem, platform: Platform) -> RebindOutcome {
         match problem {
-            BindingProblem::NeedsModifier => RebindOutcome::NeedsModifier,
+            BindingProblem::NeedsModifier => RebindOutcome::NeedsModifier {
+                message: platform.needs_modifier_message().to_owned(),
+            },
             BindingProblem::DuplicateOf(kind) => RebindOutcome::DuplicateOf { kind },
         }
     }

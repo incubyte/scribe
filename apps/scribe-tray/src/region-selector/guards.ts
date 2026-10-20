@@ -1,9 +1,9 @@
-import { hasFields, isListOf, isNumber, isOneOf } from "../popover/guards";
+import { hasFields, isListOf, isNumber, isOneOf } from "../shared/guards";
 import type { PixelRect, RegionCompletion, RegionContext } from "./types";
 
-const COMPLETION_OUTCOMES: readonly string[] = ["captured", "too_small"];
+const COMPLETION_OUTCOMES: readonly RegionCompletion["outcome"][] = ["captured", "too_small"];
 
-const isCompletionOutcome = isOneOf<RegionCompletion["outcome"]>(COMPLETION_OUTCOMES);
+const isCompletionOutcome = isOneOf(COMPLETION_OUTCOMES);
 
 function isPixelRect(value: unknown): value is PixelRect {
   return hasFields(value, { x: isNumber, y: isNumber, width: isNumber, height: isNumber });

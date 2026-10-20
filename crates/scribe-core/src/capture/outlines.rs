@@ -1,4 +1,4 @@
-use crate::capture::{MonitorPlacement, PixelRect, WindowOutline};
+use crate::capture::{FrameSize, MonitorPlacement, PixelRect, WindowOutline};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct WindowCandidate {
@@ -29,32 +29,49 @@ impl Span {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+struct Axis {
+    origin: f64,
+    extent: f64,
+    scale: f64,
+}
+
+impl Axis {
+    fn pixels_of(self, start: f64, length: f64) -> (u32, u32) {
+        let relative_start = start - self.origin;
+        Span {
+            start: relative_start,
+            end: relative_start + length,
+        }
+        .clipped_to(self.extent)
+        .scaled(self.scale)
+    }
+}
+
 #[must_use]
 pub fn visible_outlines(
     candidates: &[WindowCandidate],
     placement: &MonitorPlacement,
-    frame_width: u32,
-    frame_height: u32,
+    frame_size: FrameSize,
 ) -> Vec<WindowOutline> {
-    let scale_x = f64::from(frame_width) / f64::from(placement.width);
-    let scale_y = f64::from(frame_height) / f64::from(placement.height);
+    let horizontal = Axis {
+        origin: f64::from(placement.x),
+        extent: f64::from(placement.width),
+        scale: f64::from(frame_size.width) / f64::from(placement.width),
+    };
+    let vertical = Axis {
+        origin: f64::from(placement.y),
+        extent: f64::from(placement.height),
+        scale: f64::from(frame_size.height) / f64::from(placement.height),
+    };
     candidates
         .iter()
         .filter(|candidate| candidate.is_app_window && !candidate.is_own)
         .filter_map(|candidate| {
-            let horizontal = Span {
-                start: candidate.left - f64::from(placement.x),
-                end: candidate.left - f64::from(placement.x) + candidate.width,
-            }
-            .clipped_to(f64::from(placement.width))
-            .scaled(scale_x);
-            let vertical = Span {
-                start: candidate.top - f64::from(placement.y),
-                end: candidate.top - f64::from(placement.y) + candidate.height,
-            }
-            .clipped_to(f64::from(placement.height))
-            .scaled(scale_y);
-            outline_between(horizontal, vertical)
+            outline_between(
+                horizontal.pixels_of(candidate.left, candidate.width),
+                vertical.pixels_of(candidate.top, candidate.height),
+            )
         })
         .collect()
 }

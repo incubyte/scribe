@@ -1,9 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
+import { expecting, isString } from "../shared/guards";
 import {
-  expecting,
   isClaudeDesktopStatus,
   isFolderChange,
-  isString,
   isModelDownload,
   isRebindOutcome,
   isRecorderSnapshot,

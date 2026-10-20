@@ -44,7 +44,7 @@ impl TranscriptStore for SettingsFollowingStore {
 
     fn list(&self, limit: usize) -> Result<Vec<SessionSummary>, StoreError> {
         self.follow_settings()?;
-        TranscriptStore::list(&self.inner, limit)
+        self.inner.list(limit)
     }
 
     fn list_all(&self) -> Result<Vec<SessionSummary>, StoreError> {
@@ -71,9 +71,9 @@ impl ScreenshotStore for SettingsFollowingStore {
         self.inner.save(moment, screenshot)
     }
 
-    fn list(&self, session: &SessionId) -> Result<Vec<ScreenshotName>, StoreError> {
+    fn list_screenshots(&self, session: &SessionId) -> Result<Vec<ScreenshotName>, StoreError> {
         self.follow_settings()?;
-        ScreenshotStore::list(&self.inner, session)
+        self.inner.list_screenshots(session)
     }
 
     fn serve(

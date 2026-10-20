@@ -1,6 +1,6 @@
-import { useState } from "react";
 import { ScreenshotShortcuts } from "./ScreenshotShortcuts";
 import { SettingsPanel } from "./SettingsPanel";
+import { useAnnouncement } from "./useAnnouncement";
 import { useTranscriptsFolder } from "./useTranscriptsFolder";
 
 interface SettingsViewProps {
@@ -10,23 +10,20 @@ interface SettingsViewProps {
 
 export function SettingsView({ isRecording, onBack }: SettingsViewProps) {
   const { folder, status, change } = useTranscriptsFolder();
-  const [shortcutStatus, setShortcutStatus] = useState<string | null>(null);
-
-  const changeFolder = () => {
-    setShortcutStatus(null);
-    void change();
-  };
+  const { announcement, announce } = useAnnouncement();
 
   return (
-    <>
-      <SettingsPanel
-        folder={folder}
-        status={shortcutStatus ?? status}
-        isRecording={isRecording}
-        onChangeFolder={changeFolder}
-        onBack={onBack}
-      />
-      <ScreenshotShortcuts onStatus={setShortcutStatus} />
-    </>
+    <SettingsPanel
+      folder={folder}
+      status={status}
+      isRecording={isRecording}
+      onChangeFolder={() => void change()}
+      onBack={onBack}
+    >
+      <ScreenshotShortcuts onStatus={announce} />
+      <p key={announcement.sequence} role="status" className="settings__status">
+        {announcement.message}
+      </p>
+    </SettingsPanel>
   );
 }

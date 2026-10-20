@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use scribe_core::capture::{MonitorPlacement, PendingCapture, PixelRect};
 use serde::Serialize;
 use tauri::ipc::Response;
@@ -41,10 +43,10 @@ pub fn open<R: Runtime>(app: &AppHandle<R>, placement: &MonitorPlacement) -> tau
 }
 
 pub fn close<R: Runtime>(app: &AppHandle<R>) {
-    if let Some(window) = app.get_webview_window(WINDOW_LABEL) {
-        if let Err(error) = window.close() {
-            tracing::warn!(%error, "could not close the region selector");
-        }
+    if let Some(window) = app.get_webview_window(WINDOW_LABEL)
+        && let Err(error) = window.close()
+    {
+        tracing::warn!(%error, "could not close the region selector");
     }
 }
 
@@ -69,10 +71,11 @@ fn build_hidden<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<WebviewWindow<R
 
 fn cancel_on_blur<R: Runtime>(app: &AppHandle<R>, window: &WebviewWindow<R>) {
     let app = app.clone();
-    window.on_window_event(move |event| {
-        if matches!(event, WindowEvent::Focused(false)) {
-            cancel(&app);
-        }
+    let has_been_focused = AtomicBool::new(false);
+    window.on_window_event(move |event| match event {
+        WindowEvent::Focused(true) => has_been_focused.store(true, Ordering::Relaxed),
+        WindowEvent::Focused(false) if has_been_focused.load(Ordering::Relaxed) => cancel(&app),
+        _ => {}
     });
 }
 

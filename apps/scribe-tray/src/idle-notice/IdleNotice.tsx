@@ -13,18 +13,22 @@ export function IdleNotice() {
 
   const dismiss = () => void dismissIdleNotice(dontShowAgain);
 
-  const dismissOnKey = (event: React.KeyboardEvent) => {
-    if (DISMISS_KEYS.includes(event.key)) {
-      event.preventDefault();
-      dismiss();
-    }
-  };
+  useEffect(() => {
+    const dismissOnKey = (event: KeyboardEvent) => {
+      if (DISMISS_KEYS.includes(event.key)) {
+        event.preventDefault();
+        void dismissIdleNotice(dontShowAgain);
+      }
+    };
+    window.addEventListener("keydown", dismissOnKey);
+    return () => window.removeEventListener("keydown", dismissOnKey);
+  }, [dontShowAgain]);
 
   return (
-    <main className="window" onKeyDown={dismissOnKey}>
+    <main className="window">
       <h1 className="window__title">Copied to clipboard</h1>
       <p className="window__text">
-        Scribe saves screenshots into a meeting's folder only while it's recording. This one is on
+        Scribe saves screenshots into a meeting&apos;s folder only while it&apos;s recording. This one is on
         your clipboard, ready to paste.
       </p>
       <label className="window__option">
@@ -33,7 +37,7 @@ export function IdleNotice() {
           checked={dontShowAgain}
           onChange={(event) => setDontShowAgain(event.target.checked)}
         />
-        Don't show this again
+        Don&apos;t show this again
       </label>
       <button ref={okButton} className="button" type="button" onClick={dismiss}>
         OK

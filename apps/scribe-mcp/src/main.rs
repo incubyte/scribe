@@ -22,16 +22,13 @@ async fn main() -> anyhow::Result<()> {
 }
 
 fn build_library() -> anyhow::Result<TranscriptLibrary> {
-    Ok(match default_settings_path() {
-        Some(settings_path) => {
-            let store = Arc::new(SettingsFollowingStore::new(settings_path)?);
-            TranscriptLibrary::new(store.clone(), store)
-        }
-        None => {
-            let store = Arc::new(MarkdownTranscriptStore::new(
-                TranscriptsFolder::configured_by(None)?,
-            ));
-            TranscriptLibrary::new(store.clone(), store)
-        }
+    Ok(if let Some(settings_path) = default_settings_path() {
+        let store = Arc::new(SettingsFollowingStore::new(settings_path)?);
+        TranscriptLibrary::new(store.clone(), store)
+    } else {
+        let store = Arc::new(MarkdownTranscriptStore::new(
+            TranscriptsFolder::configured_by(None)?,
+        ));
+        TranscriptLibrary::new(store.clone(), store)
     })
 }

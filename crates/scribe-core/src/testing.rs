@@ -411,6 +411,14 @@ pub fn frame_filled(width: u32, height: u32, pixel: [u8; 4]) -> Frame {
 }
 
 #[must_use]
+pub fn opaque_grey_pixels(levels: impl IntoIterator<Item = u8>) -> Vec<u8> {
+    levels
+        .into_iter()
+        .flat_map(|level| [level, level, level, 255])
+        .collect()
+}
+
+#[must_use]
 pub fn shot_of(frame: Frame) -> MonitorShot {
     let placement = MonitorPlacement {
         x: 0,
@@ -543,7 +551,7 @@ impl ScreenshotStore for InMemoryScreenshotStore {
         Ok(name)
     }
 
-    fn list(&self, session: &SessionId) -> Result<Vec<ScreenshotName>, StoreError> {
+    fn list_screenshots(&self, session: &SessionId) -> Result<Vec<ScreenshotName>, StoreError> {
         Ok(self
             .saved()
             .keys()

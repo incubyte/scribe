@@ -100,7 +100,7 @@ fn capture_display(display: &sc::Display, windows: Vec<WindowCandidate>, deliver
                 .ok_or_else(|| capture_error(error))
                 .and_then(rgba_of)
                 .map(|frame| MonitorShot {
-                    outlines: visible_outlines(&windows, &placement, frame.width(), frame.height()),
+                    outlines: visible_outlines(&windows, &placement, frame.size()),
                     frame,
                     placement,
                 });

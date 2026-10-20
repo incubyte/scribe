@@ -48,7 +48,7 @@ pub trait ScreenshotStore: Send + Sync {
         moment: &SessionMoment,
         screenshot: &Frame,
     ) -> Result<ScreenshotName, StoreError>;
-    fn list(&self, session: &SessionId) -> Result<Vec<ScreenshotName>, StoreError>;
+    fn list_screenshots(&self, session: &SessionId) -> Result<Vec<ScreenshotName>, StoreError>;
     fn serve(
         &self,
         reference: &ScreenshotReference,

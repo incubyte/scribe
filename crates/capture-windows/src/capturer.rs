@@ -36,7 +36,7 @@ impl ScreenCapturer for DesktopCapturer {
             .map_err(|error| ScreenCaptureError::Failed(error.to_string()))?;
         let placement = placement_of(&monitor)?;
         Ok(MonitorShot {
-            outlines: visible_outlines(&windows, &placement, frame.width(), frame.height()),
+            outlines: visible_outlines(&windows, &placement, frame.size()),
             frame,
             placement,
         })

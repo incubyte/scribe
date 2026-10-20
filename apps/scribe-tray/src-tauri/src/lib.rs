@@ -34,6 +34,7 @@ pub fn run() -> tauri::Result<()> {
         .run(tauri::generate_context!())
 }
 
+#[allow(clippy::too_many_lines)]
 fn with_commands<R: Runtime>(builder: Builder<R>) -> Builder<R> {
     builder.invoke_handler(tauri::generate_handler![
         privacy::acknowledge_privacy,

@@ -321,7 +321,7 @@ In the region selector, moving the pointer highlights the window under it and sh
 - [x] **5.7.1** In the selector, the topmost visible app window under the pointer on that monitor is outlined, with its `W × H` in output pixels.
 - [x] **5.7.2** Clicking without dragging captures the highlighted window's visible rectangle, clipped to the monitor. It goes to the same destinations as a dragged region.
 - [x] **5.7.3** Starting a drag clears the highlight and selects a free region, as in 5.6.
-- [x] **5.7.4** The desktop wallpaper, the menu bar, Dock or taskbar, Scribe's own windows, and windows on other monitors are never highlighted.
+- [ ] **5.7.4** The desktop wallpaper, the menu bar, Dock or taskbar, Scribe's own windows, and windows on other monitors are never highlighted.
 - [x] **5.7.5** Clicking where no window is highlighted captures nothing and leaves the selector open.
 - [x] **5.7.6** Window outlines are taken at the same instant as the Frame. A window that moves after the press does not shift its highlight.
 
@@ -355,7 +355,7 @@ The popover's Settings view gains a "Screenshot shortcuts" section with one row 
 - [ ] **5.8.6** An accepted combination works at once, without a relaunch, and survives relaunches.
 - [x] **5.8.7** **Reset to default** restores that row's default from 5.2.1 or 5.6.1.
 - [x] **5.8.8** The launch notification for an unavailable shortcut (5.2.10) adds "Change it in Scribe Settings".
-- [ ] **5.8.9** A missing stored binding falls back to the default silently; a malformed or unparseable one falls back to the default and logs a warning. Neither ever stops Scribe from launching.
+- [x] **5.8.9** A missing stored binding falls back to the default silently; a malformed or unparseable one falls back to the default and logs a warning. Neither ever stops Scribe from launching.
 - [x] **5.8.10** Shortcuts can be changed while a recording is in progress.
 - [x] **5.8.11** Each **Change** button has an accessible name with its row and current value, for example "Change Capture region shortcut, currently ⌃⌥⌘2". Outcomes are announced through the view's existing status line. Focus stays on the row after a change. The section meets WCAG 2.2 AA contrast and focus visibility.
 

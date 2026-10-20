@@ -26,11 +26,6 @@ impl PendingCapture {
     }
 
     #[must_use]
-    pub fn destination(&self) -> &Destination {
-        &self.destination
-    }
-
-    #[must_use]
     pub fn accepts(&self, selection: Selection) -> bool {
         match selection {
             Selection::WholeMonitor => true,

@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef } from "react";
-import { rowName } from "./shortcutCapture";
+import { LISTENING_MESSAGE, rowName } from "./shortcutCapture";
 import type { ShortcutKind, ShortcutView } from "./types";
 import { useScreenshotShortcuts } from "./useScreenshotShortcuts";
 
@@ -14,8 +14,6 @@ interface ShortcutRowProps {
   readonly onChange: (kind: ShortcutKind) => void;
   readonly onReset: (kind: ShortcutKind) => void;
 }
-
-const LISTENING_TEXT = "Press the new shortcut…";
 
 function ShortcutRow({
   shortcut,
@@ -37,7 +35,7 @@ function ShortcutRow({
     <li className="shortcuts__row" ref={row} tabIndex={-1}>
       <span className="shortcuts__name">{name}</span>
       {isListening ? (
-        <span className="shortcuts__listening">{LISTENING_TEXT}</span>
+        <span className="shortcuts__listening">{LISTENING_MESSAGE}</span>
       ) : (
         <kbd className="shortcuts__keys">{shortcut.label}</kbd>
       )}
@@ -54,7 +52,7 @@ function ShortcutRow({
         className="actions__link"
         type="button"
         disabled={isLocked}
-        aria-label={`Reset ${name} shortcut to default`}
+        aria-label={`Reset to default for ${name} shortcut`}
         onClick={() => onReset(shortcut.kind)}
       >
         Reset to default

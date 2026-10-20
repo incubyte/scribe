@@ -16,8 +16,8 @@ const ROW_NAMES: Readonly<Record<ShortcutKind, string>> = {
   region: "Capture region",
 };
 
-export const NEEDS_MODIFIER_MESSAGE =
-  "Use ⌘, ⌃ or ⌥ with a letter, number or function key";
+export const LISTENING_MESSAGE = "Press the new shortcut…";
+export const CANCELLED_MESSAGE = "Shortcut change cancelled";
 export const IN_USE_MESSAGE = "Another app is using this shortcut";
 export const SHORTCUT_FAILURE_MESSAGE = "The shortcut could not be changed.";
 export const SHORTCUTS_UNAVAILABLE_MESSAGE =
@@ -47,7 +47,7 @@ export function describeRebind(outcome: RebindOutcome, kind: ShortcutKind): stri
     case "accepted":
       return `${rowName(kind)} is now ${outcome.label}`;
     case "needs_modifier":
-      return NEEDS_MODIFIER_MESSAGE;
+      return outcome.message;
     case "duplicate_of":
       return `Already used for ${rowName(outcome.kind)}`;
     case "in_use_by_another_app":

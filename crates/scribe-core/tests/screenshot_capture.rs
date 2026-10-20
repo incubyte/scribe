@@ -8,7 +8,8 @@ use scribe_core::capture::{
 use scribe_core::ports::ScreenCaptureError;
 use scribe_core::recording::SessionId;
 use scribe_core::testing::{
-    FakeScreenCapturer, InMemoryScreenshotStore, frame_filled, live_session_at, shot_of,
+    FakeScreenCapturer, InMemoryScreenshotStore, frame_filled, live_session_at, opaque_grey_pixels,
+    shot_of,
 };
 
 const RED: [u8; 4] = [255, 0, 0, 255];
@@ -28,15 +29,7 @@ fn taker_showing(frame: Frame, store: &Arc<InMemoryScreenshotStore>) -> Screensh
 }
 
 fn three_by_two() -> Frame {
-    Frame::new(
-        3,
-        2,
-        vec![
-            1, 1, 1, 255, 2, 2, 2, 255, 3, 3, 3, 255, //
-            4, 4, 4, 255, 5, 5, 5, 255, 6, 6, 6, 255,
-        ],
-    )
-    .unwrap()
+    Frame::new(3, 2, opaque_grey_pixels(1..=6)).unwrap()
 }
 
 #[test]

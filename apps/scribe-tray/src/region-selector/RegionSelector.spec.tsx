@@ -12,14 +12,19 @@ const CAPTURED: RegionCompletion = { outcome: "captured" };
 
 const BROWSER_WINDOW: PixelRect = { x: 200, y: 100, width: 600, height: 400 };
 
-function backend(completion: RegionCompletion = CAPTURED, outlines: PixelRect[] = []) {
-  const responses: Readonly<Record<string, unknown>> = {
-    region_context: { ...TWICE_THE_VIEWPORT, outlines },
-    region_frame: new ArrayBuffer(16),
-    complete_region: completion,
-    cancel_region: null,
+function backend(
+  completion: RegionCompletion = CAPTURED,
+  outlines: PixelRect[] = [],
+  failures: Readonly<Record<string, () => never>> = {},
+) {
+  const responses: Readonly<Record<string, () => unknown>> = {
+    region_context: () => ({ ...TWICE_THE_VIEWPORT, outlines }),
+    region_frame: () => new ArrayBuffer(16),
+    complete_region: () => completion,
+    cancel_region: () => null,
+    ...failures,
   };
-  const handler = vi.fn((command: string) => responses[command]);
+  const handler = vi.fn((command: string) => responses[command]?.());
   mockIPC(handler);
   return handler;
 }
@@ -176,7 +181,7 @@ describe("the region selector", () => {
     expect(handler).not.toHaveBeenCalledWith("cancel_region", expect.anything());
   });
 
-  it("fetches the window outlines once so later pointer moves cannot shift them", async () => {
+  it("keeps outlining the same window as the pointer moves within it", async () => {
     const handler = backend(CAPTURED, [BROWSER_WINDOW]);
     const selector = await renderWithFrame();
 
@@ -186,6 +191,57 @@ describe("the region selector", () => {
     const contextFetches = handler.mock.calls.filter(([command]) => command === "region_context");
     expect(contextFetches).toHaveLength(1);
     expect(screen.getByText("600 × 400")).toBeInTheDocument();
+  });
+
+  it("keeps the size readout inside the screen when the selection reaches the bottom edge", async () => {
+    backend();
+    const selector = await renderWithFrame();
+
+    drag(selector, [10, 20], [110, 760]);
+
+    expect(screen.getByText("200 × 1480")).toHaveClass("region-selector__size--upward");
+  });
+
+  it("puts the size readout below a selection with room beneath it", async () => {
+    backend();
+    const selector = await renderWithFrame();
+
+    fireEvent.pointerDown(selector, { clientX: 10, clientY: 20, button: 0 });
+    fireEvent.pointerMove(selector, { clientX: 110, clientY: 70 });
+
+    expect(screen.getByText("200 × 100")).not.toHaveClass("region-selector__size--upward");
+  });
+
+  it("cancels the capture when the frozen screen cannot be loaded", async () => {
+    const unavailable = () => {
+      throw new Error("nothing pending");
+    };
+    const handler = backend(CAPTURED, [], { region_frame: unavailable });
+    render(<RegionSelector />);
+
+    await waitFor(() => expect(handler).toHaveBeenCalledWith("cancel_region", {}));
+  });
+
+  it("cancels the capture when the window outlines cannot be loaded", async () => {
+    const unavailable = () => {
+      throw new Error("nothing pending");
+    };
+    const handler = backend(CAPTURED, [], { region_context: unavailable });
+    render(<RegionSelector />);
+
+    await waitFor(() => expect(handler).toHaveBeenCalledWith("cancel_region", {}));
+  });
+
+  it("cancels the capture when saving the selected area fails", async () => {
+    const saveFails = () => {
+      throw new Error("could not save");
+    };
+    const handler = backend(CAPTURED, [], { complete_region: saveFails });
+    const selector = await renderWithFrame();
+
+    drag(selector, [10, 20], [110, 70]);
+
+    await waitFor(() => expect(handler).toHaveBeenCalledWith("cancel_region", {}));
   });
 
   it("has no accessibility violations", async () => {

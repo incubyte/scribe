@@ -55,6 +55,7 @@ objc2 = "0.6"
 [dev-dependencies]
 scribe-core = { workspace = true, features = ["testing"] }
 tempfile.workspace = true
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "ansi"] }
 
 [lints]
 workspace = true

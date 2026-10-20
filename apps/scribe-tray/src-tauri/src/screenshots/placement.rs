@@ -7,10 +7,9 @@ pub fn centred_in(placement: &MonitorPlacement, size: (f64, f64)) -> Position {
     let top = f64::from(placement.y) + (f64::from(placement.height) - size.1) / 2.0;
     match placement.units {
         PlacementUnits::Points => Position::Logical(LogicalPosition::new(left, top)),
-        PlacementUnits::Pixels => Position::Physical(PhysicalPosition::new(
-            left.round() as i32,
-            top.round() as i32,
-        )),
+        PlacementUnits::Pixels => {
+            Position::Physical(PhysicalPosition::new(to_pixel(left), to_pixel(top)))
+        }
     }
 }
 
@@ -32,4 +31,9 @@ pub fn covering(placement: &MonitorPlacement) -> Rect {
             size: Size::Physical(PhysicalSize::new(placement.width, placement.height)),
         },
     }
+}
+
+#[allow(clippy::cast_possible_truncation)]
+fn to_pixel(value: f64) -> i32 {
+    value.round() as i32
 }

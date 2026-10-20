@@ -1,7 +1,10 @@
 use scribe_tray::screenshots::bindings::{
     BindingProblem, Bindings, Platform, PressedKeys, RebindOutcome, ShortcutBinding, ShortcutKind,
 };
+use serde_json::{Value, json};
+use std::sync::{Arc, Mutex};
 use tauri_plugin_global_shortcut::{Code, Modifiers, Shortcut};
+use tracing_subscriber::fmt::MakeWriter;
 
 fn pressed(code: &str) -> PressedKeys {
     PressedKeys {
@@ -165,34 +168,123 @@ fn a_stored_combination_round_trips() {
     })
     .unwrap();
 
-    let restored =
-        ShortcutBinding::from_stored(ShortcutKind::Region, Some(original.keys()), Platform::MacOs);
+    let restored = ShortcutBinding::from_stored(
+        ShortcutKind::Region,
+        Some(&json!(original.keys())),
+        Platform::MacOs,
+    );
 
     assert_eq!(restored, original);
 }
 
-#[test]
-fn a_missing_empty_or_unparseable_stored_value_falls_back_to_the_default() {
-    for raw in [None, Some(""), Some("not a shortcut"), Some("control+")] {
-        let binding = ShortcutBinding::from_stored(ShortcutKind::Region, raw, Platform::Windows);
+fn stored_region(raw: Option<&Value>) -> ShortcutBinding {
+    ShortcutBinding::from_stored(ShortcutKind::Region, raw, Platform::Windows)
+}
 
-        assert_eq!(
-            binding,
-            default_for(ShortcutKind::Region, Platform::Windows),
-            "{raw:?} should fall back"
-        );
+fn region_default() -> ShortcutBinding {
+    default_for(ShortcutKind::Region, Platform::Windows)
+}
+
+fn warnings_logged_by(action: impl FnOnce()) -> String {
+    let written = CapturedLog::default();
+    let subscriber = tracing_subscriber::fmt()
+        .with_writer(written.clone())
+        .with_ansi(false)
+        .finish();
+    tracing::subscriber::with_default(subscriber, action);
+    written.text()
+}
+
+#[derive(Clone, Default)]
+struct CapturedLog(Arc<Mutex<Vec<u8>>>);
+
+impl CapturedLog {
+    fn text(&self) -> String {
+        String::from_utf8(self.0.lock().unwrap().clone()).unwrap()
+    }
+}
+
+impl std::io::Write for CapturedLog {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.0.lock().unwrap().extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+impl<'a> MakeWriter<'a> for CapturedLog {
+    type Writer = CapturedLog;
+
+    fn make_writer(&'a self) -> CapturedLog {
+        self.clone()
     }
 }
 
 #[test]
-fn a_rebind_outcome_is_tagged_for_the_webview() {
+fn a_missing_stored_value_falls_back_to_the_default_without_a_warning() {
+    let mut binding = None;
+
+    let log = warnings_logged_by(|| binding = Some(stored_region(None)));
+
+    assert_eq!(binding, Some(region_default()));
+    assert_eq!(log, "");
+}
+
+#[test]
+fn a_malformed_stored_value_falls_back_to_the_default_with_a_warning() {
+    let malformed = [
+        json!(""),
+        json!("not a shortcut"),
+        json!("control+"),
+        json!(42),
+        json!(null),
+        json!("shift+KeyR"),
+        json!("control+Enter"),
+        json!("control+F13"),
+    ];
+    for raw in malformed {
+        let mut binding = None;
+
+        let log = warnings_logged_by(|| binding = Some(stored_region(Some(&raw))));
+
+        assert_eq!(binding, Some(region_default()), "{raw} should fall back");
+        assert!(log.contains("WARN"), "{raw} should log a warning");
+    }
+}
+
+#[test]
+fn a_stored_alias_is_read_and_kept_in_canonical_form() {
+    let binding = stored_region(Some(&json!("ctrl+option+r")));
+
+    assert_eq!(binding.keys(), "control+alt+KeyR");
+}
+
+#[test]
+fn a_stored_region_shortcut_that_duplicates_the_full_screen_one_falls_back_to_its_default() {
+    let shared = json!("control+alt+KeyR");
+
+    let bindings = Bindings::from_stored(Some(&shared), Some(&shared), Platform::Windows);
+
+    assert_eq!(
+        bindings.get(ShortcutKind::FullScreen).keys(),
+        "control+alt+KeyR"
+    );
+    assert_eq!(bindings.get(ShortcutKind::Region), &region_default());
+}
+
+#[test]
+fn settings_is_told_whether_a_combination_was_accepted_or_why_it_was_refused() {
     let accepted = serde_json::to_value(RebindOutcome::Accepted {
         label: "⌃R".to_owned(),
     })
     .unwrap();
-    let duplicate = serde_json::to_value(RebindOutcome::from(BindingProblem::DuplicateOf(
-        ShortcutKind::FullScreen,
-    )))
+    let duplicate = serde_json::to_value(RebindOutcome::refused(
+        BindingProblem::DuplicateOf(ShortcutKind::FullScreen),
+        Platform::MacOs,
+    ))
     .unwrap();
 
     assert_eq!(
@@ -206,7 +298,28 @@ fn a_rebind_outcome_is_tagged_for_the_webview() {
 }
 
 #[test]
-fn pressed_keys_arrive_from_the_webview_as_code_and_modifier_flags() {
+fn a_combination_without_a_modifier_is_refused_in_the_platforms_own_words() {
+    let on_mac = RebindOutcome::refused(BindingProblem::NeedsModifier, Platform::MacOs);
+    let on_windows = RebindOutcome::refused(BindingProblem::NeedsModifier, Platform::Windows);
+
+    assert_eq!(
+        serde_json::to_value(on_mac).unwrap(),
+        json!({
+            "outcome": "needs_modifier",
+            "message": "Use ⌘, ⌃ or ⌥ with a letter, number or function key"
+        })
+    );
+    assert_eq!(
+        serde_json::to_value(on_windows).unwrap(),
+        json!({
+            "outcome": "needs_modifier",
+            "message": "Use Ctrl or Alt with a letter, number or function key"
+        })
+    );
+}
+
+#[test]
+fn settings_understands_a_key_press_as_the_physical_key_and_the_held_modifiers() {
     let pressed_keys: PressedKeys = serde_json::from_value(serde_json::json!({
         "code": "Digit2",
         "control": true,

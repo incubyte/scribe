@@ -1,5 +1,5 @@
 import { clearMocks, mockIPC } from "@tauri-apps/api/mocks";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { axe } from "vitest-axe";
@@ -17,30 +17,34 @@ const shortcutsWithRegion = (label: string): readonly ShortcutView[] => [
   { kind: "region", label },
 ];
 
-function backend(rebind: () => RebindOutcome = () => ({ outcome: "accepted", label: "⌃R" })) {
+function backend(
+  rebind: () => RebindOutcome = () => ({ outcome: "accepted", label: "⌃R" }),
+  failures: Readonly<Record<string, () => never>> = {},
+) {
   let shortcuts = shortcutsWithRegion(REGION_DEFAULT);
-  const handler = vi.fn((command: string) => {
-    if (command === "screenshot_shortcuts") {
-      return shortcuts;
-    }
-    if (command === "transcripts_folder") {
-      return "/Users/me/Documents/Scribe";
-    }
-    if (command === "rebind_screenshot_shortcut") {
+  const responses: Readonly<Record<string, () => unknown>> = {
+    screenshot_shortcuts: () => shortcuts,
+    transcripts_folder: () => "/Users/me/Documents/Scribe",
+    rebind_screenshot_shortcut: () => {
       const outcome = rebind();
-      if (outcome.outcome === "accepted") {
-        shortcuts = shortcutsWithRegion(outcome.label);
-      }
+      shortcuts = outcome.outcome === "accepted" ? shortcutsWithRegion(outcome.label) : shortcuts;
       return outcome;
-    }
-    if (command === "reset_screenshot_shortcut") {
+    },
+    reset_screenshot_shortcut: () => {
       shortcuts = shortcutsWithRegion(REGION_DEFAULT);
       return { outcome: "accepted", label: REGION_DEFAULT };
-    }
-    return undefined;
-  });
+    },
+    ...failures,
+  };
+  const handler = vi.fn((command: string) => responses[command]?.());
   mockIPC(handler);
   return handler;
+}
+
+function failing(message: string): () => never {
+  return () => {
+    throw new Error(message);
+  };
 }
 
 function commandsIssued(handler: ReturnType<typeof backend>) {
@@ -85,7 +89,8 @@ describe("the screenshot shortcuts section", () => {
 
   it("restores the old combination and resumes the shortcuts when Escape cancels", async () => {
     const handler = backend();
-    render(<ScreenshotShortcuts onStatus={vi.fn()} />);
+    const onStatus = vi.fn();
+    render(<ScreenshotShortcuts onStatus={onStatus} />);
     await startListeningOnRegion();
 
     await userEvent.keyboard("{Escape}");
@@ -96,6 +101,7 @@ describe("the screenshot shortcuts section", () => {
       expect(commandsIssued(handler)).toContain("resume_screenshot_shortcuts"),
     );
     expect(commandsIssued(handler)).not.toContain("rebind_screenshot_shortcut");
+    expect(onStatus).toHaveBeenLastCalledWith("Shortcut change cancelled");
   });
 
   it("resumes the shortcuts when the section goes away while listening", async () => {
@@ -143,8 +149,11 @@ describe("the screenshot shortcuts section", () => {
   it.each<[string, RebindOutcome, string]>([
     [
       "a combination without a usable modifier",
-      { outcome: "needs_modifier" },
-      "Use ⌘, ⌃ or ⌥ with a letter, number or function key",
+      {
+        outcome: "needs_modifier",
+        message: "Use Ctrl or Alt with a letter, number or function key",
+      },
+      "Use Ctrl or Alt with a letter, number or function key",
     ],
     [
       "a combination the other row uses",
@@ -179,7 +188,7 @@ describe("the screenshot shortcuts section", () => {
     await screen.findByText("⌃R");
 
     await userEvent.click(
-      screen.getByRole("button", { name: "Reset Capture region shortcut to default" }),
+      screen.getByRole("button", { name: "Reset to default for Capture region shortcut" }),
     );
 
     expect(await screen.findByText(REGION_DEFAULT)).toBeInTheDocument();
@@ -198,6 +207,70 @@ describe("the screenshot shortcuts section", () => {
     await screen.findByText("⌃R");
 
     expect(row).toHaveFocus();
+  });
+
+  it("announces that it is listening", async () => {
+    backend();
+    const onStatus = vi.fn();
+    render(<ScreenshotShortcuts onStatus={onStatus} />);
+
+    await startListeningOnRegion();
+
+    expect(onStatus).toHaveBeenCalledWith(LISTENING);
+  });
+
+  it("stops listening and resumes the shortcuts when the window loses focus", async () => {
+    const handler = backend();
+    render(<ScreenshotShortcuts onStatus={vi.fn()} />);
+    await startListeningOnRegion();
+
+    fireEvent.blur(window);
+
+    expect(await screen.findByText(REGION_DEFAULT)).toBeInTheDocument();
+    expect(screen.queryByText(LISTENING)).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(commandsIssued(handler)).toContain("resume_screenshot_shortcuts"),
+    );
+    expect(commandsIssued(handler)).not.toContain("rebind_screenshot_shortcut");
+  });
+
+  it("says the shortcuts cannot be read when they fail to load", async () => {
+    backend(undefined, { screenshot_shortcuts: failing("unavailable") });
+    const onStatus = vi.fn();
+
+    render(<ScreenshotShortcuts onStatus={onStatus} />);
+
+    await waitFor(() =>
+      expect(onStatus).toHaveBeenCalledWith("Scribe could not read the screenshot shortcuts."),
+    );
+  });
+
+  it("says the shortcut could not be changed and keeps the shortcuts live when pausing fails", async () => {
+    const handler = backend(undefined, { pause_screenshot_shortcuts: failing("cannot pause") });
+    const onStatus = vi.fn();
+    render(<ScreenshotShortcuts onStatus={onStatus} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: REGION_CHANGE }));
+
+    await waitFor(() =>
+      expect(onStatus).toHaveBeenCalledWith("The shortcut could not be changed."),
+    );
+    expect(screen.queryByText(LISTENING)).not.toBeInTheDocument();
+    expect(commandsIssued(handler)).toContain("resume_screenshot_shortcuts");
+  });
+
+  it("says the shortcut could not be changed and keeps the old combination when rebinding fails", async () => {
+    backend(undefined, { rebind_screenshot_shortcut: failing("cannot rebind") });
+    const onStatus = vi.fn();
+    render(<ScreenshotShortcuts onStatus={onStatus} />);
+    await startListeningOnRegion();
+
+    await userEvent.keyboard("{Control>}r{/Control}");
+
+    await waitFor(() =>
+      expect(onStatus).toHaveBeenCalledWith("The shortcut could not be changed."),
+    );
+    expect(await screen.findByText(REGION_DEFAULT)).toBeInTheDocument();
   });
 
   it("has no accessibility violations while idle or listening", async () => {
@@ -226,16 +299,42 @@ describe("the screenshot shortcuts in the settings view", () => {
     ).toBeDisabled();
   });
 
-  it("announces the outcome on the settings status line", async () => {
+  it("announces the outcome in its own status region, apart from the folder status", async () => {
     backend();
     render(<SettingsView isRecording={false} onBack={vi.fn()} />);
     await userEvent.click(await screen.findByRole("button", { name: REGION_CHANGE }));
-    await screen.findByText(LISTENING);
+    await screen.findAllByText(LISTENING);
 
     await userEvent.keyboard("{Control>}r{/Control}");
 
+    const outcome = await screen.findByText("Capture region is now ⌃R");
+    expect(outcome).toHaveAttribute("role", "status");
+  });
+
+  it("announces a repeated identical outcome again", async () => {
+    backend(() => ({ outcome: "in_use_by_another_app" }));
+    render(<SettingsView isRecording={false} onBack={vi.fn()} />);
+    await userEvent.click(await screen.findByRole("button", { name: REGION_CHANGE }));
+    await screen.findAllByText(LISTENING);
+    await userEvent.keyboard("{Control>}r{/Control}");
+    const first = await screen.findByText("Another app is using this shortcut");
+
+    await userEvent.click(await screen.findByRole("button", { name: REGION_CHANGE }));
+    await screen.findAllByText(LISTENING);
+    await userEvent.keyboard("{Control>}r{/Control}");
+
     await waitFor(() =>
-      expect(screen.getByRole("status")).toHaveTextContent("Capture region is now ⌃R"),
+      expect(screen.getByText("Another app is using this shortcut")).not.toBe(first),
     );
+  });
+
+  it("keeps Back as the last control in tab order, after the shortcuts", async () => {
+    backend();
+    render(<SettingsView isRecording={false} onBack={vi.fn()} />);
+    const back = await screen.findByRole("button", { name: "Back" });
+    const change = await screen.findByRole("button", { name: REGION_CHANGE });
+
+    expect(change.compareDocumentPosition(back)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(back.closest("section")?.lastElementChild).toBe(back);
   });
 });

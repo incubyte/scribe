@@ -50,6 +50,11 @@ body:has(.region-selector) {
   font-variant-numeric: tabular-nums;
 }
 
+.region-selector__size--upward {
+  margin-top: calc(var(--space-1) * -1);
+  transform: translateY(-100%);
+}
+
 .region-selector__hint {
   bottom: var(--space-5);
   left: 50%;

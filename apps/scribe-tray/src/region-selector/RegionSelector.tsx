@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { cancelRegion } from "./commands";
-import { sizeLabel } from "./selection";
+import { sizeLabel, sizeLabelAnchor } from "./selection";
 import type { PixelRect, Size } from "./types";
 import { useFrozenFrame } from "./useFrozenFrame";
 import { useRegionDrag } from "./useRegionDrag";
@@ -31,6 +31,7 @@ function useEscapeToCancel() {
 
 function SelectedArea({ area, frame }: Readonly<{ area: PixelRect; frame: Size }>) {
   const left = percentOf(area.x, frame.width);
+  const anchor = sizeLabelAnchor(area, frame);
   return (
     <>
       <div
@@ -43,8 +44,8 @@ function SelectedArea({ area, frame }: Readonly<{ area: PixelRect; frame: Size }
         }}
       />
       <span
-        className="region-selector__size"
-        style={{ left, top: percentOf(area.y + area.height, frame.height) }}
+        className={`region-selector__size${anchor.opensUpward ? " region-selector__size--upward" : ""}`}
+        style={{ left, top: percentOf(anchor.y, frame.height) }}
       >
         {sizeLabel(area)}
       </span>

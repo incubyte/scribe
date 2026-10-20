@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isLargeEnough, rectBetween, sizeLabel, toFramePoint } from "./selection";
+import { isLargeEnough, rectBetween, sizeLabel, sizeLabelAnchor, toFramePoint } from "./selection";
 
 const RETINA_VIEWPORT = { width: 1440, height: 900 };
 const RETINA_FRAME = { width: 2880, height: 1800 };
@@ -40,5 +40,27 @@ describe("a dragged selection", () => {
 
   it("reads out its size as width by height in output pixels", () => {
     expect(sizeLabel({ x: 10, y: 20, width: 1240, height: 680 })).toBe("1240 × 680");
+  });
+});
+
+describe("where the size readout sits next to a selection", () => {
+  const frame = { width: 2000, height: 1000 };
+
+  it("opens below the selection when there is room", () => {
+    const area = { x: 100, y: 100, width: 200, height: 300 };
+
+    expect(sizeLabelAnchor(area, frame)).toEqual({ y: 400, opensUpward: false });
+  });
+
+  it("opens upward from the top edge when the selection reaches the bottom of the screen", () => {
+    const area = { x: 100, y: 300, width: 200, height: 700 };
+
+    expect(sizeLabelAnchor(area, frame)).toEqual({ y: 300, opensUpward: true });
+  });
+
+  it("opens upward from inside the bottom edge when the selection fills the screen height", () => {
+    const area = { x: 0, y: 0, width: 2000, height: 1000 };
+
+    expect(sizeLabelAnchor(area, frame)).toEqual({ y: 1000, opensUpward: true });
   });
 });

@@ -47,7 +47,7 @@ impl Call {
         }
     }
 
-    fn screenshot_at(&self, offset: Duration, width: u32, height: u32) {
+    fn screenshot_at(&self, offset: Duration, (width, height): (u32, u32)) {
         let moment = SessionMoment {
             session: self.id.clone(),
             offset,
@@ -133,9 +133,9 @@ fn collect_files(folder: &Path, files: &mut Vec<(PathBuf, Vec<u8>)>) {
 async fn a_transcript_with_screenshots_ends_with_their_references_in_offset_order() {
     let folder = tempfile::tempdir().unwrap();
     let recorded = Call::started_in(folder.path());
-    recorded.screenshot_at(FORTY_ONE_MINUTES_TWO, 4, 3);
-    recorded.screenshot_at(TWELVE_MINUTES_THIRTY_FOUR, 4, 3);
-    recorded.screenshot_at(TWELVE_MINUTES_THIRTY_FOUR, 4, 3);
+    recorded.screenshot_at(FORTY_ONE_MINUTES_TWO, (4, 3));
+    recorded.screenshot_at(TWELVE_MINUTES_THIRTY_FOUR, (4, 3));
+    recorded.screenshot_at(TWELVE_MINUTES_THIRTY_FOUR, (4, 3));
     let client = recorded.connect().await;
 
     let text = transcript_text(&client, &recorded.id).await;
@@ -184,7 +184,7 @@ async fn a_month_file_transcript_is_returned_exactly_as_stored() {
 async fn files_that_are_not_screenshot_names_are_left_out_of_the_listing() {
     let folder = tempfile::tempdir().unwrap();
     let recorded = Call::started_in(folder.path());
-    recorded.screenshot_at(TWELVE_MINUTES_THIRTY_FOUR, 4, 3);
+    recorded.screenshot_at(TWELVE_MINUTES_THIRTY_FOUR, (4, 3));
     fs::write(recorded.session_folder().join("notes.txt"), b"x").unwrap();
     fs::write(recorded.session_folder().join("shot.png"), b"x").unwrap();
     let client = recorded.connect().await;
@@ -200,7 +200,7 @@ async fn files_that_are_not_screenshot_names_are_left_out_of_the_listing() {
 async fn reading_a_transcript_changes_no_file_on_disk() {
     let folder = tempfile::tempdir().unwrap();
     let recorded = Call::started_in(folder.path());
-    recorded.screenshot_at(TWELVE_MINUTES_THIRTY_FOUR, 4, 3);
+    recorded.screenshot_at(TWELVE_MINUTES_THIRTY_FOUR, (4, 3));
     let client = recorded.connect().await;
     let before = tree_snapshot(folder.path());
 
@@ -214,7 +214,7 @@ async fn reading_a_transcript_changes_no_file_on_disk() {
 async fn a_listed_screenshot_is_returned_as_a_label_then_a_png_image() {
     let folder = tempfile::tempdir().unwrap();
     let recorded = Call::started_in(folder.path());
-    recorded.screenshot_at(TWELVE_MINUTES_THIRTY_FOUR, 4, 3);
+    recorded.screenshot_at(TWELVE_MINUTES_THIRTY_FOUR, (4, 3));
     let client = recorded.connect().await;
 
     let result = call(
@@ -238,7 +238,7 @@ async fn a_listed_screenshot_is_returned_as_a_label_then_a_png_image() {
 async fn a_large_screenshot_is_returned_scaled_and_the_label_says_so() {
     let folder = tempfile::tempdir().unwrap();
     let recorded = Call::started_in(folder.path());
-    recorded.screenshot_at(TWELVE_MINUTES_THIRTY_FOUR, 1800, 1000);
+    recorded.screenshot_at(TWELVE_MINUTES_THIRTY_FOUR, (1800, 1000));
     let client = recorded.connect().await;
 
     let result = call(
@@ -259,7 +259,7 @@ async fn a_large_screenshot_is_returned_scaled_and_the_label_says_so() {
 async fn serving_a_screenshot_changes_no_file_on_disk() {
     let folder = tempfile::tempdir().unwrap();
     let recorded = Call::started_in(folder.path());
-    recorded.screenshot_at(TWELVE_MINUTES_THIRTY_FOUR, 1800, 1000);
+    recorded.screenshot_at(TWELVE_MINUTES_THIRTY_FOUR, (1800, 1000));
     let client = recorded.connect().await;
     let before = tree_snapshot(folder.path());
 
@@ -284,7 +284,7 @@ async fn a_name_that_is_not_a_session_and_screenshot_name_is_rejected_and_the_se
  {
     let folder = tempfile::tempdir().unwrap();
     let recorded = Call::started_in(folder.path());
-    recorded.screenshot_at(TWELVE_MINUTES_THIRTY_FOUR, 4, 3);
+    recorded.screenshot_at(TWELVE_MINUTES_THIRTY_FOUR, (4, 3));
     let client = recorded.connect().await;
 
     assert_rejected_as_invalid(&client, "2026-10-20-143005/../00-12-34.png").await;
@@ -353,7 +353,7 @@ async fn a_screenshot_taken_while_the_server_runs_is_listed_and_served_without_a
     let client = recorded.connect().await;
     let before = transcript_text(&client, &recorded.id).await;
 
-    recorded.screenshot_at(TWELVE_MINUTES_THIRTY_FOUR, 4, 3);
+    recorded.screenshot_at(TWELVE_MINUTES_THIRTY_FOUR, (4, 3));
 
     let after = transcript_text(&client, &recorded.id).await;
     assert!(!before.contains("## Screenshots"));
@@ -372,7 +372,7 @@ async fn a_screenshot_taken_while_the_server_runs_is_listed_and_served_without_a
 async fn serving_a_five_k_screenshot_stays_under_one_second() {
     let folder = tempfile::tempdir().unwrap();
     let recorded = Call::started_in(folder.path());
-    recorded.screenshot_at(TWELVE_MINUTES_THIRTY_FOUR, 5120, 2880);
+    recorded.screenshot_at(TWELVE_MINUTES_THIRTY_FOUR, (5120, 2880));
     let client = recorded.connect().await;
 
     let started = Instant::now();

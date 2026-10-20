@@ -54,6 +54,6 @@ export interface PressedKeys {
 
 export type RebindOutcome =
   | { readonly outcome: "accepted"; readonly label: string }
-  | { readonly outcome: "needs_modifier" }
+  | { readonly outcome: "needs_modifier"; readonly message: string }
   | { readonly outcome: "duplicate_of"; readonly kind: ShortcutKind }
   | { readonly outcome: "in_use_by_another_app" };

@@ -12,7 +12,7 @@ use tauri_plugin_store::StoreExt;
 
 use crate::recording::RecordingController;
 use crate::screenshots::bindings::{
-    Bindings, Platform, PressedKeys, RebindOutcome, SHORTCUT_KINDS, ShortcutBinding, ShortcutKind,
+    Assignment, Bindings, Platform, RebindOutcome, SHORTCUT_KINDS, ShortcutBinding, ShortcutKind,
 };
 use crate::screenshots::capture::ScreenshotService;
 use crate::screenshots::delivery::show_notice;
@@ -26,19 +26,15 @@ impl ShortcutRegistry {
     fn load<R: Runtime>(app: &AppHandle<R>) -> ShortcutRegistry {
         let store = app.store(SETTINGS_FILE_NAME).ok();
         let stored = |kind: ShortcutKind| {
-            let value = store
+            store
                 .as_ref()
-                .and_then(|store| store.get(kind.storage_key()));
-            ShortcutBinding::from_stored(
-                kind,
-                value.as_ref().and_then(|value| value.as_str()),
-                Platform::current(),
-            )
+                .and_then(|store| store.get(kind.storage_key()))
         };
         ShortcutRegistry {
-            bindings: Mutex::new(Bindings::new(
-                stored(ShortcutKind::FullScreen),
-                stored(ShortcutKind::Region),
+            bindings: Mutex::new(Bindings::from_stored(
+                stored(ShortcutKind::FullScreen).as_ref(),
+                stored(ShortcutKind::Region).as_ref(),
+                Platform::current(),
             )),
         }
     }
@@ -62,40 +58,30 @@ impl ShortcutRegistry {
         log_refused(&refused);
     }
 
-    pub fn rebind<R: Runtime>(
-        &self,
-        app: &AppHandle<R>,
-        kind: ShortcutKind,
-        pressed: &PressedKeys,
-    ) -> tauri_plugin_store::Result<RebindOutcome> {
-        match ShortcutBinding::from_pressed(pressed) {
-            Ok(binding) => self.install_binding(app, kind, binding),
-            Err(problem) => Ok(problem.into()),
-        }
-    }
-
     pub fn reset<R: Runtime>(
         &self,
         app: &AppHandle<R>,
         kind: ShortcutKind,
     ) -> tauri_plugin_store::Result<RebindOutcome> {
-        self.install_binding(
+        self.assign(
             app,
-            kind,
-            ShortcutBinding::default_for(kind, Platform::current()),
+            Assignment {
+                kind,
+                binding: ShortcutBinding::default_for(kind, Platform::current()),
+            },
         )
     }
 
-    fn install_binding<R: Runtime>(
+    pub fn assign<R: Runtime>(
         &self,
         app: &AppHandle<R>,
-        kind: ShortcutKind,
-        binding: ShortcutBinding,
+        assignment: Assignment,
     ) -> tauri_plugin_store::Result<RebindOutcome> {
+        let Assignment { kind, binding } = assignment;
         let mut current = self.lock();
         let candidate = match current.replacing(kind, binding) {
             Ok(candidate) => candidate,
-            Err(problem) => return Ok(problem.into()),
+            Err(problem) => return Ok(RebindOutcome::refused(problem, Platform::current())),
         };
         if apply(app, &candidate).contains(&kind) {
             apply(app, &current);

@@ -8,7 +8,7 @@ pub(crate) fn encode_png(
     frame: &Frame,
     compression: CompressionType,
 ) -> Result<Vec<u8>, StoreError> {
-    encode_rgba(frame.rgba(), frame.width(), frame.height(), compression)
+    encode_rgba(frame.rgba(), (frame.width(), frame.height()), compression)
 }
 
 pub(crate) fn scale_png_to_fit(png: &[u8], max_long_edge: u32) -> Option<ServedImage> {
@@ -18,7 +18,7 @@ pub(crate) fn scale_png_to_fit(png: &[u8], max_long_edge: u32) -> Option<ServedI
     let (original_width, original_height) = original.dimensions();
     let (width, height) = fit_long_edge(original_width, original_height, max_long_edge);
     let fitted = resized(original, width, height);
-    let png = encode_rgba(fitted.as_raw(), width, height, CompressionType::Fast).ok()?;
+    let png = encode_rgba(fitted.as_raw(), (width, height), CompressionType::Fast).ok()?;
     Some(ServedImage {
         png,
         width,
@@ -55,8 +55,7 @@ fn resized(original: RgbaImage, width: u32, height: u32) -> RgbaImage {
 
 fn encode_rgba(
     rgba: &[u8],
-    width: u32,
-    height: u32,
+    (width, height): (u32, u32),
     compression: CompressionType,
 ) -> Result<Vec<u8>, StoreError> {
     let mut png = Vec::new();

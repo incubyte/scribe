@@ -209,7 +209,7 @@ fn a_session_with_no_screenshot_folder_lists_nothing() {
     let store = MarkdownTranscriptStore::new(TranscriptsFolder::at(parent.path().join("Scribe")));
     let id = SessionId::parse("2026-10-20-143005").unwrap();
 
-    let names = ScreenshotStore::list(&store, &id).unwrap();
+    let names = ScreenshotStore::list_screenshots(&store, &id).unwrap();
 
     assert!(names.is_empty());
 }
@@ -225,7 +225,7 @@ fn only_files_named_like_screenshots_are_listed() {
     fs::write(recording.session_folder.join("00-12-34.jpg"), b"x").unwrap();
     fs::write(recording.session_folder.join("shot.png"), b"x").unwrap();
 
-    let names = ScreenshotStore::list(&recording.store, &recording.id).unwrap();
+    let names = ScreenshotStore::list_screenshots(&recording.store, &recording.id).unwrap();
 
     assert_eq!(names, [ScreenshotName::at(TWELVE_MINUTES_THIRTY_FOUR)]);
 }

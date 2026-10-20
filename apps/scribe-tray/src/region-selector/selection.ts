@@ -33,3 +33,19 @@ export const sizeLabel = (rect: PixelRect) => `${rect.width} × ${rect.height}`;
 export const hasDraggedPastThreshold = (origin: ClientPoint, current: ClientPoint) =>
   Math.hypot(current.clientX - origin.clientX, current.clientY - origin.clientY) >
   DRAG_THRESHOLD_PX;
+
+export const SIZE_LABEL_CLEARANCE_PX = 64;
+
+export interface SizeLabelAnchor {
+  readonly y: number;
+  readonly opensUpward: boolean;
+}
+
+export function sizeLabelAnchor(area: PixelRect, frame: Size): SizeLabelAnchor {
+  const bottom = area.y + area.height;
+  if (bottom + SIZE_LABEL_CLEARANCE_PX <= frame.height) {
+    return { y: bottom, opensUpward: false };
+  }
+  const roomAbove = area.y >= SIZE_LABEL_CLEARANCE_PX;
+  return { y: roomAbove ? area.y : bottom, opensUpward: true };
+}

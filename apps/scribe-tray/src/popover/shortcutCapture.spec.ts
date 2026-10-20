@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   IN_USE_MESSAGE,
-  NEEDS_MODIFIER_MESSAGE,
   describeRebind,
   isModifierOnly,
   pressedKeysFrom,
@@ -48,13 +47,10 @@ describe("describing the outcome of a rebind", () => {
     );
   });
 
-  it("explains what a combination needs", () => {
-    expect(describeRebind({ outcome: "needs_modifier" }, "region")).toBe(
-      NEEDS_MODIFIER_MESSAGE,
-    );
-    expect(NEEDS_MODIFIER_MESSAGE).toBe(
-      "Use ⌘, ⌃ or ⌥ with a letter, number or function key",
-    );
+  it("explains what a combination needs in the words the app supplies", () => {
+    const message = "Use Ctrl or Alt with a letter, number or function key";
+
+    expect(describeRebind({ outcome: "needs_modifier", message }, "region")).toBe(message);
   });
 
   it("names the row that already uses the combination", () => {

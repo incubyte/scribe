@@ -318,9 +318,14 @@
   cursor: pointer;
 }
 
-.actions__link:hover {
+.actions__link:hover:not(:disabled) {
   background: var(--surface-hover);
   color: var(--text);
+}
+
+.actions__link:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .actions__icon {

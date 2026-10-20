@@ -31,7 +31,7 @@ impl ScreenshotStore for MarkdownTranscriptStore {
         Err(StoreError::NoFreeScreenshotName)
     }
 
-    fn list(&self, session: &SessionId) -> Result<Vec<ScreenshotName>, StoreError> {
+    fn list_screenshots(&self, session: &SessionId) -> Result<Vec<ScreenshotName>, StoreError> {
         let session_folder = session_folder_path(self.folder().path(), session);
         match fs::read_dir(&session_folder) {
             Ok(entries) => Ok(entries.filter_map(screenshot_name_of).collect()),

@@ -58,7 +58,7 @@ impl TranscriptLibrary {
     }
 
     pub fn screenshots(&self, id: &SessionId) -> Result<Vec<ScreenshotReference>, LibraryError> {
-        let mut names = self.screenshots.list(id)?;
+        let mut names = self.screenshots.list_screenshots(id)?;
         names.sort();
         Ok(names
             .into_iter()

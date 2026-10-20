@@ -96,7 +96,7 @@ impl ScribeServer {
         match self.library.screenshots(id) {
             Ok(references) => screenshots_section(&references),
             Err(error) => {
-                report(&error);
+                tracing::warn!(%error, "could not list the screenshots of a transcript");
                 None
             }
         }

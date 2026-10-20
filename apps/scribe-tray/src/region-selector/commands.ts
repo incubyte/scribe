@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { expecting } from "../popover/guards";
+import { expecting } from "../shared/guards";
 import { isArrayBuffer, isRegionCompletion, isRegionContext } from "./guards";
 import type { PixelRect } from "./types";
 

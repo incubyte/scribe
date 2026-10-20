@@ -7,12 +7,50 @@ import {
   resumeScreenshotShortcuts,
 } from "./commands";
 import {
+  CANCELLED_MESSAGE,
+  LISTENING_MESSAGE,
   SHORTCUTS_UNAVAILABLE_MESSAGE,
   SHORTCUT_FAILURE_MESSAGE,
   describeRebind,
   pressedKeysFrom,
 } from "./shortcutCapture";
-import type { RebindOutcome, ShortcutKind, ShortcutView } from "./types";
+import type { PressedKeys, RebindOutcome, ShortcutKind, ShortcutView } from "./types";
+
+interface KeyCaptureHandlers {
+  readonly onCaptured: (kind: ShortcutKind, pressed: PressedKeys) => void;
+  readonly onCancelled: () => void;
+}
+
+function useCaptureOfPressedKeys(
+  listening: ShortcutKind | null,
+  { onCaptured, onCancelled }: KeyCaptureHandlers,
+) {
+  useEffect(() => {
+    if (listening === null) {
+      return;
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      const pressed = pressedKeysFrom(event);
+      if (pressed === undefined) {
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.code === "Escape") {
+        onCancelled();
+      } else {
+        onCaptured(listening, pressed);
+      }
+    };
+    document.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("blur", onCancelled);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("blur", onCancelled);
+      void resumeScreenshotShortcuts();
+    };
+  }, [listening, onCaptured, onCancelled]);
+}
 
 export function useScreenshotShortcuts(announce: (message: string) => void) {
   const [shortcuts, setShortcuts] = useState<readonly ShortcutView[]>([]);
@@ -39,40 +77,28 @@ export function useScreenshotShortcuts(announce: (message: string) => void) {
     [announce, refresh],
   );
 
-  useEffect(() => {
-    if (listening === null) {
-      return;
-    }
-    const stopListening = () => setListening(null);
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.code === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        stopListening();
-        return;
-      }
-      const pressed = pressedKeysFrom(event);
-      if (pressed === undefined) {
-        return;
-      }
-      event.preventDefault();
-      event.stopPropagation();
-      stopListening();
-      void report(listening, rebindScreenshotShortcut(listening, pressed));
-    };
-    document.addEventListener("keydown", onKeyDown, true);
-    window.addEventListener("blur", stopListening);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown, true);
-      window.removeEventListener("blur", stopListening);
-      void resumeScreenshotShortcuts();
-    };
-  }, [listening, report]);
+  const rebind = useCallback(
+    (kind: ShortcutKind, pressed: PressedKeys) => {
+      setListening(null);
+      void report(kind, rebindScreenshotShortcut(kind, pressed));
+    },
+    [report],
+  );
+
+  const cancelListening = useCallback(() => {
+    setListening(null);
+    announce(CANCELLED_MESSAGE);
+  }, [announce]);
+
+  useCaptureOfPressedKeys(listening, { onCaptured: rebind, onCancelled: cancelListening });
 
   const startListening = useCallback(
     (kind: ShortcutKind) =>
       pauseScreenshotShortcuts()
-        .then(() => setListening(kind))
+        .then(() => {
+          setListening(kind);
+          announce(LISTENING_MESSAGE);
+        })
         .catch(() => {
           announce(SHORTCUT_FAILURE_MESSAGE);
           void resumeScreenshotShortcuts();

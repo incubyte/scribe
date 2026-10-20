@@ -1,7 +1,9 @@
 use serde::Serialize;
 use tauri::{AppHandle, Manager, Runtime};
 
-use crate::screenshots::bindings::{PressedKeys, RebindOutcome, ShortcutKind};
+use crate::screenshots::bindings::{
+    Assignment, Platform, PressedKeys, RebindOutcome, ShortcutBinding, ShortcutKind,
+};
 use crate::screenshots::shortcuts::ShortcutRegistry;
 
 #[derive(Debug, Serialize)]
@@ -35,9 +37,13 @@ pub async fn rebind_screenshot_shortcut<R: Runtime>(
     kind: ShortcutKind,
     pressed: PressedKeys,
 ) -> Result<RebindOutcome, String> {
-    app.state::<ShortcutRegistry>()
-        .rebind(&app, kind, &pressed)
-        .map_err(|error| error.to_string())
+    match ShortcutBinding::from_pressed(&pressed) {
+        Ok(binding) => app
+            .state::<ShortcutRegistry>()
+            .assign(&app, Assignment { kind, binding })
+            .map_err(|error| error.to_string()),
+        Err(problem) => Ok(RebindOutcome::refused(problem, Platform::current())),
+    }
 }
 
 #[tauri::command]

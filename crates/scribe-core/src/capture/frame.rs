@@ -9,6 +9,12 @@ pub struct Frame {
     rgba: Vec<u8>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FrameSize {
+    pub width: u32,
+    pub height: u32,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
 #[error("the pixels do not fill a frame of the given size")]
 pub struct InvalidFrame;
@@ -43,8 +49,11 @@ impl Frame {
     }
 
     #[must_use]
-    pub fn into_rgba(self) -> Vec<u8> {
-        self.rgba
+    pub fn size(&self) -> FrameSize {
+        FrameSize {
+            width: self.width,
+            height: self.height,
+        }
     }
 
     #[must_use]

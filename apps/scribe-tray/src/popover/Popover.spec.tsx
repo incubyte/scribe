@@ -433,7 +433,7 @@ describe("the popover while a shortcut is being rebound", () => {
         name: "Change Capture region shortcut, currently ⌃⌥⌘2",
       }),
     );
-    await screen.findByText("Press the new shortcut…");
+    await screen.findAllByText("Press the new shortcut…");
 
     await userEvent.keyboard("{Escape}");
 
@@ -498,11 +498,13 @@ describe("the popover settings", () => {
     await openSettings();
 
     await waitFor(() =>
-      expect(screen.getByRole("status")).toHaveTextContent(
+      expect(folderStatus()).toHaveTextContent(
         "Scribe could not read the transcripts folder setting.",
       ),
     );
   });
+
+  const folderStatus = () => screen.getAllByRole("status")[0];
 
   async function changeFolderAndReadStatus(outcome: () => unknown) {
     backend(idle);
@@ -512,7 +514,7 @@ describe("the popover settings", () => {
     await userEvent.click(
       screen.getByRole("button", { name: CHANGE_LABEL }),
     );
-    return screen.getByRole("status");
+    return folderStatus();
   }
 
   it("announces the new folder and how many transcripts moved", async () => {
