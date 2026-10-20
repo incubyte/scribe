@@ -8,12 +8,13 @@ Scribe is a small tray app for macOS and Windows that transcribes your calls wit
 - **Transcribes on your computer.** macOS uses Apple's SpeechAnalyzer (English). Windows uses NVIDIA Parakeet, which detects the spoken language automatically.
 - **Shows the transcript live.** Click the tray icon to open a popover with the running transcript, a timer, and your recent calls.
 - **Stops when the conversation goes quiet.** A recording stops automatically after 5 minutes without speech, and a notification tells you the transcript is saved.
-- **Saves plain text.** Each call becomes one Markdown file, with a timestamp and speaker on every line. Files are grouped into month folders such as `2026-10/` inside your transcripts folder, which is `Documents/Scribe` by default.
-- **Connects to AI apps.** The bundled `scribe-mcp` server gives AI apps five tools: `list_transcripts`, `get_transcript`, `search_transcripts`, `get_screenshot`, and `get_transcripts_folder`, which tells apps that can read local files where transcripts are saved. The tray can connect Scribe to Claude Desktop in one click.
+- **Saves plain text.** Each call becomes one Markdown file, with a timestamp and speaker on every line. Each call gets its own folder inside a month folder, such as `2026-10/2026-10-20-143005/`, in your transcripts folder, which is `Documents/Scribe` by default.
+- **Takes screenshots.** One shortcut captures the whole screen and another lets you select a region or click a window, always on the monitor under your pointer. During a call, the screenshot is saved in that call's folder, named by its time into the call (`00-12-34.png`) so it lines up with the transcript. Every screenshot is also copied to the clipboard.
+- **Connects to AI apps.** The bundled `scribe-mcp` server gives AI apps five tools: `list_transcripts`, `get_transcript`, `search_transcripts`, `get_screenshot`, and `get_transcripts_folder`, which tells apps that can read local files where transcripts are saved. A transcript lists the call's screenshots at the end, and `get_screenshot` returns any of them as an image scaled to 1568 px on the long edge. The tray can connect Scribe to Claude Desktop in one click.
 
 ## Privacy
 
-Audio and transcripts never leave your computer. Audio is processed in memory and is never written to disk, and only the transcript text is saved. The only network traffic is a one-time download of the speech model on Windows (and Apple's speech model install on macOS).
+Audio, transcripts, and screenshots never leave your computer through Scribe. Audio is processed in memory and is never written to disk, and only the transcript text is saved. Screenshots are saved only while a call is being recorded; at other times they go to the clipboard only. An AI app connected through MCP receives a scaled copy of a screenshot only when it asks for one. The only network traffic is a one-time download of the speech model on Windows (and Apple's speech model install on macOS).
 
 You are responsible for telling the people on a call that you are transcribing it. Recording and transcription laws differ by country and state, and some require everyone's consent.
 
@@ -28,7 +29,7 @@ Download the latest build from the [Releases page](https://github.com/incubyte/s
 
 Builds are not signed with a developer certificate yet, so each platform asks you to confirm the first launch:
 
-- **macOS:** open Scribe once, then go to System Settings → Privacy & Security and choose **Open Anyway**. Allow the **Microphone** and **System Audio Recording** permissions when Scribe asks for them.
+- **macOS:** open Scribe once, then go to System Settings → Privacy & Security and choose **Open Anyway**. Allow the **Microphone** and **System Audio Recording** permissions when Scribe asks for them, and **Screen Recording** the first time you take a screenshot. macOS asks you to reconfirm Screen Recording about once a month.
 - **Windows:** on the SmartScreen prompt, choose **More info → Run anyway**. The installer also installs the Microsoft Visual C++ runtime if your computer does not have it yet, and on first launch Scribe downloads its speech model (about 670 MB).
 
 ## Use
@@ -41,6 +42,19 @@ To keep transcripts somewhere else, open **Settings** from the popover and choos
 
 Right-click the tray icon for the menu, which has the same actions plus **Privacy** and **Quit Scribe**.
 
+### Take a screenshot
+
+| Shortcut | macOS | Windows |
+|---|---|---|
+| Whole screen under the pointer | `⌃⌥⌘1` | `Ctrl+Shift+Alt+1` |
+| Region or window | `⌃⌥⌘2` | `Ctrl+Shift+Alt+2` |
+
+The region shortcut freezes the screen under your pointer. Drag to select a region, or hover over a window and click it to capture just that window. Press Esc or right-click to cancel. The capture is of the screen as it was when you pressed the shortcut, so a window snap includes anything that was covering part of that window.
+
+While a call is recording, the screenshot is saved in that call's folder and copied to the clipboard. When nothing is recording, it is only copied to the clipboard.
+
+To change either shortcut, open **Settings** from the popover, choose **Change** next to the shortcut, and press the new keys. A shortcut needs ⌘, ⌃ or ⌥ (Ctrl or Alt on Windows) plus a letter, number or function key. **Reset to default** restores the shortcuts above.
+
 ### Connect an AI app
 
 - **Claude Desktop:** click **Connect to Claude Desktop** in the popover, then restart Claude Desktop. Scribe adds itself to Claude Desktop's config and keeps all your other MCP servers.
@@ -48,6 +62,16 @@ Right-click the tray icon for the menu, which has the same actions plus **Privac
 - **Claude Code:** run `claude mcp add scribe -s user -- <path to scribe-mcp>`. The path is inside the app bundle, next to the Scribe executable.
 
 Then ask things like "List my recent Scribe calls" or "Search my Scribe transcripts for budget".
+
+### Install the Claude plugin
+
+The Scribe plugin adds two commands to Claude: `/recap` lists your recent calls with a summary of each, and `/meeting-notes` writes one call up as notes with todos. Connect Scribe to Claude Desktop first (see above). The repository is private, so Claude needs GitHub connected with access to `incubyte/scribe`.
+
+- **Claude Code:** run `/plugin marketplace add incubyte/scribe`, then `/plugin install scribe@scribe`.
+- **Claude Desktop:** open **Customize**, then **Plugins**, click **Add marketplace**, enter `incubyte/scribe`, and install **Scribe**.
+- **If the marketplace install fails:** download `scribe-plugin.zip` from the latest [GitHub Release](https://github.com/incubyte/scribe/releases) and upload it under **Customize**, then **Plugins**.
+
+See the [plugin README](plugins/scribe/README.md) for its requirements and commands.
 
 ## Development
 
@@ -60,7 +84,9 @@ Scribe is a Rust workspace with a Tauri 2 tray app and a React popover. The desi
 | `crates/scribe-core` | Recording domain, transcript library, and the ports |
 | `crates/audio-*` | Microphone, macOS Core Audio tap, and Windows WASAPI loopback capture |
 | `crates/stt-*` | Apple SpeechAnalyzer and Parakeet speech-to-text adapters |
-| `crates/store-markdown` | Markdown transcript files |
+| `crates/capture-*` | Screen capture: ScreenCaptureKit on macOS, `xcap` on Windows |
+| `crates/store-markdown` | Markdown transcript files and screenshots |
+| `plugins/scribe` | Claude plugin with the `recap` and `meeting-notes` commands |
 | `docs/` | Spec, plans, and architecture |
 
 You need Rust 1.93, Node 22 or later, and on macOS the macOS 26 SDK (Xcode 26). The bundled MCP server must be built before the tray app, so run the staging script once before your first build:
