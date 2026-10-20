@@ -24,6 +24,14 @@ pub struct GetTranscriptRequest {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+pub struct GetScreenshotRequest {
+    #[schemars(
+        description = "A screenshot name as listed at the end of get_transcript, written <session id>/<HH-MM-SS>.png, for example 2026-10-20-143005/00-12-34.png."
+    )]
+    pub name: String,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
 pub struct SearchTranscriptsRequest {
     #[schemars(
         description = "Text to find in what was said. Matched literally, ignoring case; it is never treated as a pattern."

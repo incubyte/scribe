@@ -5,7 +5,7 @@ use chrono::{DateTime, FixedOffset, TimeDelta};
 use scribe_core::library::{Limit, SearchQuery, TranscriptLibrary};
 use scribe_core::ports::TranscriptStore;
 use scribe_core::recording::{Segment, SessionHeader, Speaker};
-use scribe_core::testing::InMemoryTranscriptStore;
+use scribe_core::testing::{InMemoryScreenshotStore, InMemoryTranscriptStore};
 
 const CALL_COUNT: usize = 500;
 const SEGMENTS_PER_HOUR: u64 = 720;
@@ -51,7 +51,7 @@ fn transcript_search_performance_stays_under_one_second() {
     for call in 0..CALL_COUNT {
         save_one_hour_call(&store, call);
     }
-    let library = TranscriptLibrary::new(store);
+    let library = TranscriptLibrary::new(store, Arc::new(InMemoryScreenshotStore::default()));
     let query = SearchQuery::parse("pricing decision").unwrap();
 
     let started = Instant::now();

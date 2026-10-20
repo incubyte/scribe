@@ -212,19 +212,19 @@ get_screenshot({ name: "2026-10-20-143005/00-12-34.png" })
 
 **Acceptance criteria**
 
-- [ ] **5.3.1** For a session with screenshots, `get_transcript` returns the transcript markdown unchanged, followed by a `## Screenshots` section. It lists every screenshot in offset order as `[HH:MM:SS] <screenshot reference>`, with no local paths.
-- [ ] **5.3.2** For a session without screenshots, including every flat and month-file session, the `get_transcript` response is byte-identical to today's.
-- [ ] **5.3.3** Only files whose names parse as screenshot names are listed. Any other file in the session folder is ignored.
-- [ ] **5.3.4** The session's `.md` file on disk is byte-identical before and after any number of `get_transcript` calls.
-- [ ] **5.3.5** `get_screenshot` with a listed reference returns a one-line text label (offset, reference, served and original size) followed by the image as a PNG image block.
-- [ ] **5.3.6** A screenshot whose long edge is over 1568 px is served scaled down, keeping its aspect ratio, so its long edge is exactly 1568 px. A 5120 × 2880 original is served at 1568 × 882.
-- [ ] **5.3.7** A screenshot whose long edge is 1568 px or less is served at its original size, never upscaled.
-- [ ] **5.3.8** Serving a screenshot changes no file on disk and writes no scaled copy anywhere.
-- [ ] **5.3.9** A reference that is not exactly `<valid session id>/<valid screenshot name>` is rejected with a tool error before any file is touched. This covers `..`, a backslash, an absolute path, extra segments and a non-`.png` name.
-- [ ] **5.3.10** A well-formed reference to a screenshot that does not exist, or a PNG that cannot be decoded, returns the tool error "No screenshot named <reference>". The server keeps running.
+- [x] **5.3.1** For a session with screenshots, `get_transcript` returns the transcript markdown unchanged, followed by a `## Screenshots` section. It lists every screenshot in offset order as `[HH:MM:SS] <screenshot reference>`, with no local paths.
+- [x] **5.3.2** For a session without screenshots, including every flat and month-file session, the `get_transcript` response is byte-identical to today's.
+- [x] **5.3.3** Only files whose names parse as screenshot names are listed. Any other file in the session folder is ignored.
+- [x] **5.3.4** The session's `.md` file on disk is byte-identical before and after any number of `get_transcript` calls.
+- [x] **5.3.5** `get_screenshot` with a listed reference returns a one-line text label (offset, reference, served and original size) followed by the image as a PNG image block.
+- [x] **5.3.6** A screenshot whose long edge is over 1568 px is served scaled down, keeping its aspect ratio, so its long edge is exactly 1568 px. A 5120 × 2880 original is served at 1568 × 882.
+- [x] **5.3.7** A screenshot whose long edge is 1568 px or less is served at its original size, never upscaled.
+- [x] **5.3.8** Serving a screenshot changes no file on disk and writes no scaled copy anywhere.
+- [x] **5.3.9** A reference that is not exactly `<valid session id>/<valid screenshot name>` is rejected with a tool error before any file is touched. This covers `..`, a backslash, an absolute path, extra segments and a non-`.png` name.
+- [x] **5.3.10** A well-formed reference to a screenshot that does not exist, or a PNG that cannot be decoded, returns the tool error "No screenshot named <reference>". The server keeps running.
 - [ ] **5.3.11** Serving a 5120 × 2880 screenshot takes under one second on the machines Scribe supports.
-- [ ] **5.3.12** The tool descriptions tell the client that `get_transcript` lists screenshot names at the end, and that `get_screenshot` takes one of those names and returns the image.
-- [ ] **5.3.13** A screenshot added while Claude Desktop keeps `scribe-mcp` running is listed and served on the next call, with no restart.
+- [x] **5.3.12** The tool descriptions tell the client that `get_transcript` lists screenshot names at the end, and that `get_screenshot` takes one of those names and returns the image.
+- [x] **5.3.13** A screenshot added while Claude Desktop keeps `scribe-mcp` running is listed and served on the next call, with no restart.
 
 ### 5.4 Guide the user to Screen Recording access on macOS
 

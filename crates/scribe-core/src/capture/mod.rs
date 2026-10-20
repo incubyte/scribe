@@ -10,6 +10,6 @@ pub use destination::{Destination, SessionMoment};
 pub use frame::{Frame, InvalidFrame};
 pub use geometry::{InvalidSelection, PixelRect, Selection};
 pub use monitor::{MonitorPlacement, MonitorShot, PlacementUnits, WindowOutline};
-pub use reference::{ScreenshotReference, ServedImage};
+pub use reference::{InvalidScreenshotReference, ScreenshotReference, ServedImage};
 pub use screenshot_name::{InvalidScreenshotName, ScreenshotName};
 pub use taker::{CaptureFailure, CaptureOutcome, PendingCapture, ScreenshotTaker};

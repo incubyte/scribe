@@ -1,7 +1,10 @@
 use std::path::PathBuf;
 
 use chrono::{DateTime, FixedOffset};
-use scribe_core::ports::{StoreError, TranscriptStore};
+use scribe_core::capture::{
+    Frame, ScreenshotName, ScreenshotReference, ServedImage, SessionMoment,
+};
+use scribe_core::ports::{ScreenshotStore, StoreError, TranscriptStore};
 use scribe_core::recording::{Segment, SessionDocument, SessionHeader, SessionId, SessionSummary};
 use store_markdown::{MarkdownTranscriptStore, TranscriptsFolder};
 
@@ -41,7 +44,7 @@ impl TranscriptStore for SettingsFollowingStore {
 
     fn list(&self, limit: usize) -> Result<Vec<SessionSummary>, StoreError> {
         self.follow_settings()?;
-        self.inner.list(limit)
+        TranscriptStore::list(&self.inner, limit)
     }
 
     fn list_all(&self) -> Result<Vec<SessionSummary>, StoreError> {
@@ -56,5 +59,29 @@ impl TranscriptStore for SettingsFollowingStore {
 
     fn mark_abandoned_incomplete(&self) -> Result<usize, StoreError> {
         self.inner.mark_abandoned_incomplete()
+    }
+}
+
+impl ScreenshotStore for SettingsFollowingStore {
+    fn save(
+        &self,
+        moment: &SessionMoment,
+        screenshot: &Frame,
+    ) -> Result<ScreenshotName, StoreError> {
+        self.inner.save(moment, screenshot)
+    }
+
+    fn list(&self, session: &SessionId) -> Result<Vec<ScreenshotName>, StoreError> {
+        self.follow_settings()?;
+        ScreenshotStore::list(&self.inner, session)
+    }
+
+    fn serve(
+        &self,
+        reference: &ScreenshotReference,
+        max_long_edge: u32,
+    ) -> Result<ServedImage, StoreError> {
+        self.follow_settings()?;
+        self.inner.serve(reference, max_long_edge)
     }
 }
