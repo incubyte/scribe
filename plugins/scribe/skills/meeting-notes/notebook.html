@@ -1,0 +1,1182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Scribe notebook</title>
+<style>
+:root {
+  color-scheme: light dark;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+
+  --radius-control: 8px;
+  --header-height: calc(var(--space-3) * 2 + 24px + 1px);
+
+  --glass: rgb(250 250 252 / 0.84);
+  --surface: #fafafc;
+  --surface-sunken: rgb(0 0 0 / 0.045);
+  --surface-hover: rgb(0 0 0 / 0.06);
+  --hairline: rgb(0 0 0 / 0.1);
+  --control-border: #6b6b73;
+  --text: #1d1d1f;
+  --text-muted: #4a4a50;
+  --accent: #0f6f6a;
+  --on-accent: #ffffff;
+  --accent-soft: rgb(15 111 106 / 0.12);
+  --recording: #c9302c;
+  --recording-soft: rgb(201 48 44 / 0.08);
+  --focus-ring: 3px solid #0f6f6a;
+  --focus-ring-offset: 2px;
+
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", sans-serif;
+  --font-figures: ui-rounded, "SF Pro Rounded", -apple-system, "Segoe UI Variable", sans-serif;
+  --text-sm: 12px;
+  --text-md: 13px;
+  --text-lg: 15px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --glass: rgb(30 30 33 / 0.86);
+    --surface: #1e1e21;
+    --surface-sunken: rgb(255 255 255 / 0.05);
+    --surface-hover: rgb(255 255 255 / 0.08);
+    --hairline: rgb(255 255 255 / 0.12);
+    --control-border: #8c8c96;
+    --text: #f2f2f5;
+    --text-muted: #b9b9c0;
+    --accent: #5fd3c6;
+    --on-accent: #062b28;
+    --accent-soft: rgb(95 211 198 / 0.14);
+    --recording: #ff6b62;
+    --recording-soft: rgb(255 107 98 / 0.12);
+    --focus-ring: 3px solid #5fd3c6;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass: var(--surface);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: var(--text-md);
+  scroll-padding-top: var(--header-height);
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-body);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+select {
+  font: inherit;
+}
+
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.notebook {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.notebook__header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--hairline);
+  background: var(--glass);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+}
+
+.notebook__mark {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  color: var(--accent);
+}
+
+.notebook__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.notebook__count {
+  margin-left: auto;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.notebook__body {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(200px, 280px) 1fr;
+}
+
+.sidebar {
+  padding: var(--space-4) var(--space-3);
+  border-right: 1px solid var(--hairline);
+}
+
+.sidebar__heading {
+  margin: 0 0 var(--space-2);
+  padding-left: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.sidebar__select {
+  display: none;
+  width: 100%;
+  min-height: 32px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.meeting-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.session {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 32px;
+  padding: var(--space-2);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 120ms ease-out;
+}
+
+.session:hover {
+  background: var(--surface-hover);
+}
+
+.session[aria-current="true"] {
+  background: var(--accent-soft);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.session__title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.session__meta {
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.meeting {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+  max-width: 760px;
+  padding: var(--space-5);
+}
+
+.meeting__header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.meeting__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 650;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.meeting__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin: 0;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.badge {
+  padding: 1px var(--space-2);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.panel__heading {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.panel__body {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.speakers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.speaker {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-control);
+  background: var(--surface-sunken);
+}
+
+.speaker__name {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.speaker__confidence {
+  font-weight: 400;
+  color: var(--text-muted);
+}
+
+.speaker__evidence {
+  margin: var(--space-1) 0 0;
+  max-width: 48ch;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.block-list,
+.item-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  padding-left: var(--space-2);
+  border-left: 2px solid transparent;
+}
+
+.item::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  transform: translateY(-2px);
+}
+
+.block {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.block--heading {
+  font-size: var(--text-lg);
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.block--decision {
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--accent);
+  background: var(--accent-soft);
+  border-radius: 0 var(--radius-control) var(--radius-control) 0;
+}
+
+.block__label {
+  display: block;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.block--metric {
+  display: inline-flex;
+  flex-direction: column;
+  align-self: flex-start;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-control);
+  background: var(--surface-sunken);
+}
+
+.block__figure {
+  font-family: var(--font-figures);
+  font-size: 20px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.block__note {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.block--quote {
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--hairline);
+}
+
+.block--quote .block__label {
+  margin-top: var(--space-1);
+}
+
+.block--callout {
+  padding: var(--space-2) var(--space-3);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--radius-control) var(--radius-control) 0;
+  background: var(--surface-sunken);
+}
+
+.block--risk {
+  border-left-color: var(--recording);
+  background: var(--recording-soft);
+}
+
+.block--risk .block__label {
+  color: var(--recording);
+}
+
+.block__table-scroll {
+  overflow-x: auto;
+}
+
+.block__table {
+  border-collapse: collapse;
+  min-width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+.block__table th,
+.block__table td {
+  padding: var(--space-1) var(--space-3);
+  border-bottom: 1px solid var(--hairline);
+  text-align: left;
+  vertical-align: top;
+}
+
+.block__table th {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.block--screen {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  color: var(--text-muted);
+}
+
+.offset-chip {
+  flex: none;
+  padding: 1px var(--space-2);
+  border-radius: 999px;
+  background: var(--surface-sunken);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.line--me {
+  border-left-color: var(--accent);
+}
+
+.todo {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.todo__choice {
+  display: flex;
+  gap: var(--space-2);
+  align-items: baseline;
+  cursor: pointer;
+}
+
+.todo__checkbox {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+  transform: translateY(2px);
+}
+
+.todo__text {
+  overflow-wrap: anywhere;
+}
+
+.todo__checkbox:checked + .todo__text {
+  text-decoration: line-through;
+  color: var(--text-muted);
+}
+
+.todo__meta {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+}
+
+.todo__actions-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.todo__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.button {
+  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--control-border);
+  border-radius: var(--radius-control);
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button:hover:not(:disabled):not([aria-disabled="true"]) {
+  background: var(--surface-hover);
+}
+
+.button:disabled,
+.button[aria-disabled="true"] {
+  color: var(--text-muted);
+  background: transparent;
+  cursor: not-allowed;
+}
+
+.todo__reason {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.action-output:empty {
+  padding: 0;
+}
+
+.action-output {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+  padding: var(--space-2);
+  border-radius: var(--radius-control);
+  background: var(--surface-sunken);
+}
+
+.action-output__text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.button[aria-busy="true"] {
+  font-style: italic;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  align-items: flex-start;
+  margin: var(--space-5);
+  padding: var(--space-5);
+  border-radius: var(--radius-control);
+  background: var(--surface-sunken);
+}
+
+.empty__title {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 650;
+}
+
+.empty__body {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+@media (forced-colors: active) {
+  .session[aria-current="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  .button,
+  .sidebar__select {
+    border: 1px solid ButtonText;
+  }
+
+  .button:disabled,
+  .button[aria-disabled="true"] {
+    border-color: GrayText;
+    color: GrayText;
+  }
+}
+
+@media (max-width: 640px) {
+  .notebook__header {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .notebook__body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+  }
+
+  .sidebar {
+    padding: var(--space-3) var(--space-4);
+    border-right: 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .sidebar__heading,
+  .meeting-list {
+    display: none;
+  }
+
+  .sidebar__select {
+    display: block;
+  }
+
+  .meeting {
+    padding: var(--space-4);
+  }
+
+  .empty {
+    margin: var(--space-4);
+  }
+}
+</style>
+</head>
+<body>
+<div class="notebook">
+  <header class="notebook__header">
+    <svg class="notebook__mark" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect x="5" y="3" width="14" height="18" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"></rect>
+      <path d="M9 8h6M9 12h6M9 16h3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
+    </svg>
+    <h1 class="notebook__title">Scribe notebook</h1>
+    <p class="notebook__count" id="meeting-count"></p>
+  </header>
+  <div class="notebook__body">
+    <nav class="sidebar" id="sidebar" aria-label="Meetings"></nav>
+    <main id="meeting-pane"></main>
+  </div>
+</div>
+<script type="application/json" id="scribe-meetings">[]</script>
+<script>
+const FALLBACK_MEETING_TYPE = "Meeting";
+
+const AI_UNAVAILABLE_REASON = "AI actions need Claude web or Desktop on a paid plan.";
+const ACTION_FAILED_MESSAGE = "Couldn't run this action. Try again.";
+const WORKING_LABEL = "Working…";
+const UNTITLED_MEETING = "Untitled meeting";
+
+const state = { meetings: [], selectedId: null, ticked: new Map() };
+
+function element(tagName, className, text) {
+  const node = document.createElement(tagName);
+  if (className) {
+    node.className = className;
+  }
+  if (text !== undefined) {
+    node.textContent = text;
+  }
+  return node;
+}
+
+function records(list) {
+  return Array.isArray(list) ? list.filter((entry) => entry !== null && typeof entry === "object") : [];
+}
+
+function meetingTitle(meeting) {
+  return typeof meeting.title === "string" && meeting.title.trim() ? meeting.title : UNTITLED_MEETING;
+}
+
+function readMeetings() {
+  const island = document.getElementById("scribe-meetings");
+  try {
+    return records(JSON.parse(island.textContent));
+  } catch (error) {
+    return [];
+  }
+}
+
+function formatStart(startedAt) {
+  const date = new Date(startedAt);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+function formatDuration(durationSeconds) {
+  if (typeof durationSeconds !== "number") {
+    return "";
+  }
+  const minutes = Math.max(1, Math.round(durationSeconds / 60));
+  return minutes + " min";
+}
+
+function formatWhen(meeting) {
+  return [formatStart(meeting.started_at), formatDuration(meeting.duration_seconds)]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function renderMeetingList(meetings, selectedId) {
+  const sidebar = document.getElementById("sidebar");
+  sidebar.replaceChildren();
+  if (meetings.length === 0) {
+    return;
+  }
+  sidebar.append(
+    element("h2", "sidebar__heading", "Meetings"),
+    buildMeetingSelect(meetings, selectedId),
+    buildMeetingButtons(meetings, selectedId)
+  );
+}
+
+function buildMeetingSelect(meetings, selectedId) {
+  const wrapper = element("div");
+  const label = element("label", "visually-hidden", "Choose a meeting");
+  label.htmlFor = "meeting-select";
+  const select = element("select", "sidebar__select");
+  select.id = "meeting-select";
+  meetings.forEach((meeting) => {
+    const option = element("option", "", meetingTitle(meeting) + " (" + formatWhen(meeting) + ")");
+    option.value = meeting.id;
+    option.selected = meeting.id === selectedId;
+    select.append(option);
+  });
+  select.addEventListener("change", () => selectMeeting(select.value).catch(logFailure));
+  wrapper.append(label, select);
+  return wrapper;
+}
+
+function buildMeetingButtons(meetings, selectedId) {
+  const list = element("ul", "meeting-list");
+  meetings.forEach((meeting) => {
+    const item = element("li");
+    const button = element("button", "session");
+    button.type = "button";
+    button.dataset.meetingId = meeting.id;
+    button.setAttribute("aria-current", String(meeting.id === selectedId));
+    button.append(element("span", "session__title", meetingTitle(meeting)), element("span", "session__meta", formatWhen(meeting)));
+    button.addEventListener("click", () => selectMeeting(meeting.id).catch(logFailure));
+    item.append(button);
+    list.append(item);
+  });
+  return list;
+}
+
+function renderMeeting(meeting) {
+  const pane = document.getElementById("meeting-pane");
+  pane.replaceChildren();
+  if (!meeting) {
+    pane.append(renderEmptyState());
+    return;
+  }
+  const article = element("article", "meeting");
+  article.append(
+    renderMeetingHeader(meeting),
+    renderSpeakers(records(meeting.speakers)),
+    renderSummary(meeting.summary),
+    renderBlocks(records(meeting.blocks)),
+    renderTodos(meeting)
+  );
+  pane.append(article);
+}
+
+function renderEmptyState() {
+  const empty = element("section", "empty");
+  empty.append(
+    element("h2", "empty__title", "No meetings yet"),
+    element("p", "empty__body", "Ask Claude for notes from a call and it will appear here.")
+  );
+  return empty;
+}
+
+function meetingTypeLabel(meeting) {
+  return typeof meeting.type === "string" && meeting.type.trim() ? meeting.type : FALLBACK_MEETING_TYPE;
+}
+
+function renderMeetingHeader(meeting) {
+  const header = element("header", "meeting__header");
+  const meta = element("p", "meeting__meta");
+  meta.append(element("span", "badge", meetingTypeLabel(meeting)));
+  meta.append(element("span", "", formatWhen(meeting)));
+  header.append(element("h2", "meeting__title", meetingTitle(meeting)), meta);
+  return header;
+}
+
+function renderSummary(summary) {
+  const panel = element("section", "panel");
+  panel.append(element("h3", "panel__heading", "Summary"), element("p", "panel__body", summary || ""));
+  return panel;
+}
+
+function speakerDisplayName(speaker) {
+  if (speaker.label === "Me") {
+    return "Me";
+  }
+  if (speaker.confidence === "unknown" || !speaker.name) {
+    return "Them";
+  }
+  return speaker.name;
+}
+
+function speakerConfidenceNote(speaker) {
+  if (speaker.label === "Me") {
+    return "";
+  }
+  if (speaker.confidence === "likely") {
+    return " (inferred)";
+  }
+  if (speaker.confidence === "stated") {
+    return " (named in the call)";
+  }
+  return " (one or more people)";
+}
+
+function renderSpeaker(speaker) {
+  const item = element("li", "speaker");
+  const details = element("details");
+  const summary = element("summary", "speaker__name", speakerDisplayName(speaker));
+  summary.append(element("span", "speaker__confidence", speakerConfidenceNote(speaker)));
+  details.append(summary);
+  if (speaker.evidence) {
+    details.append(element("p", "speaker__evidence", speaker.evidence));
+  }
+  item.append(details);
+  return item;
+}
+
+function renderSpeakers(speakers) {
+  const panel = element("section", "panel");
+  const list = element("ul", "speakers");
+  speakers.forEach((speaker) => list.append(renderSpeaker(speaker)));
+  panel.append(element("h3", "panel__heading", "Speakers"), list);
+  return panel;
+}
+
+function textOf(value) {
+  return typeof value === "string" ? value : "";
+}
+
+function labelledBlock(className, label, text) {
+  const block = element("p", "block " + className);
+  if (label) {
+    block.append(element("span", "block__label", label));
+  }
+  block.append(textOf(text));
+  return block;
+}
+
+function renderHeadingBlock(block) {
+  return element("h3", "block block--heading", textOf(block.text));
+}
+
+function renderParagraphBlock(block) {
+  return element("p", "block", textOf(block.text));
+}
+
+function renderListBlock(block) {
+  const list = element("ul", "block item-list");
+  (Array.isArray(block.items) ? block.items : []).filter((text) => typeof text === "string").forEach((text) => {
+    const item = element("li", "item");
+    item.append(element("span", "item__text", text));
+    list.append(item);
+  });
+  return list;
+}
+
+function renderDecisionBlock(block) {
+  const by = textOf(block.by);
+  return labelledBlock("block--decision", by ? "Decision · " + by : "Decision", block.text);
+}
+
+function renderMetricBlock(block) {
+  const metric = element("p", "block block--metric");
+  metric.append(element("span", "block__label", textOf(block.label)), element("span", "block__figure", textOf(block.value)));
+  if (textOf(block.note)) {
+    metric.append(element("span", "block__note", block.note));
+  }
+  return metric;
+}
+
+function renderQuoteBlock(block) {
+  const quote = element("blockquote", "block block--quote", textOf(block.text));
+  if (textOf(block.speaker)) {
+    quote.append(element("span", "block__label", "— " + block.speaker));
+  }
+  return quote;
+}
+
+function tableCells(row) {
+  return Array.isArray(row) ? row.map((cell) => (typeof cell === "string" || typeof cell === "number" ? String(cell) : "")) : [];
+}
+
+function appendCells(row, cellTag, cells) {
+  cells.forEach((cell) => row.append(element(cellTag, "", cell)));
+  return row;
+}
+
+function renderTableBlock(block) {
+  const columns = tableCells(block.columns);
+  const table = element("table", "block__table");
+  const head = element("thead");
+  head.append(appendCells(element("tr"), "th", columns));
+  const body = element("tbody");
+  (Array.isArray(block.rows) ? block.rows : []).filter(Array.isArray).forEach((row) => body.append(appendCells(element("tr"), "td", tableCells(row))));
+  table.append(head, body);
+  const scroller = element("div", "block block__table-scroll");
+  scroller.append(table);
+  return scroller;
+}
+
+function renderScreenBlock(block) {
+  const screen = element("p", "block block--screen");
+  screen.append(element("span", "offset-chip", textOf(block.offset)), element("span", "", "Screen: " + textOf(block.caption)));
+  return screen;
+}
+
+function renderCalloutBlock(block) {
+  const isRisk = block.tone === "risk";
+  return labelledBlock("block--callout" + (isRisk ? " block--risk" : ""), isRisk ? "Risk" : "Note", block.text);
+}
+
+const BLOCK_RENDERERS = {
+  heading: renderHeadingBlock,
+  paragraph: renderParagraphBlock,
+  list: renderListBlock,
+  decision: renderDecisionBlock,
+  metric: renderMetricBlock,
+  quote: renderQuoteBlock,
+  table: renderTableBlock,
+  screen: renderScreenBlock,
+  callout: renderCalloutBlock
+};
+
+function renderBlocks(blocks) {
+  const wrapper = element("div", "block-list");
+  blocks
+    .filter((block) => Object.hasOwn(BLOCK_RENDERERS, block.kind))
+    .forEach((block) => wrapper.append(BLOCK_RENDERERS[block.kind](block)));
+  return wrapper;
+}
+
+function describeTodo(todo) {
+  return ["Owner: " + (todo.owner || "Unassigned"), todo.due ? "Due: " + todo.due : ""]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function canAskClaude() {
+  return typeof window.claude?.complete === "function";
+}
+
+function completionText(completion) {
+  if (typeof completion === "string") {
+    return completion;
+  }
+  const text = completion?.text ?? completion?.completion;
+  return typeof text === "string" ? text : "";
+}
+
+async function runAction(action, outputElement) {
+  try {
+    const text = completionText(await window.claude.complete(action.prompt));
+    if (!text.trim()) {
+      throw new Error("empty completion");
+    }
+    renderActionResult(outputElement, text);
+  } catch (error) {
+    const failure = element("p", "action-output__text", ACTION_FAILED_MESSAGE);
+    failure.setAttribute("role", "alert");
+    outputElement.replaceChildren(failure);
+  }
+}
+
+function renderActionResult(outputElement, text) {
+  outputElement.replaceChildren(element("p", "action-output__text", text));
+  if (typeof navigator.clipboard?.writeText === "function") {
+    outputElement.append(buildCopyButton(text));
+  }
+}
+
+function buildCopyButton(text) {
+  const button = element("button", "button", "Copy");
+  button.type = "button";
+  button.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      button.textContent = "Copied";
+    } catch (error) {
+      button.textContent = "Couldn't copy";
+    }
+  });
+  return button;
+}
+
+function buildActionButton(action, outputElement, reasonId) {
+  const button = element("button", "button", action.label);
+  button.type = "button";
+  if (!canAskClaude()) {
+    button.disabled = true;
+    button.setAttribute("aria-describedby", reasonId);
+    return button;
+  }
+  button.addEventListener("click", async () => {
+    if (button.getAttribute("aria-disabled") === "true") {
+      return;
+    }
+    button.setAttribute("aria-disabled", "true");
+    button.setAttribute("aria-busy", "true");
+    button.textContent = WORKING_LABEL;
+    await runAction(action, outputElement);
+    button.textContent = action.label;
+    button.removeAttribute("aria-busy");
+    button.removeAttribute("aria-disabled");
+  });
+  return button;
+}
+
+function isRunnableAction(action) {
+  return typeof action.label === "string" && action.label !== "" && typeof action.prompt === "string" && action.prompt !== "";
+}
+
+function renderActions(meeting, todo) {
+  const wrapper = element("div", "todo__actions-group");
+  const actions = element("div", "todo__actions");
+  const output = element("div", "action-output");
+  output.setAttribute("aria-live", "polite");
+  const reasonId = "reason-" + meeting.id + "-" + todo.id;
+  records(todo.actions).filter(isRunnableAction).forEach((action) => actions.append(buildActionButton(action, output, reasonId)));
+  wrapper.append(actions);
+  if (!canAskClaude() && actions.children.length > 0) {
+    const reason = element("p", "todo__reason", AI_UNAVAILABLE_REASON);
+    reason.id = reasonId;
+    wrapper.append(reason);
+  }
+  wrapper.append(output);
+  return wrapper;
+}
+
+function tickedIds(meetingId) {
+  return state.ticked.get(meetingId) || new Set();
+}
+
+function renderTodo(meeting, todo) {
+  const item = element("li", "item" + (todo.owner === "Me" ? " line--me" : ""));
+  const body = element("div", "todo");
+  const choice = element("label", "todo__choice");
+  const checkbox = element("input", "todo__checkbox");
+  checkbox.type = "checkbox";
+  checkbox.dataset.todoId = todo.id;
+  checkbox.checked = tickedIds(meeting.id).has(todo.id);
+  checkbox.addEventListener("change", () => toggleTodo(meeting, todo, checkbox.checked));
+  choice.append(checkbox, element("span", "todo__text", todo.text));
+  body.append(choice, element("p", "todo__meta", describeTodo(todo)), renderActions(meeting, todo));
+  item.append(body);
+  return item;
+}
+
+function toggleTodo(meeting, todo, isChecked) {
+  const ticked = new Set(tickedIds(meeting.id));
+  if (isChecked) {
+    ticked.add(todo.id);
+  } else {
+    ticked.delete(todo.id);
+  }
+  state.ticked.set(meeting.id, ticked);
+  saveTicked(meeting.id, ticked);
+}
+
+function tickedStorageKey(meetingId) {
+  return "ticked:" + meetingId;
+}
+
+function storedText(stored) {
+  return typeof stored === "string" ? stored : stored?.value;
+}
+
+async function loadTicked(meetingId) {
+  try {
+    const stored = await window.storage.get(tickedStorageKey(meetingId), false);
+    const ids = JSON.parse(storedText(stored));
+    return new Set(Array.isArray(ids) ? ids.filter((id) => typeof id === "string") : []);
+  } catch (error) {
+    return new Set();
+  }
+}
+
+function ignoreFailure() {
+  return undefined;
+}
+
+async function saveTicked(meetingId, ticked) {
+  await Promise.resolve()
+    .then(() => window.storage.set(tickedStorageKey(meetingId), JSON.stringify([...ticked]), false))
+    .catch(ignoreFailure);
+}
+
+function renderTodos(meeting) {
+  const panel = element("section", "panel");
+  const list = element("ul", "item-list");
+  records(meeting.todos).forEach((todo) => list.append(renderTodo(meeting, todo)));
+  panel.append(element("h3", "panel__heading", "Todos"), list);
+  return panel;
+}
+
+function markSelected(id) {
+  document.querySelectorAll(".session").forEach((button) => {
+    button.setAttribute("aria-current", String(button.dataset.meetingId === id));
+  });
+  const select = document.getElementById("meeting-select");
+  if (select && id !== null) {
+    select.value = id;
+  }
+}
+
+function applyTicked(meetingId) {
+  const ticked = tickedIds(meetingId);
+  document.querySelectorAll(".todo__checkbox").forEach((checkbox) => {
+    checkbox.checked = ticked.has(checkbox.dataset.todoId);
+  });
+}
+
+async function selectMeeting(id) {
+  state.selectedId = id;
+  markSelected(id);
+  renderMeeting(state.meetings.find((meeting) => meeting.id === id));
+  if (id === null || state.ticked.has(id)) {
+    return;
+  }
+  const ticked = await loadTicked(id);
+  const unsaved = tickedIds(id);
+  state.ticked.set(id, new Set([...ticked, ...unsaved]));
+  if (state.selectedId === id) {
+    applyTicked(id);
+  }
+}
+
+function logFailure(error) {
+  console.error(error);
+}
+
+function renderMeetingCount(count) {
+  document.getElementById("meeting-count").textContent = count === 1 ? "1 meeting" : count + " meetings";
+}
+
+function start() {
+  state.meetings = readMeetings();
+  renderMeetingCount(state.meetings.length);
+  const firstMeeting = state.meetings[0];
+  const firstId = firstMeeting ? firstMeeting.id : null;
+  renderMeetingList(state.meetings, firstId);
+  selectMeeting(firstId).catch(logFailure);
+}
+
+start();
+</script>
+</body>
+</html>

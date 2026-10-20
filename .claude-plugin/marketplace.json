@@ -1,0 +1,16 @@
+{
+  "name": "scribe",
+  "owner": {
+    "name": "Incubyte"
+  },
+  "metadata": {
+    "description": "Plugins for Scribe, the private call transcriber for Mac and Windows."
+  },
+  "plugins": [
+    {
+      "name": "scribe",
+      "source": "./plugins/scribe",
+      "description": "Recap your recent calls and write meeting notes from Scribe's local transcripts."
+    }
+  ]
+}
