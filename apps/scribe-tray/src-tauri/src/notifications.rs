@@ -18,6 +18,12 @@ const OTHER_SIDE_SILENT_TITLE: &str = "Scribe can't hear the other side of the c
 const OTHER_SIDE_SILENT_BODY: &str =
     "Allow Scribe in System Settings > Privacy & Security > Screen & System Audio Recording.";
 
+#[cfg(target_os = "macos")]
+const SCREEN_RECORDING_NEEDED_TITLE: &str =
+    "Scribe needs Screen Recording access to take screenshots";
+#[cfg(target_os = "macos")]
+const SCREEN_RECORDING_NEEDED_BODY: &str = "Allow Scribe in Screen & System Audio Recording. If screenshots still fail after allowing it, quit and reopen Scribe.";
+
 const RECORDING_NOT_STARTED_TITLE: &str = "Scribe couldn't start recording";
 const RECORDING_AUTO_STOPPED_TITLE: &str = "Recording auto-stopped";
 const SECONDS_PER_MINUTE: u64 = 60;
@@ -136,6 +142,14 @@ pub fn notify_cannot_hear_other_side<R: Runtime>(app: &AppHandle<R>) {
     show_plain(app, OTHER_SIDE_SILENT_TITLE, OTHER_SIDE_SILENT_BODY);
 }
 
+#[cfg(target_os = "macos")]
+pub use system_settings::notify_screen_recording_needed;
+
+#[cfg(not(target_os = "macos"))]
+pub fn notify_screen_recording_needed<R: Runtime>(_app: &AppHandle<R>) {
+    tracing::info!("screen recording access is not required on this platform");
+}
+
 #[cfg(windows)]
 pub fn notify_other_side_unavailable<R: Runtime>(app: &AppHandle<R>) {
     let alert = crate::other_side_alert::OTHER_SIDE_UNAVAILABLE_ON_WINDOWS;
@@ -152,7 +166,7 @@ pub fn notify_cannot_hear_other_side<R: Runtime>(_app: &AppHandle<R>) {
     tracing::info!("the other side has been silent since the recording started");
 }
 
-fn show_plain<R: Runtime>(app: &AppHandle<R>, title: &str, body: &str) {
+pub(crate) fn show_plain<R: Runtime>(app: &AppHandle<R>, title: &str, body: &str) {
     let shown = app.notification().builder().title(title).body(body).show();
     if let Err(error) = shown {
         tracing::warn!(%error, title, "could not show a notification");
@@ -167,34 +181,72 @@ mod system_settings {
     use tauri::{AppHandle, Runtime};
     use tauri_plugin_opener::OpenerExt;
 
-    use super::{OTHER_SIDE_SILENT_BODY, OTHER_SIDE_SILENT_TITLE};
+    use super::{
+        OTHER_SIDE_SILENT_BODY, OTHER_SIDE_SILENT_TITLE, SCREEN_RECORDING_NEEDED_BODY,
+        SCREEN_RECORDING_NEEDED_TITLE,
+    };
 
     const OPEN_SYSTEM_SETTINGS: &str = "Open System Settings";
+    const OPEN_SETTINGS: &str = "Open Settings";
     const SYSTEM_AUDIO_SETTINGS_URL: &str =
         "x-apple.systempreferences:com.apple.preference.security?Privacy_AudioCapture";
+    const SCREEN_RECORDING_SETTINGS_URL: &str =
+        "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture";
     const DEV_NOTIFICATION_SENDER: &str = "com.apple.Terminal";
 
+    struct SettingsPrompt {
+        title: &'static str,
+        body: &'static str,
+        button: &'static str,
+        settings_url: &'static str,
+    }
+
+    const OTHER_SIDE_PROMPT: SettingsPrompt = SettingsPrompt {
+        title: OTHER_SIDE_SILENT_TITLE,
+        body: OTHER_SIDE_SILENT_BODY,
+        button: OPEN_SYSTEM_SETTINGS,
+        settings_url: SYSTEM_AUDIO_SETTINGS_URL,
+    };
+
+    const SCREEN_RECORDING_PROMPT: SettingsPrompt = SettingsPrompt {
+        title: SCREEN_RECORDING_NEEDED_TITLE,
+        body: SCREEN_RECORDING_NEEDED_BODY,
+        button: OPEN_SETTINGS,
+        settings_url: SCREEN_RECORDING_SETTINGS_URL,
+    };
+
     pub fn notify_cannot_hear_other_side<R: Runtime>(app: &AppHandle<R>) {
+        prompt_to_open_settings(app, &OTHER_SIDE_PROMPT);
+    }
+
+    pub fn notify_screen_recording_needed<R: Runtime>(app: &AppHandle<R>) {
+        prompt_to_open_settings(app, &SCREEN_RECORDING_PROMPT);
+    }
+
+    fn prompt_to_open_settings<R: Runtime>(app: &AppHandle<R>, prompt: &'static SettingsPrompt) {
         let app = app.clone();
         thread::spawn(move || {
-            if user_chose_to_open_settings(&app) {
-                open_system_audio_settings(&app);
+            if user_chose_to_open_settings(&app, prompt) {
+                open_settings(&app, prompt.settings_url);
             }
         });
     }
 
-    fn user_chose_to_open_settings<R: Runtime>(app: &AppHandle<R>) -> bool {
+    fn user_chose_to_open_settings<R: Runtime>(
+        app: &AppHandle<R>,
+        prompt: &SettingsPrompt,
+    ) -> bool {
         let _ = mac_notification_sys::set_application(&notification_sender(app));
         let response = Notification::new()
-            .title(OTHER_SIDE_SILENT_TITLE)
-            .message(OTHER_SIDE_SILENT_BODY)
-            .main_button(MainButton::SingleAction(OPEN_SYSTEM_SETTINGS))
+            .title(prompt.title)
+            .message(prompt.body)
+            .main_button(MainButton::SingleAction(prompt.button))
             .send();
         match response {
             Ok(NotificationResponse::ActionButton(_) | NotificationResponse::Click) => true,
             Ok(_) => false,
             Err(error) => {
-                tracing::warn!(%error, "could not show the system audio permission notification");
+                tracing::warn!(%error, title = prompt.title, "could not show the settings notification");
                 false
             }
         }
@@ -208,12 +260,9 @@ mod system_settings {
         }
     }
 
-    fn open_system_audio_settings<R: Runtime>(app: &AppHandle<R>) {
-        if let Err(error) = app
-            .opener()
-            .open_url(SYSTEM_AUDIO_SETTINGS_URL, None::<&str>)
-        {
-            tracing::warn!(%error, "could not open the system audio privacy settings");
+    fn open_settings<R: Runtime>(app: &AppHandle<R>, settings_url: &str) {
+        if let Err(error) = app.opener().open_url(settings_url, None::<&str>) {
+            tracing::warn!(%error, settings_url, "could not open the system settings");
         }
     }
 }

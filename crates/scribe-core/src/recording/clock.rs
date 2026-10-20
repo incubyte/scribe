@@ -13,6 +13,15 @@ impl SessionClock {
         }
     }
 
+    #[cfg(feature = "testing")]
+    pub(crate) fn started_ago(elapsed: Duration) -> SessionClock {
+        SessionClock {
+            started: Instant::now()
+                .checked_sub(elapsed)
+                .expect("a session clock cannot start before the machine's clock began"),
+        }
+    }
+
     #[must_use]
     pub fn elapsed(&self) -> Duration {
         self.started.elapsed()

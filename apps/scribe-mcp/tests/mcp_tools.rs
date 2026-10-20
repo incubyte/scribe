@@ -46,7 +46,8 @@ fn line(speaker: Speaker, text: &str) -> Segment {
 }
 
 async fn connect_to(folder: &Path) -> RunningService<RoleClient, ()> {
-    let library = TranscriptLibrary::new(Arc::new(store_in(folder)));
+    let store = Arc::new(store_in(folder));
+    let library = TranscriptLibrary::new(store.clone(), store);
     let (server_side, client_side) = tokio::io::duplex(DUPLEX_BUFFER_BYTES);
     tokio::spawn(async move {
         ScribeServer::new(library)
@@ -61,7 +62,8 @@ async fn connect_to(folder: &Path) -> RunningService<RoleClient, ()> {
 
 async fn connect_following(settings_path: &Path) -> RunningService<RoleClient, ()> {
     let store = SettingsFollowingStore::new(settings_path.to_path_buf()).unwrap();
-    let library = TranscriptLibrary::new(Arc::new(store));
+    let store = Arc::new(store);
+    let library = TranscriptLibrary::new(store.clone(), store);
     let (server_side, client_side) = tokio::io::duplex(DUPLEX_BUFFER_BYTES);
     tokio::spawn(async move {
         ScribeServer::new(library)
@@ -131,25 +133,59 @@ fn collect_files(root: &Path, folder: &Path, files: &mut Vec<(String, Vec<u8>)>)
     }
 }
 
-#[tokio::test]
-async fn an_ai_app_discovers_the_list_and_read_tools_with_descriptions_and_input_schemas() {
+async fn tools_sorted_by_name() -> Vec<rmcp::model::Tool> {
     let folder = tempfile::tempdir().unwrap();
     let client = connect_to(folder.path()).await;
-
     let mut tools = client.list_all_tools().await.unwrap();
     tools.sort_by(|a, b| a.name.cmp(&b.name));
+    tools
+}
+
+#[tokio::test]
+async fn an_ai_app_discovers_the_screenshot_list_read_and_search_tools_by_name() {
+    let tools = tools_sorted_by_name().await;
 
     let names: Vec<&str> = tools.iter().map(|tool| tool.name.as_ref()).collect();
     assert_eq!(
         names,
-        ["get_transcript", "list_transcripts", "search_transcripts"]
+        [
+            "get_screenshot",
+            "get_transcript",
+            "list_transcripts",
+            "search_transcripts"
+        ]
     );
-    assert!(tools.iter().all(|tool| tool.description.is_some()));
-    assert!(tools[0].input_schema["properties"]["id"].is_object());
-    assert!(tools[1].input_schema["properties"]["limit"].is_object());
-    assert!(tools[1].input_schema["properties"]["since"].is_object());
-    assert!(tools[2].input_schema["properties"]["query"].is_object());
+}
+
+#[tokio::test]
+async fn an_ai_app_is_told_what_each_tool_takes() {
+    let tools = tools_sorted_by_name().await;
+
+    assert!(tools[0].input_schema["properties"]["name"].is_object());
+    assert!(tools[1].input_schema["properties"]["id"].is_object());
     assert!(tools[2].input_schema["properties"]["limit"].is_object());
+    assert!(tools[2].input_schema["properties"]["since"].is_object());
+    assert!(tools[3].input_schema["properties"]["query"].is_object());
+    assert!(tools[3].input_schema["properties"]["limit"].is_object());
+}
+
+#[tokio::test]
+async fn an_ai_app_is_told_what_each_tool_does_and_how_screenshots_are_reached() {
+    let tools = tools_sorted_by_name().await;
+
+    assert!(tools.iter().all(|tool| tool.description.is_some()));
+    assert!(
+        tools[0]
+            .description
+            .as_deref()
+            .is_some_and(|text| text.contains("get_transcript"))
+    );
+    assert!(
+        tools[1]
+            .description
+            .as_deref()
+            .is_some_and(|text| text.contains("get_screenshot"))
+    );
 }
 
 #[tokio::test]

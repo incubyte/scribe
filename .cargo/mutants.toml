@@ -1,0 +1,15 @@
+exclude_globs = [
+    "crates/capture-macos/src/**",
+    "crates/capture-windows/src/**",
+    "apps/scribe-tray/src-tauri/src/lib.rs",
+    "apps/scribe-tray/src-tauri/src/notifications.rs",
+    "apps/scribe-tray/src-tauri/src/screenshots/shortcuts.rs",
+    "apps/scribe-tray/src-tauri/src/screenshots/region_selector.rs",
+    "apps/scribe-tray/src-tauri/src/screenshots/capture.rs",
+    "apps/scribe-tray/src-tauri/src/screenshots/delivery.rs",
+    "apps/scribe-tray/src-tauri/src/screenshots/idle_notice.rs",
+    "apps/scribe-tray/src-tauri/src/screenshots/capturers.rs",
+    "apps/scribe-tray/src-tauri/src/screenshots/commands.rs",
+    "apps/scribe-tray/src-tauri/src/screenshots/mod.rs",
+    "apps/scribe-tray/src-tauri/src/screenshots/window_level/**",
+]

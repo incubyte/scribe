@@ -21,7 +21,7 @@ import { usePopoverView, VIEWS } from "./usePopoverView";
 function useEscapeToHide() {
   useEffect(() => {
     const hideOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
+      if (event.key === "Escape" && !event.defaultPrevented) {
         void hidePopover();
       }
     };

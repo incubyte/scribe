@@ -1,5 +1,15 @@
 import { invoke } from "@tauri-apps/api/core";
-import { expecting, isClaudeDesktopStatus, isFolderChange, isString, isModelDownload, isRecorderSnapshot, isSessionSummaries } from "./guards";
+import { expecting, isString } from "../shared/guards";
+import {
+  isClaudeDesktopStatus,
+  isFolderChange,
+  isModelDownload,
+  isRebindOutcome,
+  isRecorderSnapshot,
+  isSessionSummaries,
+  isShortcutViewList,
+} from "./guards";
+import type { PressedKeys, ShortcutKind } from "./types";
 
 const RECENT_SESSION_COUNT = 5;
 
@@ -39,3 +49,20 @@ export const fetchTranscriptsFolder = () =>
 
 export const changeTranscriptsFolder = () =>
   invoke<unknown>("change_transcripts_folder").then(expecting(isFolderChange, "folder change"));
+
+export const fetchScreenshotShortcuts = () =>
+  invoke<unknown>("screenshot_shortcuts").then(expecting(isShortcutViewList, "screenshot shortcuts"));
+
+export const pauseScreenshotShortcuts = () => invoke("pause_screenshot_shortcuts");
+
+export const resumeScreenshotShortcuts = () => invoke("resume_screenshot_shortcuts");
+
+export const rebindScreenshotShortcut = (kind: ShortcutKind, pressed: PressedKeys) =>
+  invoke<unknown>("rebind_screenshot_shortcut", { kind, pressed }).then(
+    expecting(isRebindOutcome, "shortcut change"),
+  );
+
+export const resetScreenshotShortcut = (kind: ShortcutKind) =>
+  invoke<unknown>("reset_screenshot_shortcut", { kind }).then(
+    expecting(isRebindOutcome, "shortcut reset"),
+  );

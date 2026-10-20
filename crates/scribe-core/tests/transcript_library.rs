@@ -2,12 +2,13 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use chrono::{DateTime, FixedOffset, NaiveDate};
+use scribe_core::capture::SessionMoment;
 use scribe_core::library::{
     LibraryError, Limit, ListQuery, SearchHit, SearchQuery, TranscriptLibrary,
 };
-use scribe_core::ports::TranscriptStore;
+use scribe_core::ports::{ScreenshotStore, TranscriptStore};
 use scribe_core::recording::{Segment, SessionHeader, SessionId, SessionStatus, Speaker};
-use scribe_core::testing::InMemoryTranscriptStore;
+use scribe_core::testing::{InMemoryScreenshotStore, InMemoryTranscriptStore, frame_filled};
 
 fn moment(text: &str) -> DateTime<FixedOffset> {
     DateTime::parse_from_rfc3339(text).unwrap()
@@ -18,7 +19,24 @@ fn day(year: i32, month: u32, day: u32) -> NaiveDate {
 }
 
 fn library_over(store: &Arc<InMemoryTranscriptStore>) -> TranscriptLibrary {
-    TranscriptLibrary::new(store.clone())
+    library_with_screenshots(store, &Arc::new(InMemoryScreenshotStore::default()))
+}
+
+fn library_with_screenshots(
+    store: &Arc<InMemoryTranscriptStore>,
+    screenshots: &Arc<InMemoryScreenshotStore>,
+) -> TranscriptLibrary {
+    TranscriptLibrary::new(store.clone(), screenshots.clone())
+}
+
+fn screenshot_at(screenshots: &InMemoryScreenshotStore, session: &SessionId, seconds: u64) {
+    let moment = SessionMoment {
+        session: session.clone(),
+        offset: Duration::from_secs(seconds),
+    };
+    screenshots
+        .save(&moment, &frame_filled(2, 2, [0, 0, 0, 255]))
+        .unwrap();
 }
 
 fn finished_call(store: &InMemoryTranscriptStore, started_at: &str) -> SessionId {
@@ -271,4 +289,58 @@ fn a_blank_search_query_is_rejected() {
     let error = SearchQuery::parse(" \t ").unwrap_err();
 
     assert!(matches!(error, LibraryError::EmptyQuery));
+}
+
+#[test]
+fn a_calls_screenshots_are_listed_in_offset_order() {
+    let store = Arc::new(InMemoryTranscriptStore::default());
+    let screenshots = Arc::new(InMemoryScreenshotStore::default());
+    let id = finished_call(&store, "2026-10-20T14:30:05+05:30");
+    screenshot_at(&screenshots, &id, 41 * 60 + 2);
+    screenshot_at(&screenshots, &id, 12 * 60 + 34);
+    screenshot_at(&screenshots, &id, 12 * 60 + 34);
+
+    let references: Vec<String> = library_with_screenshots(&store, &screenshots)
+        .screenshots(&id)
+        .unwrap()
+        .iter()
+        .map(ToString::to_string)
+        .collect();
+
+    assert_eq!(
+        references,
+        [
+            "2026-10-20-143005/00-12-34.png",
+            "2026-10-20-143005/00-12-34-2.png",
+            "2026-10-20-143005/00-41-02.png"
+        ]
+    );
+}
+
+#[test]
+fn asking_for_a_screenshot_that_was_never_taken_reports_its_reference() {
+    let store = Arc::new(InMemoryTranscriptStore::default());
+
+    let failure = library_over(&store)
+        .screenshot("2026-10-20-143005/00-12-34.png", 1568)
+        .unwrap_err();
+
+    assert_eq!(
+        failure.to_string(),
+        "No screenshot named 2026-10-20-143005/00-12-34.png"
+    );
+}
+
+#[test]
+fn a_malformed_screenshot_reference_is_rejected_by_name() {
+    let store = Arc::new(InMemoryTranscriptStore::default());
+
+    let failure = library_over(&store)
+        .screenshot("../escape.png", 1568)
+        .unwrap_err();
+
+    assert_eq!(
+        failure.to_string(),
+        "Invalid screenshot name: ../escape.png"
+    );
 }

@@ -1,0 +1,16 @@
+[package]
+name = "capture-macos"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+scribe-core.workspace = true
+
+[target.'cfg(target_os = "macos")'.dependencies]
+tracing.workspace = true
+cidre = { version = "0.29", default-features = false, features = ["sc", "cg", "blocks", "macos_15_0"] }
+
+[lints]
+workspace = true

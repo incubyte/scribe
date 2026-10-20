@@ -1,8 +1,10 @@
 mod format;
+mod image_codec;
 mod month_layout;
 mod private_file;
 mod reader;
 mod relocation;
+mod screenshot_files;
 mod settings_file;
 mod store_error;
 mod transcripts_folder;

@@ -4,6 +4,9 @@ use std::time::Duration;
 
 use chrono::{DateTime, FixedOffset};
 
+use crate::capture::{
+    Frame, MonitorShot, ScreenshotName, ScreenshotReference, ServedImage, SessionMoment,
+};
 use crate::recording::{
     AudioChunk, RecordingEvent, Segment, SessionClock, SessionDocument, SessionHeader, SessionId,
     SessionSummary, TranscriptEvent, Transcription,
@@ -33,6 +36,26 @@ pub trait TranscriptStore: Send + Sync {
     fn read(&self, id: &SessionId) -> Result<SessionDocument, StoreError>;
 }
 
+pub trait ScreenCapturer: Send + Sync {
+    fn access(&self) -> CaptureAccess;
+    fn request_access(&self);
+    fn capture_under_pointer(&self) -> Result<MonitorShot, ScreenCaptureError>;
+}
+
+pub trait ScreenshotStore: Send + Sync {
+    fn save(
+        &self,
+        moment: &SessionMoment,
+        screenshot: &Frame,
+    ) -> Result<ScreenshotName, StoreError>;
+    fn list_screenshots(&self, session: &SessionId) -> Result<Vec<ScreenshotName>, StoreError>;
+    fn serve(
+        &self,
+        reference: &ScreenshotReference,
+        max_long_edge: u32,
+    ) -> Result<ServedImage, StoreError>;
+}
+
 pub trait RecordingListener: Send + Sync {
     fn on_event(&self, event: RecordingEvent);
 }
@@ -45,6 +68,22 @@ pub enum CaptureError {
     DeviceUnavailable,
     #[error("the audio stream could not be started: {0}")]
     StreamFailed(String),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CaptureAccess {
+    Granted,
+    NotGranted,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum ScreenCaptureError {
+    #[error("screen recording access has not been granted")]
+    AccessNotGranted,
+    #[error("no monitor is under the pointer")]
+    NoMonitorUnderPointer,
+    #[error("the screen could not be captured: {0}")]
+    Failed(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -77,4 +116,10 @@ pub enum StoreError {
     Malformed { file_name: String },
     #[error("every session id for this start time is already taken")]
     NoFreeSessionId,
+    #[error("every screenshot name for this moment is already taken")]
+    NoFreeScreenshotName,
+    #[error("the screenshot could not be encoded as a PNG")]
+    ScreenshotNotEncoded,
+    #[error("no screenshot named {reference}")]
+    ScreenshotNotFound { reference: ScreenshotReference },
 }

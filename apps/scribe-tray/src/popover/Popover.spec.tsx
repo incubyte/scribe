@@ -72,6 +72,10 @@ function backend(
     claude_desktop_status: "not_connected",
     transcripts_folder: () => readFolder(),
     change_transcripts_folder: () => changeFolder(),
+    screenshot_shortcuts: [
+      { kind: "full_screen", label: "⌃⌥⌘1" },
+      { kind: "region", label: "⌃⌥⌘2" },
+    ],
   };
   const handler = vi.fn((command: string) => {
     const response = responses[command];
@@ -417,6 +421,29 @@ describe("dismissing the popover", () => {
   });
 });
 
+describe("the popover while a shortcut is being rebound", () => {
+  it("keeps the popover open when Escape cancels the rebind", async () => {
+    const handler = backend(idle);
+    render(<Popover />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Settings" }),
+    );
+    await userEvent.click(
+      await screen.findByRole("button", {
+        name: "Change Capture region shortcut, currently ⌃⌥⌘2",
+      }),
+    );
+    await screen.findAllByText("Press the new shortcut…");
+
+    await userEvent.keyboard("{Escape}");
+
+    await waitFor(() =>
+      expect(screen.queryByText("Press the new shortcut…")).not.toBeInTheDocument(),
+    );
+    expect(handler).not.toHaveBeenCalledWith("hide_popover", {});
+  });
+});
+
 describe("the idle popover accessibility", () => {
   it("has no accessibility violations", async () => {
     backend(idle);
@@ -471,11 +498,13 @@ describe("the popover settings", () => {
     await openSettings();
 
     await waitFor(() =>
-      expect(screen.getByRole("status")).toHaveTextContent(
+      expect(folderStatus()).toHaveTextContent(
         "Scribe could not read the transcripts folder setting.",
       ),
     );
   });
+
+  const folderStatus = () => screen.getByRole("status", { name: "Folder status" });
 
   async function changeFolderAndReadStatus(outcome: () => unknown) {
     backend(idle);
@@ -485,7 +514,7 @@ describe("the popover settings", () => {
     await userEvent.click(
       screen.getByRole("button", { name: CHANGE_LABEL }),
     );
-    return screen.getByRole("status");
+    return folderStatus();
   }
 
   it("announces the new folder and how many transcripts moved", async () => {

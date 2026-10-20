@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
@@ -194,4 +195,134 @@ fn a_dangling_link_already_at_the_destination_is_never_replaced() {
         "october"
     );
     assert_eq!(fs::read_link(&destination).unwrap(), missing_target);
+}
+
+fn write_session_folder(
+    folder: &TranscriptsFolder,
+    id: &str,
+    contents: &str,
+) -> std::path::PathBuf {
+    let session_folder = folder.path().join(&id[..7]).join(id);
+    fs::create_dir_all(&session_folder).unwrap();
+    fs::write(session_folder.join(format!("{id}.md")), contents).unwrap();
+    session_folder
+}
+
+fn files_in(folder: &Path) -> BTreeMap<String, String> {
+    let Ok(entries) = fs::read_dir(folder) else {
+        return BTreeMap::new();
+    };
+    entries
+        .map(|entry| entry.unwrap())
+        .map(|entry| {
+            let contents = fs::read_to_string(entry.path()).unwrap();
+            (entry.file_name().to_string_lossy().into_owned(), contents)
+        })
+        .collect()
+}
+
+fn texts<const N: usize>(files: [(&str, &str); N]) -> BTreeMap<String, String> {
+    files
+        .into_iter()
+        .map(|(name, contents)| (name.to_owned(), contents.to_owned()))
+        .collect()
+}
+
+fn session_folder_in(folder: &TranscriptsFolder, id: &str) -> std::path::PathBuf {
+    folder.path().join(&id[..7]).join(id)
+}
+
+#[test]
+fn a_session_folder_moves_whole_with_every_file_inside_it() {
+    let parent = tempfile::tempdir().unwrap();
+    let old = folder_in(parent.path(), "old");
+    let new = folder_in(parent.path(), "new");
+    let source = write_session_folder(&old, OCTOBER_ID, "october");
+    fs::write(source.join("00-00-04.png"), "first screenshot").unwrap();
+    fs::write(source.join("00-01-10.png"), "second screenshot").unwrap();
+
+    let report = move_transcripts(&old, &new).unwrap();
+
+    let moved = session_folder_in(&new, OCTOBER_ID);
+    assert_eq!(report, MoveReport { moved: 1, kept: 0 });
+    assert_eq!(
+        files_in(&moved),
+        texts([
+            ("2026-10-19-114521.md", "october"),
+            ("00-00-04.png", "first screenshot"),
+            ("00-01-10.png", "second screenshot"),
+        ])
+    );
+    assert!(!source.exists());
+}
+
+#[test]
+fn a_session_folder_whose_destination_already_exists_stays_where_it_is() {
+    let parent = tempfile::tempdir().unwrap();
+    let old = folder_in(parent.path(), "old");
+    let new = folder_in(parent.path(), "new");
+    let source = write_session_folder(&old, OCTOBER_ID, "from the old folder");
+    fs::write(source.join("00-00-04.png"), "screenshot").unwrap();
+    let existing = write_session_folder(&new, OCTOBER_ID, "already in the new folder");
+
+    let report = move_transcripts(&old, &new).unwrap();
+
+    assert_eq!(report, MoveReport { moved: 0, kept: 1 });
+    assert_eq!(
+        files_in(&source),
+        texts([
+            ("2026-10-19-114521.md", "from the old folder"),
+            ("00-00-04.png", "screenshot"),
+        ])
+    );
+    assert_eq!(
+        files_in(&existing),
+        texts([("2026-10-19-114521.md", "already in the new folder")])
+    );
+}
+
+#[test]
+fn an_empty_session_folder_waiting_at_the_destination_is_never_filled_over() {
+    let parent = tempfile::tempdir().unwrap();
+    let old = folder_in(parent.path(), "old");
+    let new = folder_in(parent.path(), "new");
+    let source = write_session_folder(&old, OCTOBER_ID, "october");
+    fs::create_dir_all(session_folder_in(&new, OCTOBER_ID)).unwrap();
+
+    let report = move_transcripts(&old, &new).unwrap();
+
+    assert_eq!(report, MoveReport { moved: 0, kept: 1 });
+    assert!(source.join(format!("{OCTOBER_ID}.md")).is_file());
+}
+
+#[test]
+fn session_folders_flat_files_and_month_files_are_each_counted_once() {
+    let parent = tempfile::tempdir().unwrap();
+    let old = folder_in(parent.path(), "old");
+    write_flat(&old, OCTOBER_ID, "legacy");
+    write_in_month(&old, SEPTEMBER_ID, "september");
+    let session = write_session_folder(&old, "2026-08-01-090000", "august");
+    fs::write(session.join("00-00-04.png"), "screenshot").unwrap();
+    fs::write(session.join("00-00-09.png"), "screenshot").unwrap();
+
+    assert_eq!(count_transcripts(&old).unwrap(), 3);
+}
+
+#[cfg(unix)]
+#[test]
+fn a_moved_session_folder_stays_private_to_the_user() {
+    use std::os::unix::fs::PermissionsExt;
+    let parent = tempfile::tempdir().unwrap();
+    let old = folder_in(parent.path(), "old");
+    let new = folder_in(parent.path(), "new");
+    let source = write_session_folder(&old, OCTOBER_ID, "private");
+    fs::set_permissions(&source, fs::Permissions::from_mode(0o700)).unwrap();
+
+    move_transcripts(&old, &new).unwrap();
+
+    let mode = fs::metadata(session_folder_in(&new, OCTOBER_ID))
+        .unwrap()
+        .permissions()
+        .mode();
+    assert_eq!(mode & 0o777, 0o700);
 }

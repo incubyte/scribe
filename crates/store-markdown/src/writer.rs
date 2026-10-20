@@ -50,7 +50,13 @@ impl MarkdownTranscriptStore {
         header: &SessionHeader,
         id: SessionId,
     ) -> Result<Option<SessionId>, StoreError> {
-        let path = month_layout::month_path(folder.path(), &id);
+        if month_layout::has_older_layout_file(folder.path(), &id) {
+            return Ok(None);
+        }
+        if folder.ensure_session_folder_exists(&id)?.is_none() {
+            return Ok(None);
+        }
+        let path = month_layout::session_path(folder.path(), &id);
         let header = header.clone().with_id(id.clone());
         match private_file::create_new(&path, &render_header(&header)) {
             Ok(()) => Ok(Some(id)),
@@ -60,7 +66,7 @@ impl MarkdownTranscriptStore {
     }
 
     fn transcript_paths(&self) -> Result<Vec<PathBuf>, StoreError> {
-        month_layout::transcript_paths_in(self.folder().path())
+        Ok(month_layout::stored_sessions_in(self.folder().path())?.transcript_paths())
     }
 }
 

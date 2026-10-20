@@ -1,19 +1,25 @@
 use std::collections::{BTreeMap, VecDeque};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::io;
+use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::sync::{Arc, Mutex, PoisonError};
+use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
 
 use chrono::{DateTime, FixedOffset};
 
+use crate::capture::{
+    Frame, MonitorPlacement, MonitorShot, PlacementUnits, ScreenshotName, ScreenshotReference,
+    ServedImage, SessionMoment,
+};
 use crate::ports::{
-    AudioSource, CaptureError, RecordingListener, StoreError, TranscribeError, Transcriber,
-    TranscriptStore,
+    AudioSource, CaptureAccess, CaptureError, RecordingListener, ScreenCaptureError,
+    ScreenCapturer, ScreenshotStore, StoreError, TranscribeError, Transcriber, TranscriptStore,
 };
 use crate::recording::{
-    AudioChunk, RecordingEvent, SAMPLE_RATE_HZ, Segment, SessionClock, SessionDocument,
-    SessionHeader, SessionId, SessionStatus, SessionSummary, TranscriptEvent, Transcription,
-    Utterance, offset_as_clock,
+    AudioChunk, LiveSession, RecordingEvent, SAMPLE_RATE_HZ, Segment, SessionClock,
+    SessionDocument, SessionHeader, SessionId, SessionStatus, SessionSummary, TranscriptEvent,
+    Transcription, Utterance, offset_as_clock,
 };
 
 const CHUNK_SAMPLES: u32 = SAMPLE_RATE_HZ / 10;
@@ -390,5 +396,184 @@ impl RecordingListener for RecordingListenerSpy {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .push(event);
+    }
+}
+
+#[must_use]
+pub fn live_session_at(id: SessionId, offset: Duration) -> LiveSession {
+    LiveSession::new(id, SessionClock::started_ago(offset))
+}
+
+#[must_use]
+pub fn frame_filled(width: u32, height: u32, pixel: [u8; 4]) -> Frame {
+    let pixel_count = usize::try_from(width * height).expect("a test frame fits in memory");
+    Frame::new(width, height, pixel.repeat(pixel_count)).expect("a filled frame is complete")
+}
+
+#[must_use]
+pub fn opaque_grey_pixels(levels: impl IntoIterator<Item = u8>) -> Vec<u8> {
+    levels
+        .into_iter()
+        .flat_map(|level| [level, level, level, 255])
+        .collect()
+}
+
+#[must_use]
+pub fn shot_of(frame: Frame) -> MonitorShot {
+    let placement = MonitorPlacement {
+        x: 0,
+        y: 0,
+        width: frame.width(),
+        height: frame.height(),
+        units: PlacementUnits::Pixels,
+    };
+    MonitorShot {
+        frame,
+        outlines: Vec::new(),
+        placement,
+    }
+}
+
+pub struct FakeScreenCapturer {
+    outcome: Result<MonitorShot, ScreenCaptureError>,
+    access_granted: AtomicBool,
+    access_requests: AtomicUsize,
+    captures_attempted: AtomicUsize,
+}
+
+impl FakeScreenCapturer {
+    #[must_use]
+    pub fn showing(shot: MonitorShot) -> FakeScreenCapturer {
+        FakeScreenCapturer::with_outcome(Ok(shot))
+    }
+
+    #[must_use]
+    pub fn failing(error: ScreenCaptureError) -> FakeScreenCapturer {
+        FakeScreenCapturer::with_outcome(Err(error))
+    }
+
+    #[must_use]
+    pub fn showing_without_access(shot: MonitorShot) -> FakeScreenCapturer {
+        let capturer = FakeScreenCapturer::showing(shot);
+        capturer.access_granted.store(false, Ordering::SeqCst);
+        capturer
+    }
+
+    pub fn grant_access(&self) {
+        self.access_granted.store(true, Ordering::SeqCst);
+    }
+
+    #[must_use]
+    pub fn access_requests(&self) -> usize {
+        self.access_requests.load(Ordering::SeqCst)
+    }
+
+    #[must_use]
+    pub fn captures_attempted(&self) -> usize {
+        self.captures_attempted.load(Ordering::SeqCst)
+    }
+
+    fn with_outcome(outcome: Result<MonitorShot, ScreenCaptureError>) -> FakeScreenCapturer {
+        FakeScreenCapturer {
+            outcome,
+            access_granted: AtomicBool::new(true),
+            access_requests: AtomicUsize::new(0),
+            captures_attempted: AtomicUsize::new(0),
+        }
+    }
+}
+
+impl ScreenCapturer for FakeScreenCapturer {
+    fn access(&self) -> CaptureAccess {
+        if self.access_granted.load(Ordering::SeqCst) {
+            CaptureAccess::Granted
+        } else {
+            CaptureAccess::NotGranted
+        }
+    }
+
+    fn request_access(&self) {
+        self.access_requests.fetch_add(1, Ordering::SeqCst);
+    }
+
+    fn capture_under_pointer(&self) -> Result<MonitorShot, ScreenCaptureError> {
+        self.captures_attempted.fetch_add(1, Ordering::SeqCst);
+        self.outcome.clone()
+    }
+}
+
+type SavedScreenshots = BTreeMap<(SessionId, ScreenshotName), Frame>;
+
+#[derive(Default)]
+pub struct InMemoryScreenshotStore {
+    saved: Mutex<SavedScreenshots>,
+    refuses_saves: bool,
+}
+
+impl InMemoryScreenshotStore {
+    #[must_use]
+    pub fn refusing_saves() -> InMemoryScreenshotStore {
+        InMemoryScreenshotStore {
+            refuses_saves: true,
+            ..InMemoryScreenshotStore::default()
+        }
+    }
+
+    #[must_use]
+    pub fn screenshot(&self, session: &SessionId, name: &ScreenshotName) -> Option<Frame> {
+        self.saved().get(&(session.clone(), name.clone())).cloned()
+    }
+
+    #[must_use]
+    pub fn saved_count(&self) -> usize {
+        self.saved().len()
+    }
+
+    fn saved(&self) -> MutexGuard<'_, SavedScreenshots> {
+        self.saved.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+impl ScreenshotStore for InMemoryScreenshotStore {
+    fn save(
+        &self,
+        moment: &SessionMoment,
+        screenshot: &Frame,
+    ) -> Result<ScreenshotName, StoreError> {
+        if self.refuses_saves {
+            return Err(unwritable_session_folder(moment.offset));
+        }
+        let mut saved = self.saved();
+        let name = ScreenshotName::candidates(moment.offset)
+            .find(|name| !saved.contains_key(&(moment.session.clone(), name.clone())))
+            .ok_or(StoreError::NoFreeScreenshotName)?;
+        saved.insert((moment.session.clone(), name.clone()), screenshot.clone());
+        Ok(name)
+    }
+
+    fn list_screenshots(&self, session: &SessionId) -> Result<Vec<ScreenshotName>, StoreError> {
+        Ok(self
+            .saved()
+            .keys()
+            .filter(|(saved_session, _)| saved_session == session)
+            .map(|(_, name)| name.clone())
+            .collect())
+    }
+
+    fn serve(
+        &self,
+        reference: &ScreenshotReference,
+        _max_long_edge: u32,
+    ) -> Result<ServedImage, StoreError> {
+        Err(StoreError::ScreenshotNotFound {
+            reference: reference.clone(),
+        })
+    }
+}
+
+fn unwritable_session_folder(offset: Duration) -> StoreError {
+    StoreError::Io {
+        path: PathBuf::from(ScreenshotName::at(offset).to_string()),
+        source: io::Error::from(io::ErrorKind::PermissionDenied),
     }
 }

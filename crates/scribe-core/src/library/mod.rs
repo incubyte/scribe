@@ -12,18 +12,29 @@ pub use summary_view::SessionSummaryView;
 
 use search::find_matches;
 
-use crate::ports::TranscriptStore;
+use crate::capture::{ScreenshotReference, ServedImage};
+use crate::ports::{ScreenshotStore, StoreError, TranscriptStore};
 use crate::recording::{SessionDocument, SessionId, SessionStatus, SessionSummary};
 
 #[derive(Clone)]
 pub struct TranscriptLibrary {
     store: Arc<dyn TranscriptStore>,
+    screenshots: Arc<dyn ScreenshotStore>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServedScreenshot {
+    pub reference: ScreenshotReference,
+    pub image: ServedImage,
 }
 
 impl TranscriptLibrary {
     #[must_use]
-    pub fn new(store: Arc<dyn TranscriptStore>) -> TranscriptLibrary {
-        TranscriptLibrary { store }
+    pub fn new(
+        store: Arc<dyn TranscriptStore>,
+        screenshots: Arc<dyn ScreenshotStore>,
+    ) -> TranscriptLibrary {
+        TranscriptLibrary { store, screenshots }
     }
 
     pub fn list(&self, query: ListQuery) -> Result<Vec<SessionSummary>, LibraryError> {
@@ -43,6 +54,31 @@ impl TranscriptLibrary {
             Ok(document)
         } else {
             Err(LibraryError::NotFound(id))
+        }
+    }
+
+    pub fn screenshots(&self, id: &SessionId) -> Result<Vec<ScreenshotReference>, LibraryError> {
+        let mut names = self.screenshots.list_screenshots(id)?;
+        names.sort();
+        Ok(names
+            .into_iter()
+            .map(|name| ScreenshotReference::new(id.clone(), name))
+            .collect())
+    }
+
+    pub fn screenshot(
+        &self,
+        raw_reference: &str,
+        max_long_edge: u32,
+    ) -> Result<ServedScreenshot, LibraryError> {
+        let reference = ScreenshotReference::parse(raw_reference)
+            .map_err(|_| LibraryError::InvalidScreenshotName(raw_reference.to_owned()))?;
+        match self.screenshots.serve(&reference, max_long_edge) {
+            Ok(image) => Ok(ServedScreenshot { reference, image }),
+            Err(StoreError::Malformed { .. }) => {
+                Err(LibraryError::ScreenshotNotFound(reference.to_string()))
+            }
+            Err(other) => Err(other.into()),
         }
     }
 

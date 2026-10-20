@@ -21,6 +21,7 @@ fn transcript_text(parent: &Path, id: &SessionId) -> String {
         parent
             .join("Scribe")
             .join(id.month())
+            .join(id.as_str())
             .join(format!("{id}.md")),
     )
     .unwrap()
@@ -126,7 +127,12 @@ fn finishing_a_session_leaves_no_temporary_file_behind() {
 
     store.finalise(&id, ended_at()).unwrap();
 
-    let names: Vec<_> = fs::read_dir(parent.path().join("Scribe").join("2026-10"))
+    let session_folder = parent
+        .path()
+        .join("Scribe")
+        .join("2026-10")
+        .join(id.as_str());
+    let names: Vec<_> = fs::read_dir(session_folder)
         .unwrap()
         .map(|entry| entry.unwrap().file_name())
         .collect();
@@ -205,6 +211,7 @@ fn transcript_files_are_private_to_the_user() {
         .path()
         .join("Scribe")
         .join("2026-10")
+        .join(id.as_str())
         .join(format!("{id}.md"));
     let created_mode = fs::metadata(&path).unwrap().permissions().mode();
 

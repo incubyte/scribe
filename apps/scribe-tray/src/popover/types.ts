@@ -36,3 +36,24 @@ export type FolderChange =
   | { readonly outcome: "changed"; readonly folder: string; readonly moved: number; readonly kept: number };
 
 export type ClaudeDesktopStatus = "not_installed" | "not_connected" | "outdated" | "connected";
+
+export type ShortcutKind = "full_screen" | "region";
+
+export interface ShortcutView {
+  readonly kind: ShortcutKind;
+  readonly label: string;
+}
+
+export interface PressedKeys {
+  readonly code: string;
+  readonly control: boolean;
+  readonly alt: boolean;
+  readonly shift: boolean;
+  readonly meta: boolean;
+}
+
+export type RebindOutcome =
+  | { readonly outcome: "accepted"; readonly label: string }
+  | { readonly outcome: "needs_modifier"; readonly message: string }
+  | { readonly outcome: "duplicate_of"; readonly kind: ShortcutKind }
+  | { readonly outcome: "in_use_by_another_app" };

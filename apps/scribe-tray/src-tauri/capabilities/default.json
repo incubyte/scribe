@@ -4,6 +4,8 @@
   "description": "Lets Scribe open its transcripts folder, run the privacy statement window and drive the popover",
   "windows": [
     "privacy",
+    "idle-notice",
+    "region-selector",
     "popover"
   ],
   "permissions": [

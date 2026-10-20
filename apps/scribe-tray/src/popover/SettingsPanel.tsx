@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef } from "react";
+import { type ReactNode, useEffect, useId, useRef } from "react";
 import { RECORDING_REASON } from "./folderChangeMessage";
 
 interface SettingsPanelProps {
@@ -7,6 +7,7 @@ interface SettingsPanelProps {
   readonly isRecording: boolean;
   readonly onChangeFolder: () => void;
   readonly onBack: () => void;
+  readonly children?: ReactNode;
 }
 
 export const CHANGE_LABEL = "Change Transcripts Folder";
@@ -18,6 +19,7 @@ export function SettingsPanel({
   isRecording,
   onChangeFolder,
   onBack,
+  children,
 }: SettingsPanelProps) {
   const heading = useRef<HTMLHeadingElement>(null);
   const headingId = useId();
@@ -54,9 +56,10 @@ export function SettingsPanel({
           {RECORDING_REASON}
         </p>
       ) : null}
-      <p role="status" className="settings__status">
+      <p role="status" aria-label="Folder status" className="settings__status">
         {status}
       </p>
+      {children}
       <button className="actions__link" type="button" onClick={onBack}>
         Back
       </button>

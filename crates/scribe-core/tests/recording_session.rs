@@ -832,3 +832,45 @@ fn the_quiet_announcement_names_the_session_that_went_quiet() {
         vec![RecordingEvent::ConversationWentQuiet { id }]
     );
 }
+
+#[test]
+fn the_recording_session_is_live_while_it_records() {
+    let mut call = Call::ready();
+    let live = call.recorder.live_session_slot();
+
+    let id = call.start(vec![silent_mic_lane()]).unwrap();
+
+    assert_eq!(live.current().map(|session| session.id().clone()), Some(id));
+    call.recorder.stop().unwrap();
+}
+
+#[test]
+fn nothing_is_live_before_a_recording_starts() {
+    let call = Call::ready();
+
+    let live = call.recorder.live_session_slot();
+
+    assert!(live.current().is_none());
+}
+
+#[test]
+fn the_session_stops_being_live_as_soon_as_stopping_begins() {
+    let mut call = Call::ready();
+    let live = call.recorder.live_session_slot();
+    let (announce, transcribing) = mpsc::channel();
+    let (release, held) = mpsc::channel();
+    let held_transcriber = ScriptedTranscriber::new(vec![])
+        .announcing_push(0, announce)
+        .pausing_before_push(0, held);
+    call.start(vec![lane(Speaker::Me, held_transcriber)])
+        .unwrap();
+    transcribing.recv_timeout(PATIENCE).unwrap();
+
+    let stopping = thread::spawn(move || call.recorder.stop());
+    wait_until(|| live.current().is_none());
+
+    assert!(live.current().is_none());
+    assert!(!stopping.is_finished());
+    release.send(()).unwrap();
+    stopping.join().unwrap().unwrap();
+}

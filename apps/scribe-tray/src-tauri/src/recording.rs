@@ -6,7 +6,8 @@ use std::thread;
 use chrono::Local;
 use scribe_core::ports::{RecordingListener, StoreError, TranscriptStore};
 use scribe_core::recording::{
-    CapturingLanes, Readiness, Recorder, RecorderError, RecorderState, SessionHeader, SessionId,
+    CapturingLanes, LiveSession, LiveSessionSlot, Readiness, Recorder, RecorderError,
+    RecorderState, SessionHeader, SessionId,
 };
 use serde::Serialize;
 use store_markdown::{MarkdownTranscriptStore, SETTINGS_FILE_NAME, TranscriptsFolder};
@@ -27,6 +28,7 @@ const START_FAILED_EVENT: &str = "recording://start-failed";
 
 pub struct RecordingController {
     recorder: Mutex<Recorder>,
+    live: LiveSessionSlot,
     listener: Arc<dyn RecordingListener>,
     engine: OnceLock<SpeechEngine>,
     starting: AtomicBool,
@@ -36,6 +38,7 @@ impl RecordingController {
     #[must_use]
     pub fn new(recorder: Recorder, listener: Arc<dyn RecordingListener>) -> RecordingController {
         RecordingController {
+            live: recorder.live_session_slot(),
             recorder: Mutex::new(recorder),
             listener,
             engine: OnceLock::new(),
@@ -68,6 +71,10 @@ impl RecordingController {
 
     pub fn state(&self) -> RecorderState {
         self.recorder().state()
+    }
+
+    pub fn live_session(&self) -> Option<LiveSession> {
+        self.live.current()
     }
 
     pub fn mark_privacy_acknowledged(&self) {

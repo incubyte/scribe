@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use rmcp::ServiceExt;
 use scribe_core::library::TranscriptLibrary;
-use scribe_core::ports::TranscriptStore;
 use scribe_mcp::following_store::SettingsFollowingStore;
 use scribe_mcp::server::ScribeServer;
 use scribe_mcp::transport::bounded_stdio;
@@ -14,8 +13,7 @@ async fn main() -> anyhow::Result<()> {
         .with_writer(std::io::stderr)
         .with_ansi(false)
         .init();
-    let library = TranscriptLibrary::new(build_store()?);
-    ScribeServer::new(library)
+    ScribeServer::new(build_library()?)
         .serve(bounded_stdio())
         .await?
         .waiting()
@@ -23,11 +21,14 @@ async fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn build_store() -> anyhow::Result<Arc<dyn TranscriptStore>> {
-    Ok(match default_settings_path() {
-        Some(settings_path) => Arc::new(SettingsFollowingStore::new(settings_path)?),
-        None => Arc::new(MarkdownTranscriptStore::new(
+fn build_library() -> anyhow::Result<TranscriptLibrary> {
+    Ok(if let Some(settings_path) = default_settings_path() {
+        let store = Arc::new(SettingsFollowingStore::new(settings_path)?);
+        TranscriptLibrary::new(store.clone(), store)
+    } else {
+        let store = Arc::new(MarkdownTranscriptStore::new(
             TranscriptsFolder::configured_by(None)?,
-        )),
+        ));
+        TranscriptLibrary::new(store.clone(), store)
     })
 }

@@ -1,11 +1,16 @@
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
 use rmcp::handler::server::wrapper::Parameters;
+use rmcp::model::{CallToolResult, ContentBlock};
 use rmcp::{Json, ServerHandler, tool, tool_handler, tool_router};
 use scribe_core::library::{LibraryError, SearchQuery, TranscriptLibrary};
+use scribe_core::recording::SessionId;
 
 use crate::requests::{
-    GetTranscriptRequest, ListTranscriptsRequest, SearchResults, SearchTranscriptsRequest,
-    TranscriptList,
+    GetScreenshotRequest, GetTranscriptRequest, ListTranscriptsRequest, SearchResults,
+    SearchTranscriptsRequest, TranscriptList,
 };
+use crate::screenshot_listing::{MAX_SERVED_EDGE_PX, screenshots_section, served_label};
 
 #[derive(Clone)]
 pub struct ScribeServer {
@@ -34,7 +39,7 @@ impl ScribeServer {
     }
 
     #[tool(
-        description = "Read one call transcript recorded by Scribe, by id, as markdown, including its header (title, start and end time, status) and every spoken line with its timestamp and speaker."
+        description = "Read one call transcript recorded by Scribe, by id, as markdown, including its header (title, start and end time, status) and every spoken line with its timestamp and speaker. When the call has screenshots, the markdown ends with a Screenshots section naming each one; pass a name to get_screenshot to see the image."
     )]
     async fn get_transcript(
         &self,
@@ -44,7 +49,30 @@ impl ScribeServer {
             .library
             .get(&request.id)
             .map_err(|error| report(&error))?;
-        Ok(document.raw)
+        let mut markdown = document.raw;
+        if let Some(section) = self.screenshots_section_for(&document.header.id) {
+            markdown.push_str(&section);
+        }
+        Ok(markdown)
+    }
+
+    #[tool(
+        description = "See one screenshot Scribe saved during a call, by the name listed at the end of get_transcript (written <session id>/<HH-MM-SS>.png). Returns a one-line label and the image, scaled down to at most 1568 px on its long edge."
+    )]
+    async fn get_screenshot(
+        &self,
+        Parameters(request): Parameters<GetScreenshotRequest>,
+    ) -> Result<CallToolResult, String> {
+        let served = self
+            .library
+            .screenshot(&request.name, MAX_SERVED_EDGE_PX)
+            .map_err(|error| report(&error))?;
+        let label = served_label(&served.reference, &served.image);
+        let png = STANDARD.encode(&served.image.png);
+        Ok(CallToolResult::success(vec![
+            ContentBlock::text(label),
+            ContentBlock::image(png, "image/png"),
+        ]))
     }
 
     #[tool(
@@ -60,6 +88,18 @@ impl ScribeServer {
             .search(&query, request.limit())
             .map_err(|error| report(&error))?;
         Ok(Json(SearchResults::from(hits)))
+    }
+}
+
+impl ScribeServer {
+    fn screenshots_section_for(&self, id: &SessionId) -> Option<String> {
+        match self.library.screenshots(id) {
+            Ok(references) => screenshots_section(&references),
+            Err(error) => {
+                tracing::warn!(%error, "could not list the screenshots of a transcript");
+                None
+            }
+        }
     }
 }
 

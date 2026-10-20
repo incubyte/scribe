@@ -15,6 +15,7 @@ mod power;
 mod privacy;
 pub mod recording;
 pub mod recording_label;
+pub mod screenshots;
 pub mod start_failure;
 pub mod transcripts_location;
 mod tray;
@@ -33,9 +34,20 @@ pub fn run() -> tauri::Result<()> {
         .run(tauri::generate_context!())
 }
 
+#[allow(clippy::too_many_lines)]
 fn with_commands<R: Runtime>(builder: Builder<R>) -> Builder<R> {
     builder.invoke_handler(tauri::generate_handler![
         privacy::acknowledge_privacy,
+        screenshots::idle_notice::dismiss_idle_notice,
+        screenshots::region_selector::region_frame,
+        screenshots::region_selector::region_context,
+        screenshots::region_selector::complete_region,
+        screenshots::region_selector::cancel_region,
+        screenshots::commands::screenshot_shortcuts,
+        screenshots::commands::pause_screenshot_shortcuts,
+        screenshots::commands::resume_screenshot_shortcuts,
+        screenshots::commands::rebind_screenshot_shortcut,
+        screenshots::commands::reset_screenshot_shortcut,
         commands::recorder_snapshot,
         commands::recent_sessions,
         commands::start_recording,
@@ -61,11 +73,13 @@ fn with_plugins<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_positioner::init())
+        .plugin(screenshots::plugin())
 }
 
 fn start_scribe<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::error::Error>> {
     tray::install(app)?;
     recording::install(app)?;
+    screenshots::install(app);
     recording::publish_state(app);
     popover::install_blur_hide(app)?;
     privacy::show_statement_until_acknowledged(app)?;

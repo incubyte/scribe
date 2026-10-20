@@ -41,19 +41,23 @@ graph LR
   SA[stt-speechanalyzer] -.implements.-> Core
   PK[stt-parakeet] -.implements.-> Core
   MD[store-markdown] -.implements.-> Core
+  CapMac[capture-macos] -.implements.-> Core
+  CapWin[capture-windows] -.implements.-> Core
 ```
 
 | Module | Responsibility |
 |---|---|
 | `apps/scribe-tray` | Tray, menu, popover, privacy window; per-OS adapter wiring |
 | `apps/scribe-mcp` | `list_transcripts`, `get_transcript`, `search_transcripts` over stdio |
-| `crates/scribe-core` | `recording` (Recorder, Session, Segment, EchoFilter) and `library` (list/get/search); ports `AudioSource`, `Transcriber`, `TranscriptStore` |
+| `crates/scribe-core` | `recording` (Recorder, Session, Segment, EchoFilter, LiveSessionSlot), `capture` (Frame, ScreenshotName, ScreenshotTaker) and `library` (list/get/search); ports `AudioSource`, `Transcriber`, `TranscriptStore`, `ScreenCapturer`, `ScreenshotStore` |
 | `crates/audio-mic` | Mic `AudioSource` |
 | `crates/audio-macos` | System-output `AudioSource` via process tap, excluding Scribe |
 | `crates/audio-windows` | System-output `AudioSource` via WASAPI loopback |
 | `crates/stt-speechanalyzer` | `Transcriber` via SpeechAnalyzer |
 | `crates/stt-parakeet` | `Transcriber` via Parakeet + model download and verification |
-| `crates/store-markdown` | `TranscriptStore` on Markdown files |
+| `crates/capture-macos` | `ScreenCapturer` via ScreenCaptureKit (`cidre`) |
+| `crates/capture-windows` | `ScreenCapturer` via `xcap` |
+| `crates/store-markdown` | `TranscriptStore` on Markdown files; `ScreenshotStore` as PNG files in each session folder |
 
 ## 5. Cross-cutting concerns
 
@@ -71,6 +75,8 @@ graph LR
 |---|---|---|---|
 | macOS Core Audio tap | `audio-macos` | System Audio Recording permission + `NSAudioCaptureUsageDescription` | Silent zero buffers → user notification after 5 s |
 | Windows WASAPI loopback | `audio-windows` | Default render endpoint | Device change → reopen within 3 s |
+| macOS ScreenCaptureKit | `capture-macos` | Screen Recording permission; completion awaited off the main thread for at most 5 s | Declined → `AccessNotGranted`; any other error or timeout → capture-failed notification |
+| Windows desktop capture | `capture-windows` | `xcap` monitor at the cursor | Error → capture-failed notification |
 | Apple SpeechAnalyzer | `stt-speechanalyzer` | macOS 26+, en-US asset via AssetInventory | Asset missing → Recorder `Locked` until installed |
 | Parakeet model host | `stt-parakeet` | HTTPS download, pinned SHA-256 | Mismatch or network failure → retryable error; Recorder `Locked` |
 | MCP clients | `scribe-mcp` | MCP stdio, three read-only tools | Bad input → tool error; malformed file → skipped |
