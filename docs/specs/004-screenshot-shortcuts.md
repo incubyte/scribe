@@ -357,7 +357,7 @@ The popover's Settings view gains a "Screenshot shortcuts" section with one row 
 - [x] **5.8.8** The launch notification for an unavailable shortcut (5.2.10) adds "Change it in Scribe Settings".
 - [x] **5.8.9** A missing stored binding falls back to the default silently; a malformed or unparseable one falls back to the default and logs a warning. Neither ever stops Scribe from launching.
 - [x] **5.8.10** Shortcuts can be changed while a recording is in progress.
-- [ ] **5.8.11** Each **Change** button has an accessible name with its row and current value, for example "Change Capture region shortcut, currently ⌃⌥⌘2". Outcomes are announced through the shortcut section's own status region, separate from the transcripts-folder status. Focus stays on the row after a change. The section meets WCAG 2.2 AA contrast and focus visibility.
+- [x] **5.8.11** Each **Change** button has an accessible name with its row and current value, for example "Change Capture region shortcut, currently ⌃⌥⌘2". Outcomes are announced through the shortcut section's own status region, separate from the transcripts-folder status. Focus stays on the row after a change. The section meets WCAG 2.2 AA contrast and focus visibility.
 
 ## 6. NFRs & regulatory compliance
 
