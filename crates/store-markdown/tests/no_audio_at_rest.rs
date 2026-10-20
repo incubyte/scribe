@@ -69,7 +69,7 @@ fn a_whole_recording_leaves_only_its_markdown_transcript_on_disk() {
     recorder.stop().unwrap();
 
     assert_eq!(
-        file_names_in(&folder.join("2026-10")),
+        file_names_in(&folder.join("2026-10").join("2026-10-17-143005")),
         vec!["2026-10-17-143005.md"]
     );
     assert_eq!(audio_files_in(&std::env::temp_dir()), audio_in_temp_before);

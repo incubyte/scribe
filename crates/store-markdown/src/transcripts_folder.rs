@@ -1,9 +1,11 @@
 use std::fs::DirBuilder;
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
 use scribe_core::ports::StoreError;
 use scribe_core::recording::SessionId;
 
+use crate::month_layout::session_folder_path;
 use crate::settings_file;
 
 const FOLDER_NAME: &str = "Scribe";
@@ -40,7 +42,7 @@ impl TranscriptsFolder {
     }
 
     pub fn ensure_exists(&self) -> Result<&Path, StoreError> {
-        private_dir_builder()
+        recursive_private_dir_builder()
             .create(&self.0)
             .map_err(|source| StoreError::CreateFolder {
                 path: self.0.clone(),
@@ -51,7 +53,7 @@ impl TranscriptsFolder {
 
     pub(crate) fn ensure_month_exists(&self, id: &SessionId) -> Result<PathBuf, StoreError> {
         let month_folder = self.0.join(id.month());
-        private_dir_builder()
+        recursive_private_dir_builder()
             .create(&month_folder)
             .map_err(|source| StoreError::CreateFolder {
                 path: month_folder.clone(),
@@ -60,15 +62,35 @@ impl TranscriptsFolder {
         Ok(month_folder)
     }
 
+    pub(crate) fn ensure_session_folder_exists(
+        &self,
+        id: &SessionId,
+    ) -> Result<Option<PathBuf>, StoreError> {
+        let session_folder = session_folder_path(&self.0, id);
+        match private_dir_builder().create(&session_folder) {
+            Ok(()) => Ok(Some(session_folder)),
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => Ok(None),
+            Err(source) => Err(StoreError::CreateFolder {
+                path: session_folder,
+                source,
+            }),
+        }
+    }
+
     #[must_use]
     pub fn path(&self) -> &Path {
         &self.0
     }
 }
 
-fn private_dir_builder() -> DirBuilder {
-    let mut builder = DirBuilder::new();
+fn recursive_private_dir_builder() -> DirBuilder {
+    let mut builder = private_dir_builder();
     builder.recursive(true);
+    builder
+}
+
+pub(crate) fn private_dir_builder() -> DirBuilder {
+    let mut builder = DirBuilder::new();
     #[cfg(unix)]
     std::os::unix::fs::DirBuilderExt::mode(&mut builder, OWNER_ONLY_MODE);
     builder

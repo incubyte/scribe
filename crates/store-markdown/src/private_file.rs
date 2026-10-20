@@ -10,6 +10,13 @@ pub(crate) fn create_new(path: &Path, contents: &str) -> io::Result<()> {
     write_durably(&mut file, contents)
 }
 
+pub(crate) fn copy_new(source: &Path, destination: &Path) -> io::Result<()> {
+    let mut reader = File::open(source)?;
+    let mut file = private_options().create_new(true).open(destination)?;
+    io::copy(&mut reader, &mut file)?;
+    file.sync_data()
+}
+
 pub(crate) fn append(path: &Path, line: &str) -> io::Result<()> {
     let mut file = OpenOptions::new().append(true).open(path)?;
     write_durably(&mut file, line)

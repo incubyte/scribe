@@ -138,12 +138,12 @@ Scribe/
 
 **Acceptance criteria**
 
-- [ ] **5.1.1** A recording started after this change writes its transcript to `<transcripts folder>/<YYYY-MM>/<session id>/<session id>.md`.
-- [ ] **5.1.2** Sessions stored flat or as month files still appear in Recent sessions, open from the popover, and are returned by `list_transcripts`, `get_transcript` and `search_transcripts`, with their files unchanged on disk.
-- [ ] **5.1.3** A session left in `recording` status by a crash is marked incomplete on the next launch, whichever of the three layouts it uses.
-- [ ] **5.1.4** Moving existing transcripts to a new folder moves each session folder whole, with every file inside it. A source is removed only after its copy is complete, and a session folder whose destination already exists stays where it is.
-- [ ] **5.1.5** Listing ignores folders inside a month folder whose name is not a session id. Inside a session folder, it ignores every file except `<session id>.md`.
-- [ ] **5.1.6** The session folder is created user-only (`0700` on macOS) and the transcript user-only (`0600`), like the transcripts folder and files today.
+- [x] **5.1.1** A recording started after this change writes its transcript to `<transcripts folder>/<YYYY-MM>/<session id>/<session id>.md`.
+- [x] **5.1.2** Sessions stored flat or as month files still appear in Recent sessions, open from the popover, and are returned by `list_transcripts`, `get_transcript` and `search_transcripts`, with their files unchanged on disk.
+- [x] **5.1.3** A session left in `recording` status by a crash is marked incomplete on the next launch, whichever of the three layouts it uses.
+- [x] **5.1.4** Moving existing transcripts to a new folder moves each session folder whole, with every file inside it. A source is removed only after its copy is complete, and a session folder whose destination already exists stays where it is.
+- [x] **5.1.5** Listing ignores folders inside a month folder whose name is not a session id. Inside a session folder, it ignores every file except `<session id>.md`.
+- [x] **5.1.6** The session folder is created user-only (`0700` on macOS) and the transcript user-only (`0600`), like the transcripts folder and files today.
 
 ### 5.2 Capture the full screen under the cursor into the recording
 
