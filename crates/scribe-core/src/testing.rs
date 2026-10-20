@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, VecDeque};
 use std::io;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Duration;
@@ -428,30 +428,68 @@ pub fn shot_of(frame: Frame) -> MonitorShot {
 
 pub struct FakeScreenCapturer {
     outcome: Result<MonitorShot, ScreenCaptureError>,
+    access_granted: AtomicBool,
+    access_requests: AtomicUsize,
+    captures_attempted: AtomicUsize,
 }
 
 impl FakeScreenCapturer {
     #[must_use]
     pub fn showing(shot: MonitorShot) -> FakeScreenCapturer {
-        FakeScreenCapturer { outcome: Ok(shot) }
+        FakeScreenCapturer::with_outcome(Ok(shot))
     }
 
     #[must_use]
     pub fn failing(error: ScreenCaptureError) -> FakeScreenCapturer {
+        FakeScreenCapturer::with_outcome(Err(error))
+    }
+
+    #[must_use]
+    pub fn showing_without_access(shot: MonitorShot) -> FakeScreenCapturer {
+        let capturer = FakeScreenCapturer::showing(shot);
+        capturer.access_granted.store(false, Ordering::SeqCst);
+        capturer
+    }
+
+    pub fn grant_access(&self) {
+        self.access_granted.store(true, Ordering::SeqCst);
+    }
+
+    #[must_use]
+    pub fn access_requests(&self) -> usize {
+        self.access_requests.load(Ordering::SeqCst)
+    }
+
+    #[must_use]
+    pub fn captures_attempted(&self) -> usize {
+        self.captures_attempted.load(Ordering::SeqCst)
+    }
+
+    fn with_outcome(outcome: Result<MonitorShot, ScreenCaptureError>) -> FakeScreenCapturer {
         FakeScreenCapturer {
-            outcome: Err(error),
+            outcome,
+            access_granted: AtomicBool::new(true),
+            access_requests: AtomicUsize::new(0),
+            captures_attempted: AtomicUsize::new(0),
         }
     }
 }
 
 impl ScreenCapturer for FakeScreenCapturer {
     fn access(&self) -> CaptureAccess {
-        CaptureAccess::Granted
+        if self.access_granted.load(Ordering::SeqCst) {
+            CaptureAccess::Granted
+        } else {
+            CaptureAccess::NotGranted
+        }
     }
 
-    fn request_access(&self) {}
+    fn request_access(&self) {
+        self.access_requests.fetch_add(1, Ordering::SeqCst);
+    }
 
     fn capture_under_pointer(&self) -> Result<MonitorShot, ScreenCaptureError> {
+        self.captures_attempted.fetch_add(1, Ordering::SeqCst);
         self.outcome.clone()
     }
 }

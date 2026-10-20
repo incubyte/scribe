@@ -92,6 +92,56 @@ fn a_failed_capture_yields_no_screenshot_and_saves_nothing() {
 }
 
 #[test]
+fn a_capture_without_screen_access_asks_for_it_and_captures_and_saves_nothing() {
+    let store = Arc::new(InMemoryScreenshotStore::default());
+    let capturer = Arc::new(FakeScreenCapturer::showing_without_access(shot_of(
+        monitor(),
+    )));
+    let taker = ScreenshotTaker::new(capturer.clone(), store.clone());
+    let live = live_session_at(session(), FORTY_TWO_SECONDS);
+
+    let started = taker.begin(Some(live));
+
+    assert_eq!(started.unwrap_err(), CaptureFailure::AccessNotGranted);
+    assert_eq!(capturer.access_requests(), 1);
+    assert_eq!(capturer.captures_attempted(), 0);
+    assert_eq!(store.saved_count(), 0);
+}
+
+#[test]
+fn access_withdrawn_during_a_capture_is_reported_as_missing_access() {
+    let store = Arc::new(InMemoryScreenshotStore::default());
+    let capturer = Arc::new(FakeScreenCapturer::failing(
+        ScreenCaptureError::AccessNotGranted,
+    ));
+    let taker = ScreenshotTaker::new(capturer, store);
+
+    let started = taker.begin(None);
+
+    assert_eq!(started.unwrap_err(), CaptureFailure::AccessNotGranted);
+}
+
+#[test]
+fn a_refused_capture_leaves_the_recording_session_intact_and_the_next_press_works_once_access_is_granted()
+ {
+    let store = Arc::new(InMemoryScreenshotStore::default());
+    let capturer = Arc::new(FakeScreenCapturer::showing_without_access(shot_of(
+        monitor(),
+    )));
+    let taker = ScreenshotTaker::new(capturer.clone(), store.clone());
+    let live = live_session_at(session(), FORTY_TWO_SECONDS);
+
+    let refused = taker.begin(Some(live.clone()));
+    capturer.grant_access();
+    let pending = taker.begin(Some(live.clone())).unwrap();
+    let outcome = taker.finish(pending, Selection::WholeMonitor).unwrap();
+
+    assert_eq!(refused.unwrap_err(), CaptureFailure::AccessNotGranted);
+    assert_eq!(live.id(), &session());
+    assert!(matches!(outcome, CaptureOutcome::SavedIntoSession { .. }));
+}
+
+#[test]
 fn a_capture_with_nothing_recording_is_only_copied() {
     let store = Arc::new(InMemoryScreenshotStore::default());
     let taker = taker_showing(monitor(), &store);

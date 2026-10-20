@@ -234,9 +234,9 @@ On a Mac where Scribe does not have Screen Recording access, a capture shortcut 
 
 **Acceptance criteria**
 
-- [ ] **5.4.1** When access is not granted, pressing a capture shortcut writes no file and leaves the clipboard untouched. Scribe requests access from macOS, which shows the system prompt the first time.
+- [x] **5.4.1** When access is not granted, pressing a capture shortcut writes no file and leaves the clipboard untouched. Scribe requests access from macOS, which shows the system prompt the first time.
 - [ ] **5.4.2** The notification reads "Scribe needs Screen Recording access to take screenshots", with an **Open Settings** button. The button opens System Settings › Privacy & Security › Screen & System Audio Recording.
-- [ ] **5.4.3** Recording and transcription are unaffected when Screen Recording access is missing.
+- [x] **5.4.3** Recording and transcription are unaffected when Screen Recording access is missing.
 - [ ] **5.4.4** Once access is granted, the next press of the shortcut captures normally. If a relaunch turns out to be required, the notification says so (see [§8.1](#8-open-questions)).
 
 ### 5.5 Copy to the clipboard when nothing is recording

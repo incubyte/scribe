@@ -3,7 +3,9 @@ use std::sync::Arc;
 use crate::capture::{
     Destination, Frame, InvalidSelection, MonitorShot, ScreenshotName, Selection, SessionMoment,
 };
-use crate::ports::{ScreenCapturer, ScreenshotStore, StoreError};
+use crate::ports::{
+    CaptureAccess, ScreenCaptureError, ScreenCapturer, ScreenshotStore, StoreError,
+};
 use crate::recording::{LiveSession, SessionId};
 
 pub struct ScreenshotTaker {
@@ -72,11 +74,12 @@ impl ScreenshotTaker {
     }
 
     pub fn begin(&self, live: Option<LiveSession>) -> Result<PendingCapture, CaptureFailure> {
+        if self.capturer.access() == CaptureAccess::NotGranted {
+            self.capturer.request_access();
+            return Err(CaptureFailure::AccessNotGranted);
+        }
         let destination = Destination::at_press(live);
-        let shot = self.capturer.capture_under_pointer().map_err(|error| {
-            tracing::warn!(%error, "could not capture the screen");
-            CaptureFailure::CaptureFailed
-        })?;
+        let shot = self.capturer.capture_under_pointer().map_err(failure_of)?;
         Ok(PendingCapture { shot, destination })
     }
 
@@ -99,6 +102,16 @@ impl ScreenshotTaker {
                 log_unsaved(&moment.session, &error);
                 CaptureOutcome::CopiedButNotSaved { screenshot }
             }
+        }
+    }
+}
+
+fn failure_of(error: ScreenCaptureError) -> CaptureFailure {
+    match error {
+        ScreenCaptureError::AccessNotGranted => CaptureFailure::AccessNotGranted,
+        other => {
+            tracing::warn!(error = %other, "could not capture the screen");
+            CaptureFailure::CaptureFailed
         }
     }
 }

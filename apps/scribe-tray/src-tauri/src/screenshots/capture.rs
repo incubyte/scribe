@@ -1,9 +1,10 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use scribe_core::capture::{PendingCapture, ScreenshotTaker, Selection};
+use scribe_core::capture::{CaptureFailure, PendingCapture, ScreenshotTaker, Selection};
 use scribe_core::recording::LiveSession;
 use tauri::{AppHandle, Runtime};
 
+use crate::notifications::notify_screen_recording_needed;
 use crate::screenshots::delivery::{deliver, show_notice};
 use crate::screenshots::notices::capture_failed_notice;
 
@@ -26,7 +27,7 @@ impl ScreenshotService {
         };
         match self.taker.begin(live) {
             Ok(pending) => self.finish_whole_monitor(app, pending),
-            Err(_) => show_notice(app, &capture_failed_notice()),
+            Err(failure) => report_failure(app, failure),
         }
     }
 
@@ -38,6 +39,13 @@ impl ScreenshotService {
                 show_notice(app, &capture_failed_notice());
             }
         }
+    }
+}
+
+fn report_failure<R: Runtime>(app: &AppHandle<R>, failure: CaptureFailure) {
+    match failure {
+        CaptureFailure::AccessNotGranted => notify_screen_recording_needed(app),
+        CaptureFailure::CaptureFailed => show_notice(app, &capture_failed_notice()),
     }
 }
 
