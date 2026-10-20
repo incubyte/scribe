@@ -63,6 +63,13 @@ fn an_unavailable_shortcut_is_named_in_its_notice() {
 }
 
 #[test]
+fn an_unavailable_shortcut_notice_points_to_settings() {
+    let notice = shortcut_unavailable_notice("⌃⌥⌘1");
+
+    assert!(notice.body.ends_with("Change it in Scribe Settings."));
+}
+
+#[test]
 fn a_screenshot_with_nothing_recording_is_announced_as_copied_to_the_clipboard() {
     let outcome = CaptureOutcome::CopiedOnly {
         screenshot: frame_filled(1, 1, RED),

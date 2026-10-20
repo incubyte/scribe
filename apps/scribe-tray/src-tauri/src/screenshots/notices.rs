@@ -46,7 +46,7 @@ pub fn shortcut_unavailable_notice(label: &str) -> Notice {
     Notice {
         title: SHORTCUT_UNAVAILABLE_TITLE,
         body: format!(
-            "Scribe couldn't use {label} for screenshots because another app or the system already uses it."
+            "Scribe couldn't use {label} for screenshots because another app or the system already uses it. Change it in Scribe Settings."
         ),
     }
 }

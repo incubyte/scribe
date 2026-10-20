@@ -72,6 +72,10 @@ function backend(
     claude_desktop_status: "not_connected",
     transcripts_folder: () => readFolder(),
     change_transcripts_folder: () => changeFolder(),
+    screenshot_shortcuts: [
+      { kind: "full_screen", label: "⌃⌥⌘1" },
+      { kind: "region", label: "⌃⌥⌘2" },
+    ],
   };
   const handler = vi.fn((command: string) => {
     const response = responses[command];
@@ -414,6 +418,29 @@ describe("dismissing the popover", () => {
     await userEvent.keyboard("{Escape}");
 
     expect(handler).toHaveBeenCalledWith("hide_popover", {});
+  });
+});
+
+describe("the popover while a shortcut is being rebound", () => {
+  it("keeps the popover open when Escape cancels the rebind", async () => {
+    const handler = backend(idle);
+    render(<Popover />);
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Settings" }),
+    );
+    await userEvent.click(
+      await screen.findByRole("button", {
+        name: "Change Capture region shortcut, currently ⌃⌥⌘2",
+      }),
+    );
+    await screen.findByText("Press the new shortcut…");
+
+    await userEvent.keyboard("{Escape}");
+
+    await waitFor(() =>
+      expect(screen.queryByText("Press the new shortcut…")).not.toBeInTheDocument(),
+    );
+    expect(handler).not.toHaveBeenCalledWith("hide_popover", {});
   });
 });
 

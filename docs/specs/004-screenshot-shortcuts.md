@@ -347,17 +347,17 @@ The popover's Settings view gains a "Screenshot shortcuts" section with one row 
 
 **Acceptance criteria**
 
-- [ ] **5.8.1** Settings shows "Screenshot shortcuts" with the rows "Capture full screen" and "Capture region". Each displays its current combination with platform symbols (`⌃⌥⌘1` on macOS, `Ctrl+Shift+Alt+1` on Windows).
-- [ ] **5.8.2** **Change** puts its row into listening mode ("Press the new shortcut…"). Esc cancels and restores the old combination. While listening, both global shortcuts are paused, so pressing them captures nothing.
-- [ ] **5.8.3** A combination must hold at least one of `⌘`, `⌃` or `⌥` (`Ctrl` or `Alt` on Windows) plus exactly one letter, digit or function key. Otherwise the row shows "Use ⌘, ⌃ or ⌥ with a letter, number or function key" and keeps the old combination.
-- [ ] **5.8.4** A combination already bound to the other row is rejected with "Already used for Capture region" (or "… full screen"). The old combination stays.
+- [x] **5.8.1** Settings shows "Screenshot shortcuts" with the rows "Capture full screen" and "Capture region". Each displays its current combination with platform symbols (`⌃⌥⌘1` on macOS, `Ctrl+Shift+Alt+1` on Windows).
+- [x] **5.8.2** **Change** puts its row into listening mode ("Press the new shortcut…"). Esc cancels and restores the old combination. While listening, both global shortcuts are paused, so pressing them captures nothing.
+- [x] **5.8.3** A combination must hold at least one of `⌘`, `⌃` or `⌥` (`Ctrl` or `Alt` on Windows) plus exactly one letter, digit or function key. Otherwise the row shows "Use ⌘, ⌃ or ⌥ with a letter, number or function key" and keeps the old combination.
+- [x] **5.8.4** A combination already bound to the other row is rejected with "Already used for Capture region" (or "… full screen"). The old combination stays.
 - [ ] **5.8.5** If the OS refuses to register the new combination, the row shows "Another app is using this shortcut". The old combination stays registered and working.
 - [ ] **5.8.6** An accepted combination works at once, without a relaunch, and survives relaunches.
-- [ ] **5.8.7** **Reset to default** restores that row's default from 5.2.1 or 5.6.1.
-- [ ] **5.8.8** The launch notification for an unavailable shortcut (5.2.10) adds "Change it in Scribe Settings".
-- [ ] **5.8.9** A missing, malformed or unparseable stored binding falls back to the default, logs a warning, and never stops Scribe from launching.
-- [ ] **5.8.10** Shortcuts can be changed while a recording is in progress.
-- [ ] **5.8.11** Each **Change** button has an accessible name with its row and current value, for example "Change Capture region shortcut, currently ⌃⌥⌘2". Outcomes are announced through the view's existing status line. Focus stays on the row after a change. The section meets WCAG 2.2 AA contrast and focus visibility.
+- [x] **5.8.7** **Reset to default** restores that row's default from 5.2.1 or 5.6.1.
+- [x] **5.8.8** The launch notification for an unavailable shortcut (5.2.10) adds "Change it in Scribe Settings".
+- [x] **5.8.9** A missing, malformed or unparseable stored binding falls back to the default, logs a warning, and never stops Scribe from launching.
+- [x] **5.8.10** Shortcuts can be changed while a recording is in progress.
+- [x] **5.8.11** Each **Change** button has an accessible name with its row and current value, for example "Change Capture region shortcut, currently ⌃⌥⌘2". Outcomes are announced through the view's existing status line. Focus stays on the row after a change. The section meets WCAG 2.2 AA contrast and focus visibility.
 
 ## 6. NFRs & regulatory compliance
 

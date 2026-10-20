@@ -2,6 +2,7 @@ pub mod bindings;
 mod capture;
 pub mod capture_gate;
 mod capturers;
+pub(crate) mod commands;
 mod delivery;
 pub mod idle_notice;
 pub mod notices;
@@ -24,5 +25,5 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) {
     let store = Arc::clone(app.state::<Arc<MarkdownTranscriptStore>>().inner());
     let taker = ScreenshotTaker::new(capturers::screen_capturer(), store);
     app.manage(ScreenshotService::new(taker));
-    shortcuts::register_defaults(app);
+    shortcuts::install(app);
 }

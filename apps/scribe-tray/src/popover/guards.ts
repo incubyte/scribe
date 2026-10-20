@@ -2,10 +2,13 @@ import type {
   ClaudeDesktopStatus,
   FolderChange,
   ModelDownload,
+  RebindOutcome,
   RecorderPhase,
   RecorderSnapshot,
   SessionStatus,
   SessionSummary,
+  ShortcutKind,
+  ShortcutView,
   SnapshotLine,
   Speaker,
 } from "./types";
@@ -142,6 +145,27 @@ export function isFolderChange(value: unknown): value is FolderChange {
     unchanged: () => true,
     recording: () => true,
     changed: () => hasFields(value, { folder: isString, moved: isNumber, kept: isNumber }),
+  };
+  return isString(value.outcome) && (checks[value.outcome]?.() ?? false);
+}
+
+const isShortcutKind = isOneOf<ShortcutKind>(["full_screen", "region"]);
+
+function isShortcutView(value: unknown): value is ShortcutView {
+  return hasFields(value, { kind: isShortcutKind, label: isString });
+}
+
+export const isShortcutViewList = isListOf(isShortcutView);
+
+export function isRebindOutcome(value: unknown): value is RebindOutcome {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const checks: Readonly<Record<string, () => boolean>> = {
+    accepted: () => isString(value.label),
+    needs_modifier: () => true,
+    duplicate_of: () => isShortcutKind(value.kind),
+    in_use_by_another_app: () => true,
   };
   return isString(value.outcome) && (checks[value.outcome]?.() ?? false);
 }
