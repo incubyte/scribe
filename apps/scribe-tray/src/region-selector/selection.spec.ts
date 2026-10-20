@@ -45,22 +45,43 @@ describe("a dragged selection", () => {
 
 describe("where the size readout sits next to a selection", () => {
   const frame = { width: 2000, height: 1000 };
+  const viewport = frame;
 
   it("opens below the selection when there is room", () => {
     const area = { x: 100, y: 100, width: 200, height: 300 };
 
-    expect(sizeLabelAnchor(area, frame)).toEqual({ y: 400, opensUpward: false });
+    expect(sizeLabelAnchor(area, frame, viewport)).toEqual({ x: 100, y: 400, opensUpward: false });
   });
 
   it("opens upward from the top edge when the selection reaches the bottom of the screen", () => {
     const area = { x: 100, y: 300, width: 200, height: 700 };
 
-    expect(sizeLabelAnchor(area, frame)).toEqual({ y: 300, opensUpward: true });
+    expect(sizeLabelAnchor(area, frame, viewport)).toEqual({ x: 100, y: 300, opensUpward: true });
   });
 
   it("opens upward from inside the bottom edge when the selection fills the screen height", () => {
     const area = { x: 0, y: 0, width: 2000, height: 1000 };
 
-    expect(sizeLabelAnchor(area, frame)).toEqual({ y: 1000, opensUpward: true });
+    expect(sizeLabelAnchor(area, frame, viewport)).toEqual({ x: 0, y: 1000, opensUpward: true });
+  });
+
+  it("keeps the same on-screen clearance on a high density display", () => {
+    const retinaFrame = { width: 4000, height: 2000 };
+    const area = { x: 100, y: 200, width: 200, height: 1700 };
+
+    expect(sizeLabelAnchor(area, retinaFrame, viewport)).toEqual({
+      x: 100,
+      y: 200,
+      opensUpward: true,
+    });
+  });
+
+  it("shifts left so the readout stays inside the right edge", () => {
+    const area = { x: 1950, y: 100, width: 50, height: 100 };
+
+    const anchor = sizeLabelAnchor(area, frame, viewport);
+
+    expect(anchor.x).toBeLessThan(1950);
+    expect(anchor.x).toBeGreaterThan(1700);
   });
 });

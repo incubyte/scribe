@@ -16,19 +16,29 @@ import {
 } from "./shortcutCapture";
 import type { PressedKeys, RebindOutcome, ShortcutKind, ShortcutView } from "./types";
 
-interface KeyCaptureHandlers {
+interface ShortcutCaptureHandlers {
+  readonly onListening: () => void;
   readonly onCaptured: (kind: ShortcutKind, pressed: PressedKeys) => void;
   readonly onCancelled: () => void;
+  readonly onPauseFailed: () => void;
 }
 
-function useCaptureOfPressedKeys(
-  listening: ShortcutKind | null,
-  { onCaptured, onCancelled }: KeyCaptureHandlers,
-) {
+function useShortcutCapture({
+  onListening,
+  onCaptured,
+  onCancelled,
+  onPauseFailed,
+}: ShortcutCaptureHandlers) {
+  const [listening, setListening] = useState<ShortcutKind | null>(null);
+
   useEffect(() => {
     if (listening === null) {
       return;
     }
+    const cancel = () => {
+      setListening(null);
+      onCancelled();
+    };
     const onKeyDown = (event: KeyboardEvent) => {
       const pressed = pressedKeysFrom(event);
       if (pressed === undefined) {
@@ -37,24 +47,40 @@ function useCaptureOfPressedKeys(
       event.preventDefault();
       event.stopPropagation();
       if (event.code === "Escape") {
-        onCancelled();
-      } else {
-        onCaptured(listening, pressed);
+        cancel();
+        return;
       }
+      setListening(null);
+      onCaptured(listening, pressed);
     };
     document.addEventListener("keydown", onKeyDown, true);
-    window.addEventListener("blur", onCancelled);
+    window.addEventListener("blur", cancel);
     return () => {
       document.removeEventListener("keydown", onKeyDown, true);
-      window.removeEventListener("blur", onCancelled);
+      window.removeEventListener("blur", cancel);
       void resumeScreenshotShortcuts();
     };
   }, [listening, onCaptured, onCancelled]);
+
+  const startListening = useCallback(
+    (kind: ShortcutKind) =>
+      pauseScreenshotShortcuts()
+        .then(() => {
+          setListening(kind);
+          onListening();
+        })
+        .catch(() => {
+          onPauseFailed();
+          void resumeScreenshotShortcuts();
+        }),
+    [onListening, onPauseFailed],
+  );
+
+  return { listening, startListening };
 }
 
 export function useScreenshotShortcuts(announce: (message: string) => void) {
   const [shortcuts, setShortcuts] = useState<readonly ShortcutView[]>([]);
-  const [listening, setListening] = useState<ShortcutKind | null>(null);
 
   const refresh = useCallback(
     () =>
@@ -78,33 +104,21 @@ export function useScreenshotShortcuts(announce: (message: string) => void) {
   );
 
   const rebind = useCallback(
-    (kind: ShortcutKind, pressed: PressedKeys) => {
-      setListening(null);
-      void report(kind, rebindScreenshotShortcut(kind, pressed));
-    },
+    (kind: ShortcutKind, pressed: PressedKeys) =>
+      void report(kind, rebindScreenshotShortcut(kind, pressed)),
     [report],
   );
 
-  const cancelListening = useCallback(() => {
-    setListening(null);
-    announce(CANCELLED_MESSAGE);
-  }, [announce]);
+  const announceListening = useCallback(() => announce(LISTENING_MESSAGE), [announce]);
+  const announceCancelled = useCallback(() => announce(CANCELLED_MESSAGE), [announce]);
+  const announcePauseFailed = useCallback(() => announce(SHORTCUT_FAILURE_MESSAGE), [announce]);
 
-  useCaptureOfPressedKeys(listening, { onCaptured: rebind, onCancelled: cancelListening });
-
-  const startListening = useCallback(
-    (kind: ShortcutKind) =>
-      pauseScreenshotShortcuts()
-        .then(() => {
-          setListening(kind);
-          announce(LISTENING_MESSAGE);
-        })
-        .catch(() => {
-          announce(SHORTCUT_FAILURE_MESSAGE);
-          void resumeScreenshotShortcuts();
-        }),
-    [announce],
-  );
+  const { listening, startListening } = useShortcutCapture({
+    onListening: announceListening,
+    onCaptured: rebind,
+    onCancelled: announceCancelled,
+    onPauseFailed: announcePauseFailed,
+  });
 
   const reset = useCallback(
     (kind: ShortcutKind) => report(kind, resetScreenshotShortcut(kind)),

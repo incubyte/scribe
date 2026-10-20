@@ -299,6 +299,8 @@ describe("the screenshot shortcuts in the settings view", () => {
     ).toBeDisabled();
   });
 
+  const shortcutStatus = () => screen.getByRole("status", { name: "Shortcut status" });
+
   it("announces the outcome in its own status region, apart from the folder status", async () => {
     backend();
     render(<SettingsView isRecording={false} onBack={vi.fn()} />);
@@ -307,25 +309,58 @@ describe("the screenshot shortcuts in the settings view", () => {
 
     await userEvent.keyboard("{Control>}r{/Control}");
 
-    const outcome = await screen.findByText("Capture region is now ⌃R");
-    expect(outcome).toHaveAttribute("role", "status");
+    await waitFor(() => expect(shortcutStatus()).toHaveTextContent("Capture region is now ⌃R"));
+    expect(screen.getByRole("status", { name: "Folder status" })).not.toBe(shortcutStatus());
   });
 
-  it("announces a repeated identical outcome again", async () => {
+  it("announces a repeated identical outcome again in the same status region", async () => {
     backend(() => ({ outcome: "in_use_by_another_app" }));
+    render(<SettingsView isRecording={false} onBack={vi.fn()} />);
+    const region = shortcutStatus();
+    const messages: string[] = [];
+    const observer = new MutationObserver(() => messages.push(region.textContent ?? ""));
+    observer.observe(region, { childList: true, characterData: true, subtree: true });
+    await userEvent.click(await screen.findByRole("button", { name: REGION_CHANGE }));
+    await screen.findAllByText(LISTENING);
+    await userEvent.keyboard("{Control>}r{/Control}");
+    await waitFor(() => expect(region).toHaveTextContent("Another app is using this shortcut"));
+
+    await userEvent.click(await screen.findByRole("button", { name: REGION_CHANGE }));
+    await screen.findAllByText(LISTENING);
+    await userEvent.keyboard("{Control>}r{/Control}");
+    await waitFor(() => expect(region).toHaveTextContent("Another app is using this shortcut"));
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    observer.disconnect();
+
+    const outcomeAnnouncements = messages.filter(
+      (message) => message === "Another app is using this shortcut",
+    );
+    expect(shortcutStatus()).toBe(region);
+    expect(outcomeAnnouncements).toHaveLength(2);
+  });
+
+  it("shows the listening prompt only in the row, keeping the announcement for screen readers", async () => {
+    backend();
+    render(<SettingsView isRecording={false} onBack={vi.fn()} />);
+    await userEvent.click(await screen.findByRole("button", { name: REGION_CHANGE }));
+
+    await waitFor(() => expect(shortcutStatus()).toHaveTextContent(LISTENING));
+
+    expect(shortcutStatus()).toHaveClass("visually-hidden");
+  });
+
+  it("does not leave the cancelled message visible once the row is back to normal", async () => {
+    backend();
     render(<SettingsView isRecording={false} onBack={vi.fn()} />);
     await userEvent.click(await screen.findByRole("button", { name: REGION_CHANGE }));
     await screen.findAllByText(LISTENING);
-    await userEvent.keyboard("{Control>}r{/Control}");
-    const first = await screen.findByText("Another app is using this shortcut");
 
-    await userEvent.click(await screen.findByRole("button", { name: REGION_CHANGE }));
-    await screen.findAllByText(LISTENING);
-    await userEvent.keyboard("{Control>}r{/Control}");
+    await userEvent.keyboard("{Escape}");
 
     await waitFor(() =>
-      expect(screen.getByText("Another app is using this shortcut")).not.toBe(first),
+      expect(shortcutStatus()).toHaveTextContent("Shortcut change cancelled"),
     );
+    expect(shortcutStatus()).toHaveClass("visually-hidden");
   });
 
   it("keeps Back as the last control in tab order, after the shortcuts", async () => {

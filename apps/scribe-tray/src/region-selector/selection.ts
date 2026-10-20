@@ -35,17 +35,22 @@ export const hasDraggedPastThreshold = (origin: ClientPoint, current: ClientPoin
   DRAG_THRESHOLD_PX;
 
 export const SIZE_LABEL_CLEARANCE_PX = 64;
+export const SIZE_LABEL_WIDTH_PX = 112;
 
 export interface SizeLabelAnchor {
+  readonly x: number;
   readonly y: number;
   readonly opensUpward: boolean;
 }
 
-export function sizeLabelAnchor(area: PixelRect, frame: Size): SizeLabelAnchor {
+export function sizeLabelAnchor(area: PixelRect, frame: Size, viewport: Size): SizeLabelAnchor {
+  const clearance = (SIZE_LABEL_CLEARANCE_PX * frame.height) / viewport.height;
+  const labelWidth = (SIZE_LABEL_WIDTH_PX * frame.width) / viewport.width;
+  const x = clamp(area.x, 0, Math.max(frame.width - labelWidth, 0));
   const bottom = area.y + area.height;
-  if (bottom + SIZE_LABEL_CLEARANCE_PX <= frame.height) {
-    return { y: bottom, opensUpward: false };
+  if (bottom + clearance <= frame.height) {
+    return { x, y: bottom, opensUpward: false };
   }
-  const roomAbove = area.y >= SIZE_LABEL_CLEARANCE_PX;
-  return { y: roomAbove ? area.y : bottom, opensUpward: true };
+  const roomAbove = area.y >= clearance;
+  return { x, y: roomAbove ? area.y : bottom, opensUpward: true };
 }

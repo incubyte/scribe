@@ -56,7 +56,7 @@ export function SettingsPanel({
           {RECORDING_REASON}
         </p>
       ) : null}
-      <p role="status" className="settings__status">
+      <p role="status" aria-label="Folder status" className="settings__status">
         {status}
       </p>
       {children}

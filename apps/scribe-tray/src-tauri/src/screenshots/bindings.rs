@@ -245,12 +245,21 @@ impl Bindings {
         let full_screen =
             ShortcutBinding::from_stored(ShortcutKind::FullScreen, full_screen, platform);
         let region = ShortcutBinding::from_stored(ShortcutKind::Region, region, platform);
-        if full_screen == region {
-            tracing::warn!("ignoring a stored region shortcut that duplicates the full screen one");
-            let region = ShortcutBinding::default_for(ShortcutKind::Region, platform);
+        if full_screen != region {
             return Bindings::new(full_screen, region);
         }
-        Bindings::new(full_screen, region)
+        tracing::warn!("ignoring a stored region shortcut that duplicates the full screen one");
+        let region = ShortcutBinding::default_for(ShortcutKind::Region, platform);
+        if full_screen != region {
+            return Bindings::new(full_screen, region);
+        }
+        tracing::warn!(
+            "ignoring a stored full screen shortcut that duplicates the default region one"
+        );
+        Bindings::new(
+            ShortcutBinding::default_for(ShortcutKind::FullScreen, platform),
+            region,
+        )
     }
 
     #[must_use]

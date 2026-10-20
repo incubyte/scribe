@@ -9,7 +9,7 @@ describe("finding the window under the pointer", () => {
     expect(topmostOutlineAt({ x: 150, y: 150 }, [FRONT_WINDOW, BACK_WINDOW])).toBe(FRONT_WINDOW);
   });
 
-  it("picks the window behind where the FRONT_WINDOW window does not reach", () => {
+  it("picks the window behind where the front window does not reach", () => {
     expect(topmostOutlineAt({ x: 400, y: 250 }, [FRONT_WINDOW, BACK_WINDOW])).toBe(BACK_WINDOW);
   });
 

@@ -504,7 +504,7 @@ describe("the popover settings", () => {
     );
   });
 
-  const folderStatus = () => screen.getAllByRole("status")[0];
+  const folderStatus = () => screen.getByRole("status", { name: "Folder status" });
 
   async function changeFolderAndReadStatus(outcome: () => unknown) {
     backend(idle);

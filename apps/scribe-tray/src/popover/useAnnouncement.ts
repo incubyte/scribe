@@ -1,18 +1,16 @@
-import { useCallback, useState } from "react";
-
-interface Announcement {
-  readonly message: string | null;
-  readonly sequence: number;
-}
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export function useAnnouncement() {
-  const [announcement, setAnnouncement] = useState<Announcement>({ message: null, sequence: 0 });
+  const [message, setMessage] = useState("");
+  const pendingAnnouncement = useRef<number | undefined>(undefined);
 
-  const announce = useCallback(
-    (message: string) =>
-      setAnnouncement((previous) => ({ message, sequence: previous.sequence + 1 })),
-    [],
-  );
+  useEffect(() => () => window.clearTimeout(pendingAnnouncement.current), []);
 
-  return { announcement, announce };
+  const announce = useCallback((next: string) => {
+    window.clearTimeout(pendingAnnouncement.current);
+    setMessage("");
+    pendingAnnouncement.current = window.setTimeout(() => setMessage(next), 0);
+  }, []);
+
+  return { message, announce };
 }

@@ -30,14 +30,16 @@ function useEscapeToCancel() {
 }
 
 function SelectedArea({ area, frame }: Readonly<{ area: PixelRect; frame: Size }>) {
-  const left = percentOf(area.x, frame.width);
-  const anchor = sizeLabelAnchor(area, frame);
+  const anchor = sizeLabelAnchor(area, frame, {
+    width: window.innerWidth,
+    height: window.innerHeight,
+  });
   return (
     <>
       <div
         className="region-selector__selection"
         style={{
-          left,
+          left: percentOf(area.x, frame.width),
           top: percentOf(area.y, frame.height),
           width: percentOf(area.width, frame.width),
           height: percentOf(area.height, frame.height),
@@ -45,7 +47,7 @@ function SelectedArea({ area, frame }: Readonly<{ area: PixelRect; frame: Size }
       />
       <span
         className={`region-selector__size${anchor.opensUpward ? " region-selector__size--upward" : ""}`}
-        style={{ left, top: percentOf(anchor.y, frame.height) }}
+        style={{ left: percentOf(anchor.x, frame.width), top: percentOf(anchor.y, frame.height) }}
       >
         {sizeLabel(area)}
       </span>

@@ -43,6 +43,10 @@ body:has(.popover) {
   outline-offset: var(--focus-ring-offset);
 }
 
+.window__option input:focus-visible {
+  outline: none;
+}
+
 .window__title {
   margin: 0;
   font-size: 18px;

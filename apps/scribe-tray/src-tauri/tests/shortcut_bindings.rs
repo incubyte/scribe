@@ -160,7 +160,7 @@ fn replacing_a_binding_leaves_the_other_row_untouched() {
 }
 
 #[test]
-fn a_stored_combination_round_trips() {
+fn a_saved_shortcut_is_restored_after_a_restart() {
     let original = ShortcutBinding::from_pressed(&PressedKeys {
         alt: true,
         shift: true,
@@ -233,25 +233,38 @@ fn a_missing_stored_value_falls_back_to_the_default_without_a_warning() {
     assert_eq!(log, "");
 }
 
+fn assert_falls_back_with_a_warning(raw: &Value) {
+    let mut binding = None;
+
+    let log = warnings_logged_by(|| binding = Some(stored_region(Some(raw))));
+
+    assert_eq!(binding, Some(region_default()));
+    assert!(log.contains("WARN"));
+}
+
 #[test]
-fn a_malformed_stored_value_falls_back_to_the_default_with_a_warning() {
-    let malformed = [
-        json!(""),
-        json!("not a shortcut"),
-        json!("control+"),
-        json!(42),
-        json!(null),
-        json!("shift+KeyR"),
-        json!("control+Enter"),
-        json!("control+F13"),
-    ];
-    for raw in malformed {
-        let mut binding = None;
+fn a_stored_shortcut_that_is_not_a_key_combination_falls_back_to_the_default_with_a_warning() {
+    for raw in [json!(""), json!("not a shortcut"), json!("control+")] {
+        assert_falls_back_with_a_warning(&raw);
+    }
+}
 
-        let log = warnings_logged_by(|| binding = Some(stored_region(Some(&raw))));
+#[test]
+fn a_stored_shortcut_that_is_not_text_falls_back_to_the_default_with_a_warning() {
+    for raw in [json!(42), json!(null)] {
+        assert_falls_back_with_a_warning(&raw);
+    }
+}
 
-        assert_eq!(binding, Some(region_default()), "{raw} should fall back");
-        assert!(log.contains("WARN"), "{raw} should log a warning");
+#[test]
+fn a_stored_shortcut_without_control_alt_or_command_falls_back_to_the_default_with_a_warning() {
+    assert_falls_back_with_a_warning(&json!("shift+KeyR"));
+}
+
+#[test]
+fn a_stored_shortcut_on_an_unsupported_key_falls_back_to_the_default_with_a_warning() {
+    for raw in [json!("control+Enter"), json!("control+F13")] {
+        assert_falls_back_with_a_warning(&raw);
     }
 }
 
@@ -273,6 +286,23 @@ fn a_stored_region_shortcut_that_duplicates_the_full_screen_one_falls_back_to_it
         "control+alt+KeyR"
     );
     assert_eq!(bindings.get(ShortcutKind::Region), &region_default());
+}
+
+#[test]
+fn when_the_stored_full_screen_shortcut_is_the_region_default_both_fall_back_to_their_defaults() {
+    let region_default_keys = json!(region_default().keys());
+    let mut bindings = None;
+
+    let log = warnings_logged_by(|| {
+        bindings = Some(Bindings::from_stored(
+            Some(&region_default_keys),
+            Some(&json!("not a shortcut")),
+            Platform::Windows,
+        ));
+    });
+
+    assert_eq!(bindings, Some(default_bindings(Platform::Windows)));
+    assert!(log.contains("full screen shortcut"));
 }
 
 #[test]
