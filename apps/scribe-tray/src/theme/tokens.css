@@ -27,6 +27,11 @@
   --focus-ring: 3px solid #0f6f6a;
   --focus-ring-offset: 2px;
 
+  --capture-dark: #000000;
+  --capture-light: #ffffff;
+  --capture-dim: rgb(0 0 0 / 0.45);
+  --capture-label: rgb(0 0 0 / 0.75);
+
   --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", sans-serif;
   --font-figures: ui-rounded, "SF Pro Rounded", -apple-system, "Segoe UI Variable", sans-serif;
   --text-sm: 12px;

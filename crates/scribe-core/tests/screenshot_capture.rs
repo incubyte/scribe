@@ -159,37 +159,37 @@ fn a_capture_with_nothing_recording_is_only_copied() {
 }
 
 #[test]
-fn a_selected_area_is_cut_from_the_frame_of_the_press() {
+fn a_region_completed_after_the_press_goes_into_the_session_of_the_press_at_its_offset() {
     let store = Arc::new(InMemoryScreenshotStore::default());
-    let taker = taker_showing(three_by_two(), &store);
+    let taker = taker_showing(frame_filled(8, 8, RED), &store);
+    let live = live_session_at(session(), FORTY_TWO_SECONDS);
     let area = PixelRect {
-        x: 1,
-        y: 0,
-        width: 2,
-        height: 2,
+        x: 2,
+        y: 2,
+        width: 4,
+        height: 4,
     };
 
-    let pending = taker.begin(None).unwrap();
+    let pending = taker.begin(Some(live)).unwrap();
     let outcome = taker.finish(pending, Selection::Area(area)).unwrap();
 
-    let expected = Frame::new(
-        2,
-        2,
-        vec![2, 2, 2, 255, 3, 3, 3, 255, 5, 5, 5, 255, 6, 6, 6, 255],
-    )
-    .unwrap();
-    assert_eq!(outcome.screenshot(), &expected);
+    let name = ScreenshotName::parse("00-00-42.png").unwrap();
+    assert_eq!(
+        store.screenshot(&session(), &name),
+        Some(frame_filled(4, 4, RED))
+    );
+    assert!(matches!(outcome, CaptureOutcome::SavedIntoSession { .. }));
 }
 
 #[test]
 fn an_area_reaching_past_the_monitor_edge_is_refused() {
     let store = Arc::new(InMemoryScreenshotStore::default());
-    let taker = taker_showing(three_by_two(), &store);
+    let taker = taker_showing(frame_filled(5, 5, RED), &store);
     let area = PixelRect {
         x: 2,
         y: 0,
-        width: 2,
-        height: 1,
+        width: 4,
+        height: 4,
     };
 
     let pending = taker.begin(None).unwrap();

@@ -296,18 +296,18 @@ stateDiagram-v2
 
 **Acceptance criteria**
 
-- [ ] **5.6.1** At launch, Scribe registers the region shortcut with its default: `⌃⌥⌘2` on macOS, `Ctrl+Shift+Alt+2` on Windows. A refusal is reported the same way as in 5.2.10.
+- [x] **5.6.1** At launch, Scribe registers the region shortcut with its default: `⌃⌥⌘2` on macOS, `Ctrl+Shift+Alt+2` on Windows. A refusal is reported the same way as in 5.2.10.
 - [ ] **5.6.2** Pressing the region shortcut covers only the monitor under the pointer with the frozen, dimmed image. The selector opens within 500 ms of the press on a 5K display.
 - [ ] **5.6.3** The selector covers the menu bar or taskbar and appears above full-screen apps, on the user's current Space or desktop.
-- [ ] **5.6.4** Dragging shows the selected rectangle at full brightness, with a live `W × H` readout in output pixels.
-- [ ] **5.6.5** Releasing after a drag captures exactly the selected rectangle from the frozen image at native resolution and closes the selector. The Screenshot then goes into the session as in 5.2 when a recording was active at the press, or to the clipboard as in 5.5 when not.
+- [x] **5.6.4** Dragging shows the selected rectangle at full brightness, with a live `W × H` readout in output pixels.
+- [x] **5.6.5** Releasing after a drag captures exactly the selected rectangle from the frozen image at native resolution and closes the selector. The Screenshot then goes into the session as in 5.2 when a recording was active at the press, or to the clipboard as in 5.5 when not.
 - [ ] **5.6.6** Esc, a right-click, or switching to another app (`⌘Tab` / `Alt+Tab`) cancels. The selector closes with nothing saved, copied or notified.
-- [ ] **5.6.7** A click, or a drag smaller than 4 × 4 output pixels, captures nothing and leaves the selector open.
-- [ ] **5.6.8** The selection cannot extend past the edges of the monitor.
-- [ ] **5.6.9** Pressing either capture shortcut while the selector is open does nothing.
-- [ ] **5.6.10** The Screenshot never contains the selector itself, and shows the screen as it was at the press.
+- [x] **5.6.7** A click, or a drag smaller than 4 × 4 output pixels, captures nothing and leaves the selector open.
+- [x] **5.6.8** The selection cannot extend past the edges of the monitor.
+- [x] **5.6.9** Pressing either capture shortcut while the selector is open does nothing.
+- [x] **5.6.10** The Screenshot never contains the selector itself, and shows the screen as it was at the press.
 - [ ] **5.6.11** With a 1× external monitor beside a 2× built-in display, a selection on either one captures the intended pixels at that monitor's native resolution.
-- [ ] **5.6.12** Without Screen Recording access on macOS, the region shortcut behaves as in 5.4 and no selector opens.
+- [x] **5.6.12** Without Screen Recording access on macOS, the region shortcut behaves as in 5.4 and no selector opens.
 - [ ] **5.6.13** On open, the selector announces "Region capture. Drag to select, Escape to cancel." to screen readers. The selection outline stays at 3:1 contrast against any screen content, using a two-tone outline.
 
 ### 5.7 Snap to a window in the region selector

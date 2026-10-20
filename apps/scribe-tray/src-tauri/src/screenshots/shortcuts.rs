@@ -33,8 +33,8 @@ fn on_shortcut<R: Runtime>(app: &AppHandle<R>, shortcut: &Shortcut, event: Short
     if event.state != ShortcutState::Pressed {
         return;
     }
-    if let Some(ShortcutKind::FullScreen) = kind_of(shortcut) {
-        take_full_screen_in_background(app);
+    if let Some(kind) = kind_of(shortcut) {
+        capture_in_background(app, kind);
     }
 }
 
@@ -47,11 +47,14 @@ fn kind_of(pressed: &Shortcut) -> Option<ShortcutKind> {
     })
 }
 
-fn take_full_screen_in_background<R: Runtime>(app: &AppHandle<R>) {
+fn capture_in_background<R: Runtime>(app: &AppHandle<R>, kind: ShortcutKind) {
     let live = app.state::<RecordingController>().live_session();
     let app = app.clone();
     thread::spawn(move || {
-        app.state::<ScreenshotService>()
-            .take_full_screen(&app, live);
+        let service = app.state::<ScreenshotService>();
+        match kind {
+            ShortcutKind::FullScreen => service.take_full_screen(&app, live),
+            ShortcutKind::Region => service.begin_region(&app, live),
+        }
     });
 }

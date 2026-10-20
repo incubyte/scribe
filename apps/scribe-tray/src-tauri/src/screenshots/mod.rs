@@ -1,11 +1,14 @@
 pub mod bindings;
 mod capture;
+pub mod capture_gate;
 mod capturers;
 mod delivery;
 pub mod idle_notice;
 pub mod notices;
 pub mod placement;
+pub(crate) mod region_selector;
 mod shortcuts;
+mod window_level;
 
 use std::sync::Arc;
 

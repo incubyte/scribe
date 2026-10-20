@@ -47,8 +47,13 @@ impl Frame {
         self.rgba
     }
 
+    #[must_use]
+    pub fn can_crop(&self, area: PixelRect) -> bool {
+        area.is_selectable_within(self.width, self.height)
+    }
+
     pub fn crop(&self, area: PixelRect) -> Result<Frame, InvalidSelection> {
-        if !area.fits_within(self.width, self.height) {
+        if !self.can_crop(area) {
             return Err(InvalidSelection);
         }
         let row_length = self.width as usize * BYTES_PER_PIXEL;

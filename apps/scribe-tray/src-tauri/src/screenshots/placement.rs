@@ -1,5 +1,5 @@
 use scribe_core::capture::{MonitorPlacement, PlacementUnits};
-use tauri::{LogicalPosition, PhysicalPosition, Position};
+use tauri::{LogicalPosition, LogicalSize, PhysicalPosition, PhysicalSize, Position, Rect, Size};
 
 #[must_use]
 pub fn centred_in(placement: &MonitorPlacement, size: (f64, f64)) -> Position {
@@ -11,5 +11,25 @@ pub fn centred_in(placement: &MonitorPlacement, size: (f64, f64)) -> Position {
             left.round() as i32,
             top.round() as i32,
         )),
+    }
+}
+
+#[must_use]
+pub fn covering(placement: &MonitorPlacement) -> Rect {
+    match placement.units {
+        PlacementUnits::Points => Rect {
+            position: Position::Logical(LogicalPosition::new(
+                f64::from(placement.x),
+                f64::from(placement.y),
+            )),
+            size: Size::Logical(LogicalSize::new(
+                f64::from(placement.width),
+                f64::from(placement.height),
+            )),
+        },
+        PlacementUnits::Pixels => Rect {
+            position: Position::Physical(PhysicalPosition::new(placement.x, placement.y)),
+            size: Size::Physical(PhysicalSize::new(placement.width, placement.height)),
+        },
     }
 }

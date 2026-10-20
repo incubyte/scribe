@@ -38,6 +38,10 @@ fn with_commands<R: Runtime>(builder: Builder<R>) -> Builder<R> {
     builder.invoke_handler(tauri::generate_handler![
         privacy::acknowledge_privacy,
         screenshots::idle_notice::dismiss_idle_notice,
+        screenshots::region_selector::region_frame,
+        screenshots::region_selector::region_context,
+        screenshots::region_selector::complete_region,
+        screenshots::region_selector::cancel_region,
         commands::recorder_snapshot,
         commands::recent_sessions,
         commands::start_recording,

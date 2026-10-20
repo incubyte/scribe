@@ -20,14 +20,14 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-function hasFields(
+export function hasFields(
   value: unknown,
   fields: Readonly<Record<string, Guard<unknown>>>,
 ): value is Record<string, unknown> {
   return isRecord(value) && Object.entries(fields).every(([name, guard]) => guard(value[name]));
 }
 
-function isOneOf<T extends string>(allowed: readonly string[]): Guard<T> {
+export function isOneOf<T extends string>(allowed: readonly string[]): Guard<T> {
   return (value: unknown): value is T => typeof value === "string" && allowed.includes(value);
 }
 
@@ -35,7 +35,7 @@ export function isString(value: unknown): value is string {
   return typeof value === "string";
 }
 
-function isNumber(value: unknown): value is number {
+export function isNumber(value: unknown): value is number {
   return typeof value === "number";
 }
 
@@ -43,7 +43,7 @@ function isNullable<T>(guard: Guard<T>): Guard<T | null> {
   return (value: unknown): value is T | null => value === null || guard(value);
 }
 
-function isListOf<T>(guard: Guard<T>): Guard<readonly T[]> {
+export function isListOf<T>(guard: Guard<T>): Guard<readonly T[]> {
   return (value: unknown): value is readonly T[] => Array.isArray(value) && value.every(guard);
 }
 

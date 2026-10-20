@@ -5,6 +5,7 @@
   "windows": [
     "privacy",
     "idle-notice",
+    "region-selector",
     "popover"
   ],
   "permissions": [

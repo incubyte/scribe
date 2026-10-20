@@ -8,7 +8,7 @@ mod taker;
 
 pub use destination::{Destination, SessionMoment};
 pub use frame::{Frame, InvalidFrame};
-pub use geometry::{InvalidSelection, PixelRect, Selection};
+pub use geometry::{InvalidSelection, MIN_SELECTION_EDGE_PX, PixelRect, Selection};
 pub use monitor::{MonitorPlacement, MonitorShot, PlacementUnits, WindowOutline};
 pub use reference::{InvalidScreenshotReference, ScreenshotReference, ServedImage};
 pub use screenshot_name::{InvalidScreenshotName, ScreenshotName};

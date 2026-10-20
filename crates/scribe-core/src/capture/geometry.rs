@@ -1,3 +1,5 @@
+pub const MIN_SELECTION_EDGE_PX: u32 = 4;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct PixelRect {
@@ -8,8 +10,9 @@ pub struct PixelRect {
 }
 
 impl PixelRect {
-    pub(crate) fn fits_within(&self, width: u32, height: u32) -> bool {
-        let has_area = self.width > 0 && self.height > 0;
+    pub(crate) fn is_selectable_within(&self, width: u32, height: u32) -> bool {
+        let is_large_enough =
+            self.width >= MIN_SELECTION_EDGE_PX && self.height >= MIN_SELECTION_EDGE_PX;
         let right_fits = self
             .x
             .checked_add(self.width)
@@ -18,7 +21,7 @@ impl PixelRect {
             .y
             .checked_add(self.height)
             .is_some_and(|bottom| bottom <= height);
-        has_area && right_fits && bottom_fits
+        is_large_enough && right_fits && bottom_fits
     }
 }
 
@@ -29,5 +32,5 @@ pub enum Selection {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
-#[error("the selected area does not lie inside the captured monitor")]
+#[error("the selected area is too small or does not lie inside the captured monitor")]
 pub struct InvalidSelection;

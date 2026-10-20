@@ -29,6 +29,14 @@ impl PendingCapture {
     pub fn destination(&self) -> &Destination {
         &self.destination
     }
+
+    #[must_use]
+    pub fn accepts(&self, selection: Selection) -> bool {
+        match selection {
+            Selection::WholeMonitor => true,
+            Selection::Area(area) => self.shot.frame.can_crop(area),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
