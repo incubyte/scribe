@@ -61,3 +61,14 @@ fn an_unavailable_shortcut_is_named_in_its_notice() {
 
     assert!(notice.body.contains("⌃⌥⌘1"));
 }
+
+#[test]
+fn a_screenshot_with_nothing_recording_is_announced_as_copied_to_the_clipboard() {
+    let outcome = CaptureOutcome::CopiedOnly {
+        screenshot: frame_filled(1, 1, RED),
+    };
+
+    let notice = notice_for(&outcome);
+
+    assert_eq!(notice.body, "Screenshot copied to the clipboard");
+}

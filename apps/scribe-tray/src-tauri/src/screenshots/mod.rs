@@ -2,7 +2,9 @@ pub mod bindings;
 mod capture;
 mod capturers;
 mod delivery;
+pub mod idle_notice;
 pub mod notices;
+pub mod placement;
 mod shortcuts;
 
 use std::sync::Arc;

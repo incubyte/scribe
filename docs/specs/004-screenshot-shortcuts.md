@@ -259,12 +259,12 @@ Between calls, the shortcut works as a plain screenshot tool. The capture goes t
 
 **Acceptance criteria**
 
-- [ ] **5.5.1** Pressing the full-screen shortcut while no recording is active copies the capture to the clipboard and writes no file anywhere.
-- [ ] **5.5.2** Every idle capture shows the notification "Screenshot copied to the clipboard".
+- [x] **5.5.1** Pressing the full-screen shortcut while no recording is active copies the capture to the clipboard and writes no file anywhere.
+- [x] **5.5.2** Every idle capture shows the notification "Screenshot copied to the clipboard".
 - [ ] **5.5.3** Until the user opts out, an idle capture also opens the notice above, centred on the captured monitor.
 - [ ] **5.5.4** Closing the notice with "Don't show this again" ticked stores the preference in `settings.json`. The notice never appears again, including after a relaunch, and the notification from 5.5.2 still appears.
 - [ ] **5.5.5** Closing the notice unticked means it appears on the next idle capture.
-- [ ] **5.5.6** **OK** has focus when the notice opens, and Enter or Esc closes it. Tab reaches the checkbox and Space toggles it. Text and controls meet WCAG 2.2 AA contrast and show a visible focus state, using the existing theme tokens.
+- [x] **5.5.6** **OK** has focus when the notice opens, and Enter or Esc closes it. Tab reaches the checkbox and Space toggles it. Text and controls meet WCAG 2.2 AA contrast and show a visible focus state, using the existing theme tokens.
 - [ ] **5.5.7** "No recording is active" covers every recorder state other than recording, including the states where Scribe is starting, stopping or waiting for a speech model.
 
 ### 5.6 Select a region on the monitor under the cursor

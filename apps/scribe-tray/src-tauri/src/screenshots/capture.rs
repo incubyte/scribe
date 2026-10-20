@@ -32,8 +32,9 @@ impl ScreenshotService {
     }
 
     fn finish_whole_monitor<R: Runtime>(&self, app: &AppHandle<R>, pending: PendingCapture) {
+        let placement = pending.shot().placement;
         match self.taker.finish(pending, Selection::WholeMonitor) {
-            Ok(outcome) => deliver(app, &outcome),
+            Ok(outcome) => deliver(app, &outcome, &placement),
             Err(error) => {
                 tracing::error!(%error, "could not take the whole monitor");
                 show_notice(app, &capture_failed_notice());

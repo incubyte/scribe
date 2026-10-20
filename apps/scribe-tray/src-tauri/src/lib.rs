@@ -37,6 +37,7 @@ pub fn run() -> tauri::Result<()> {
 fn with_commands<R: Runtime>(builder: Builder<R>) -> Builder<R> {
     builder.invoke_handler(tauri::generate_handler![
         privacy::acknowledge_privacy,
+        screenshots::idle_notice::dismiss_idle_notice,
         commands::recorder_snapshot,
         commands::recent_sessions,
         commands::start_recording,
