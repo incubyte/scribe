@@ -6,6 +6,7 @@ tray="$root/apps/scribe-tray"
 windows_target="x86_64-pc-windows-msvc"
 version="$(jq -r .version "$tray/src-tauri/tauri.conf.json")"
 tag="v$version"
+plugin_zip="$root/target/release/scribe-plugin.zip"
 export PATH="/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/lld/bin:$PATH"
 
 require_clean_main() {
@@ -31,6 +32,26 @@ build_windows() {
     --config src-tauri/tauri.ci.conf.json)
 }
 
+validate_plugin() {
+  if ! command -v claude > /dev/null; then
+    echo "claude CLI not found; skipping plugin validation." >&2
+    return
+  fi
+  claude plugin validate --strict "$root/plugins/scribe"
+  claude plugin validate --strict "$root"
+}
+
+build_plugin_zip() {
+  if ! command -v zip > /dev/null; then
+    echo "zip not found; install it to build the plugin zip." >&2
+    exit 1
+  fi
+  validate_plugin
+  mkdir -p "$(dirname "$plugin_zip")"
+  rm -f "$plugin_zip"
+  (cd "$root/plugins/scribe" && zip -qr "$plugin_zip" . -x '*.DS_Store')
+}
+
 tag_release() {
   if ! git -C "$root" rev-parse -q --verify "refs/tags/$tag" > /dev/null; then
     git -C "$root" tag "$tag"
@@ -44,12 +65,13 @@ publish_assets() {
   if ! gh release view "$tag" > /dev/null 2>&1; then
     gh release create "$tag" --draft --title "Scribe $tag" --notes-file "$root/scripts/release-notes.md"
   fi
-  gh release upload "$tag" "$dmg" "$installer" --clobber
+  gh release upload "$tag" "$dmg" "$installer" "$plugin_zip" --clobber
 }
 
 require_clean_main
 build_macos
 build_windows
+build_plugin_zip
 tag_release
 publish_assets
 echo "Uploaded Scribe $tag. Review and publish: $(gh release view "$tag" --json url --jq .url)"

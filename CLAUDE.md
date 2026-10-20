@@ -28,4 +28,6 @@ Releases are built on this Mac (no CI minutes):
 2. Run `scripts/release.sh`. It builds the macOS `.dmg` and cross-compiles the Windows installer (needs `cargo install cargo-xwin` and `brew install llvm lld nsis`), tags `v<version>`, and uploads both to a draft GitHub Release.
 3. Review the draft on GitHub and publish it.
 
+`scripts/release.sh` also validates the Claude plugin and uploads `scribe-plugin.zip`; the manual `release.yml` fallback does neither.
+
 `.github/workflows/release.yml` is a manual fallback that builds the Windows installer on GitHub for an existing tag. Builds are ad-hoc signed (macOS) and unsigned (Windows) until signing certificates exist. Keep `src-tauri/Entitlements.plist` with the audio-input entitlement whenever signing changes, or the microphone stops working. Decisions behind this are ADR 4 to ADR 6 in `docs/ARCHITECTURE.md`.
