@@ -132,6 +132,9 @@ jobs:
           python-version: "3.12"
       - name: Stage the MCP server the tray bundles as a sidecar
         run: apps/scribe-tray/scripts/stage-sidecar.sh
+      - name: Fetch the Visual C++ runtime the installer bundles
+        if: matrix.os == 'windows-latest'
+        run: apps/scribe-tray/scripts/fetch-vc-redist.sh
       - run: cargo install cargo-mutants --locked
       - name: Mutate the pull request's Rust changes
         run: |

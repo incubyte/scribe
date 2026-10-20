@@ -91,7 +91,14 @@ fn recursive_private_dir_builder() -> DirBuilder {
 
 pub(crate) fn private_dir_builder() -> DirBuilder {
     let mut builder = DirBuilder::new();
-    #[cfg(unix)]
-    std::os::unix::fs::DirBuilderExt::mode(&mut builder, OWNER_ONLY_MODE);
+    restrict_to_owner(&mut builder);
     builder
 }
+
+#[cfg(unix)]
+fn restrict_to_owner(builder: &mut DirBuilder) {
+    std::os::unix::fs::DirBuilderExt::mode(builder, OWNER_ONLY_MODE);
+}
+
+#[cfg(not(unix))]
+fn restrict_to_owner(_builder: &mut DirBuilder) {}
