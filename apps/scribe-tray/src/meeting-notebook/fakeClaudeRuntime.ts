@@ -66,27 +66,38 @@ type Subscription = { collection: string; documentId?: string; deliver(): void }
 
 const DEFAULT_ANSWER = "Here is what Claude drafted.";
 const CONFIRMED: SnapshotMetadata = { fromCache: false, hasPendingWrites: false };
+const DEFAULT_RUNTIME_OPTIONS: Required<RuntimeOptions> = {
+  database: "available",
+  canWriteData: true,
+  askClaude: "available",
+  answer: DEFAULT_ANSWER,
+};
 
-export function createFakeClaudeRuntime({
-  database: databaseAvailability = "available",
-  canWriteData = true,
-  askClaude = "available",
-  answer = DEFAULT_ANSWER,
-}: RuntimeOptions = {}): FakeClaudeRuntime {
+export function createFakeClaudeRuntime(options: RuntimeOptions = {}): FakeClaudeRuntime {
+  const settings = { ...DEFAULT_RUNTIME_OPTIONS, ...options };
   const scheduler = createScheduler();
   const database = new InMemoryDatabase(scheduler);
-  const namespaces = new Map<string, unknown>([["user", fakeUser(scheduler, canWriteData)]]);
-  if (databaseAvailability === "available") {
-    namespaces.set("db", database.db);
-  }
-  if (askClaude === "available") {
-    namespaces.set("sample", fakeSample(scheduler, answer));
-  }
+  const namespaces = availableNamespaces(settings, scheduler, database);
   return {
     claude: { use: (name) => scheduler.later(() => namespaces.get(name) ?? null) },
     database,
     isIdle: () => scheduler.isIdle(),
   };
+}
+
+function availableNamespaces(
+  settings: Required<RuntimeOptions>,
+  scheduler: Scheduler,
+  database: InMemoryDatabase,
+): Map<string, unknown> {
+  const namespaces = new Map<string, unknown>([["user", fakeUser(scheduler, settings.canWriteData)]]);
+  if (settings.database === "available") {
+    namespaces.set("db", database.db);
+  }
+  if (settings.askClaude === "available") {
+    namespaces.set("sample", fakeSample(scheduler, settings.answer));
+  }
+  return namespaces;
 }
 
 function createScheduler(): Scheduler {

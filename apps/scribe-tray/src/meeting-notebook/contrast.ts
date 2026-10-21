@@ -1,7 +1,6 @@
 export type ColorScheme = "light" | "dark";
 
 const HEX_COLOR = /^#([0-9a-f]{6})$/i;
-const CUSTOM_PROPERTY = /(--[a-z-]+):\s*([^;]+);/g;
 const ROOT_BLOCK = /:root\s*\{([^}]*)\}/g;
 const DARK_QUERY = "@media (prefers-color-scheme: dark)";
 
@@ -25,7 +24,13 @@ function rootBlocks(html: string): string[] {
 }
 
 function tokensIn(block: string): Record<string, string> {
-  return Object.fromEntries(Array.from(block.matchAll(CUSTOM_PROPERTY), (match) => [match[1], match[2].trim()]));
+  return Object.fromEntries(block.split(";").flatMap(customProperty));
+}
+
+function customProperty(declaration: string): [string, string][] {
+  const separator = declaration.indexOf(":");
+  const name = declaration.slice(0, separator).trim();
+  return name.startsWith("--") ? [[name, declaration.slice(separator + 1).trim()]] : [];
 }
 
 function relativeLuminance(hex: string): number {
