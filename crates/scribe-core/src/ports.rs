@@ -42,6 +42,10 @@ pub trait ScreenCapturer: Send + Sync {
     fn capture_under_pointer(&self) -> Result<MonitorShot, ScreenCaptureError>;
 }
 
+pub trait CallProbe: Send {
+    fn call_app_holds_microphone(&self) -> Result<bool, CaptureError>;
+}
+
 pub trait ScreenshotStore: Send + Sync {
     fn save(
         &self,
