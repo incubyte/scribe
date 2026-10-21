@@ -1,10 +1,12 @@
 use std::sync::{Mutex, PoisonError};
 use std::time::Instant;
 
-use tauri::{AppHandle, Manager, Runtime, WebviewWindow, WindowEvent};
+use tauri::{AppHandle, Manager, Monitor, PhysicalPosition, Runtime, WebviewWindow, WindowEvent};
 use tauri_plugin_positioner::{Position, WindowExt};
 
 use crate::blur_guard::BlurGuard;
+use crate::tray;
+use crate::tray_anchor::{ScreenArea, anchored_to_tray};
 
 const WINDOW_LABEL: &str = "popover";
 
@@ -85,9 +87,37 @@ fn place_at_tray<R: Runtime>(window: &WebviewWindow<R>) -> tauri::Result<()> {
     window
         .move_window_constrained(Position::TrayCenter)
         .or_else(|error| {
-            tracing::debug!(%error, "tray position not known yet, using the fallback position");
-            window.move_window(FALLBACK_POSITION)
+            tracing::debug!(%error, "tray position not known yet, asking the tray icon");
+            place_from_tray_icon(window)
         })
+}
+
+fn place_from_tray_icon<R: Runtime>(window: &WebviewWindow<R>) -> tauri::Result<()> {
+    match position_under_tray_icon(window)? {
+        Some(position) => window.set_position(position),
+        None => window.move_window(FALLBACK_POSITION),
+    }
+}
+
+fn position_under_tray_icon<R: Runtime>(
+    window: &WebviewWindow<R>,
+) -> tauri::Result<Option<PhysicalPosition<f64>>> {
+    let Some(tray) = tray::icon_area(window.app_handle())? else {
+        return Ok(None);
+    };
+    let tray_centre = tray.position.x + tray.size.width / 2.0;
+    let Some(monitor) = window.monitor_from_point(tray_centre, tray.position.y)? else {
+        return Ok(None);
+    };
+    let popover = window.outer_size()?.cast::<f64>();
+    Ok(Some(anchored_to_tray(&tray, popover, &area_of(&monitor))))
+}
+
+fn area_of(monitor: &Monitor) -> ScreenArea {
+    ScreenArea {
+        position: monitor.position().cast::<f64>(),
+        size: monitor.size().cast::<f64>(),
+    }
 }
 
 fn hide_after_blur<R: Runtime>(app: &AppHandle<R>, window: &WebviewWindow<R>) {

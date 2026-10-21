@@ -21,6 +21,7 @@ pub mod screenshots;
 pub mod start_failure;
 pub mod transcripts_location;
 mod tray;
+pub mod tray_anchor;
 mod tray_listener;
 mod webview;
 

@@ -19,6 +19,7 @@ use crate::popover;
 use crate::privacy;
 use crate::recording::{self, RecordingController};
 use crate::recording_label::{START_RECORDING, stop_recording_label};
+use crate::tray_anchor::ScreenArea;
 
 const TRAY_ID: &str = "main";
 const IDLE_TOOLTIP: &str = "Scribe";
@@ -38,6 +39,16 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<TrayIcon<R>> {
         .on_menu_event(|app, event| dispatch(app, event.id.as_ref()))
         .on_tray_icon_event(|tray, event| on_tray_icon_event(tray.app_handle(), &event))
         .build(app)
+}
+
+pub fn icon_area<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Option<ScreenArea>> {
+    let Some(tray) = app.tray_by_id(TRAY_ID) else {
+        return Ok(None);
+    };
+    Ok(tray.rect()?.map(|rect| ScreenArea {
+        position: rect.position.to_physical(1.0),
+        size: rect.size.to_physical(1.0),
+    }))
 }
 
 fn on_tray_icon_event<R: Runtime>(app: &AppHandle<R>, event: &TrayIconEvent) {
