@@ -1,5 +1,9 @@
 # Scribe
 
+Scribe records your calls on your own computer. No bot joins the meeting, no audio leaves your machine, and every call becomes a plain-text transcript in a folder you choose.
+
+When you want notes, ask Claude. `/meeting-notes` reads the transcript and writes up the decisions and todos, the way a colleague who was in the room would, into one notebook that collects every call.
+
 Scribe is a small tray app for macOS and Windows that transcribes your calls without joining them. You click record, and Scribe transcribes your microphone and the sound your computer plays, live and entirely on your computer. Each call is saved as a Markdown transcript, and any AI app that supports MCP, such as Claude Desktop, can list, read, and search those transcripts.
 
 ## What it does
