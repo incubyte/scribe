@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <title>Scribe notebook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inclusive+Sans:wght@400;500;600&display=swap">
 <style>
 :root {
   color-scheme: light dark;
@@ -15,26 +18,33 @@
   --space-4: 16px;
   --space-5: 24px;
 
-  --radius-control: 8px;
+  --radius-control: 12px;
   --header-height: calc(var(--space-3) * 2 + 24px + 1px);
 
-  --glass: rgb(250 250 252 / 0.84);
-  --surface: #fafafc;
-  --surface-sunken: rgb(0 0 0 / 0.045);
-  --surface-hover: rgb(0 0 0 / 0.06);
-  --hairline: rgb(0 0 0 / 0.1);
-  --control-border: #6b6b73;
-  --text: #1d1d1f;
-  --text-muted: #4a4a50;
-  --accent: #0f6f6a;
-  --on-accent: #ffffff;
-  --accent-soft: rgb(15 111 106 / 0.12);
-  --recording: #c9302c;
-  --recording-soft: rgb(201 48 44 / 0.08);
-  --focus-ring: 3px solid #0f6f6a;
+  --surface: #ebfff6;
+  --header-band: #014d43;
+  --on-header: #ebfff6;
+  --glass: rgb(1 77 67 / 0.94);
+  --heading: #014d43;
+  --surface-sunken: rgb(1 77 67 / 0.05);
+  --surface-hover: rgb(1 77 67 / 0.09);
+  --hairline: rgb(1 77 67 / 0.2);
+  --control-border: #56685f;
+  --text: #1a1d23;
+  --text-muted: #4a5a55;
+  --accent: #014d43;
+  --on-accent: #ebfff6;
+  --accent-soft: rgb(1 77 67 / 0.08);
+  --recording: #b3261e;
+  --recording-soft: rgb(179 38 30 / 0.08);
+  --button-fill: #d3fe73;
+  --on-button: #014d43;
+  --decor: #40a578;
+  --focus-ring: 3px solid var(--accent);
   --focus-ring-offset: 2px;
 
-  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", sans-serif;
+  --font-body: "Inclusive Sans", -apple-system, BlinkMacSystemFont, "Segoe UI Variable", "Segoe UI", sans-serif;
+  --font-heading: "Fraunces", ui-serif, Georgia, serif;
   --font-figures: ui-rounded, "SF Pro Rounded", -apple-system, "Segoe UI Variable", sans-serif;
   --text-sm: 12px;
   --text-md: 13px;
@@ -43,26 +53,27 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --glass: rgb(30 30 33 / 0.86);
-    --surface: #1e1e21;
-    --surface-sunken: rgb(255 255 255 / 0.05);
-    --surface-hover: rgb(255 255 255 / 0.08);
-    --hairline: rgb(255 255 255 / 0.12);
-    --control-border: #8c8c96;
-    --text: #f2f2f5;
-    --text-muted: #b9b9c0;
-    --accent: #5fd3c6;
-    --on-accent: #062b28;
-    --accent-soft: rgb(95 211 198 / 0.14);
-    --recording: #ff6b62;
-    --recording-soft: rgb(255 107 98 / 0.12);
-    --focus-ring: 3px solid #5fd3c6;
+    --surface: #062925;
+    --header-band: #0c3a34;
+    --glass: rgb(12 58 52 / 0.94);
+    --heading: #ebfff6;
+    --surface-sunken: rgb(235 255 246 / 0.06);
+    --surface-hover: rgb(235 255 246 / 0.1);
+    --hairline: rgb(235 255 246 / 0.18);
+    --control-border: #7fa89d;
+    --text: #ebfff6;
+    --text-muted: #a8cfc4;
+    --accent: #d3fe73;
+    --on-accent: #014d43;
+    --accent-soft: rgb(211 254 115 / 0.1);
+    --recording: #ff8a80;
+    --recording-soft: rgb(255 138 128 / 0.12);
   }
 }
 
 @media (prefers-reduced-transparency: reduce) {
   :root {
-    --glass: var(--surface);
+    --glass: var(--header-band);
   }
 }
 
@@ -136,11 +147,13 @@ select {
   flex: none;
   width: 24px;
   height: 24px;
-  color: var(--accent);
+  color: var(--on-header);
 }
 
 .notebook__title {
   margin: 0;
+  color: var(--on-header);
+  font-family: var(--font-heading);
   font-size: 18px;
   font-weight: 650;
   line-height: 1.25;
@@ -151,7 +164,7 @@ select {
   margin-left: auto;
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
+  color: var(--on-header);
 }
 
 .notebook__body {
@@ -244,6 +257,8 @@ select {
 }
 
 .meeting__title {
+  color: var(--heading);
+  font-family: var(--font-heading);
   margin: 0;
   font-size: 20px;
   font-weight: 650;
@@ -280,6 +295,8 @@ select {
 }
 
 .panel__heading {
+  color: var(--heading);
+  font-family: var(--font-heading);
   margin: 0;
   font-size: var(--text-lg);
   font-weight: 650;
@@ -358,6 +375,8 @@ select {
 }
 
 .block--heading {
+  color: var(--heading);
+  font-family: var(--font-heading);
   font-size: var(--text-lg);
   font-weight: 650;
   letter-spacing: -0.01em;
@@ -520,22 +539,43 @@ select {
 }
 
 .button {
+  display: inline-flex;
+  gap: var(--space-2);
+  align-items: center;
   min-height: 32px;
   padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--control-border);
-  border-radius: var(--radius-control);
-  background: var(--accent-soft);
-  color: var(--text);
+  border: 1px solid var(--on-button);
+  border-radius: 999px;
+  background: var(--button-fill);
+  color: var(--on-button);
   font-weight: 600;
   cursor: pointer;
 }
 
 .button:hover:not(:disabled):not([aria-disabled="true"]) {
-  background: var(--surface-hover);
+  filter: brightness(0.94);
+}
+
+.button__arrow {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--on-button);
+  color: var(--button-fill);
+}
+
+.button__arrow svg {
+  width: 10px;
+  height: 10px;
 }
 
 .button:disabled,
 .button[aria-disabled="true"] {
+  border-color: var(--control-border);
   color: var(--text-muted);
   background: transparent;
   cursor: not-allowed;
@@ -583,6 +623,8 @@ select {
 }
 
 .empty__title {
+  color: var(--heading);
+  font-family: var(--font-heading);
   margin: 0;
   font-size: var(--text-lg);
   font-weight: 650;
@@ -602,6 +644,11 @@ select {
   .button,
   .sidebar__select {
     border: 1px solid ButtonText;
+  }
+
+  .button__arrow {
+    background: ButtonText;
+    color: ButtonFace;
   }
 
   .button:disabled,
@@ -666,6 +713,8 @@ select {
   const FALLBACK_MEETING_TYPE = "Meeting";
   const AI_UNAVAILABLE_REASON = "AI actions need Claude web or Desktop on a paid plan.";
   const ACTION_FAILED_MESSAGE = "Couldn't run this action. Try again.";
+  const ARROW_ICON =
+    '<svg viewBox="0 0 10 10" aria-hidden="true" focusable="false"><path d="M2 5h6M5.5 2.5L8 5L5.5 7.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
   const WORKING_LABEL = "Working…";
   const UNTITLED_MEETING = "Untitled meeting";
   const NO_MEETINGS_TITLE = "No meetings yet";
@@ -1145,8 +1194,16 @@ select {
     return button;
   }
 
+  function buildArrowChip() {
+    const chip = element("span", "button__arrow");
+    chip.innerHTML = ARROW_ICON;
+    return chip;
+  }
+
   function buildActionButton(action, outputElement, reasonId) {
-    const button = element("button", "button", action.label);
+    const button = element("button", "button");
+    const label = element("span", "button__label", action.label);
+    button.append(label, buildArrowChip());
     button.type = "button";
     if (!canAskClaude()) {
       button.disabled = true;
@@ -1159,9 +1216,9 @@ select {
       }
       button.setAttribute("aria-disabled", "true");
       button.setAttribute("aria-busy", "true");
-      button.textContent = WORKING_LABEL;
+      label.textContent = WORKING_LABEL;
       await runAction(action, outputElement);
-      button.textContent = action.label;
+      label.textContent = action.label;
       button.removeAttribute("aria-busy");
       button.removeAttribute("aria-disabled");
     });

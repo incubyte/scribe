@@ -221,11 +221,11 @@ The notebook takes on Incubyte's look: a deep green header band, mint page backg
 
 **Acceptance criteria**
 
-- [ ] **5.3.1** In light mode the page uses the light token column and in dark mode (system setting) the dark column, with the page background set explicitly in both.
-- [ ] **5.3.2** Headings use Fraunces and body text Inclusive Sans, loaded from Google Fonts, falling back to system serif and sans fonts when they do not load.
-- [ ] **5.3.3** Every text and control pairing meets WCAG 2.2 AA contrast (4.5:1 text, 3:1 large text and UI parts); `#40A578` is never used for text or for a control's only boundary.
-- [ ] **5.3.4** AI action buttons are lime pills with a round arrow icon that is hidden from assistive technology.
-- [ ] **5.3.5** Focus rings, forced-colours styling, reduced-motion and reduced-transparency handling, and the under-640px layout all still work.
+- [x] **5.3.1** In light mode the page uses the light token column and in dark mode (system setting) the dark column, with the page background set explicitly in both.
+- [x] **5.3.2** Headings use Fraunces and body text Inclusive Sans, loaded from Google Fonts, falling back to system serif and sans fonts when they do not load.
+- [x] **5.3.3** Every text and control pairing meets WCAG 2.2 AA contrast (4.5:1 text, 3:1 large text and UI parts); `#40A578` is never used for text or for a control's only boundary.
+- [x] **5.3.4** AI action buttons are lime pills with a round arrow icon that is hidden from assistive technology.
+- [x] **5.3.5** Focus rings, forced-colours styling, reduced-motion and reduced-transparency handling, and the under-640px layout all still work.
 
 ### 5.4 Tick a todo done for everyone
 
