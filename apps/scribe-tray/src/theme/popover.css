@@ -139,6 +139,7 @@
 }
 
 .transcript {
+  position: relative;
   flex: 1;
   min-height: 96px;
   overflow-y: auto;
