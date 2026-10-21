@@ -1,4 +1,6 @@
 pub mod blur_guard;
+mod call_probes;
+mod call_watch;
 pub mod claude_desktop;
 mod claude_desktop_connect;
 mod commands;
@@ -82,6 +84,7 @@ fn start_scribe<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::error
     screenshots::install(app);
     recording::publish_state(app);
     popover::install_blur_hide(app)?;
+    call_watch::install(app);
     privacy::show_statement_until_acknowledged(app)?;
     Ok(())
 }

@@ -12,4 +12,8 @@ exclude_globs = [
     "apps/scribe-tray/src-tauri/src/screenshots/commands.rs",
     "apps/scribe-tray/src-tauri/src/screenshots/mod.rs",
     "apps/scribe-tray/src-tauri/src/screenshots/window_level/**",
+    "apps/scribe-tray/src-tauri/src/call_watch.rs",
+    "apps/scribe-tray/src-tauri/src/call_probes.rs",
+    "crates/audio-macos/src/call_probe.rs",
+    "crates/audio-windows/src/call_probe.rs",
 ]

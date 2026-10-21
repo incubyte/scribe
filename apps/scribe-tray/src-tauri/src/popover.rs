@@ -25,7 +25,6 @@ pub fn toggle<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
-#[allow(dead_code)]
 pub fn open_for_call<R: Runtime>(app: &AppHandle<R>) {
     let window = match popover_window(app) {
         Ok(window) => window,
