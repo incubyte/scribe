@@ -345,6 +345,7 @@ dependencies = [
  "scribe-core",
  "tracing",
  "wasapi",
+ "windows 0.62.2",
 ]
 
 [[package]]
