@@ -104,6 +104,8 @@ Make the artifact like this:
 1. If no Scribe notebook artifact exists in this conversation, create one titled `Scribe notebook` from the template, with the data island `<script type="application/json" id="scribe-meetings">` set to a one-meeting array holding the new meeting.
 2. If one exists, take the meetings array from the data island of the latest version of that artifact, which you wrote earlier in this conversation. Keep every meeting exactly as it is. Replace a meeting only when it has the same `id` as the new one, otherwise put the new meeting first. Then update that same artifact with the full template and the complete array.
 
+When you publish with an Artifact tool that takes `capabilities` (claude.ai/artifact links), pass `capabilities: {sample: {}}` when you create the notebook, or the AI action buttons stay disabled. Leave `capabilities` out when you update it, so the declaration carries forward.
+
 Start from the unmodified template file each time. Change only the data island. Never edit the template's markup, styles or script.
 
 Reply with one line that names the meeting you added and says how many meetings the notebook now holds.

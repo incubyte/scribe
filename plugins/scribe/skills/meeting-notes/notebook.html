@@ -670,7 +670,7 @@ const ACTION_FAILED_MESSAGE = "Couldn't run this action. Try again.";
 const WORKING_LABEL = "Working…";
 const UNTITLED_MEETING = "Untitled meeting";
 
-const state = { meetings: [], selectedId: null, ticked: new Map() };
+const state = { meetings: [], selectedId: null, ticked: new Map(), askClaude: null };
 
 function element(tagName, className, text) {
   const node = document.createElement(tagName);
@@ -971,7 +971,17 @@ function describeTodo(todo) {
 }
 
 function canAskClaude() {
-  return typeof window.claude?.complete === "function";
+  return state.askClaude !== null;
+}
+
+async function resolveAskClaude() {
+  if (typeof window.claude?.complete === "function") {
+    return (prompt) => window.claude.complete(prompt);
+  }
+  if (typeof window.claude?.use === "function") {
+    return window.claude.use("sample");
+  }
+  return null;
 }
 
 function completionText(completion) {
@@ -984,7 +994,7 @@ function completionText(completion) {
 
 async function runAction(action, outputElement) {
   try {
-    const text = completionText(await window.claude.complete(action.prompt));
+    const text = completionText(await state.askClaude(action.prompt));
     if (!text.trim()) {
       throw new Error("empty completion");
     }
@@ -1144,10 +1154,14 @@ function applyTicked(meetingId) {
   });
 }
 
+function selectedMeeting() {
+  return state.meetings.find((meeting) => meeting.id === state.selectedId);
+}
+
 async function selectMeeting(id) {
   state.selectedId = id;
   markSelected(id);
-  renderMeeting(state.meetings.find((meeting) => meeting.id === id));
+  renderMeeting(selectedMeeting());
   if (id === null || state.ticked.has(id)) {
     return;
   }
@@ -1174,6 +1188,15 @@ function start() {
   const firstId = firstMeeting ? firstMeeting.id : null;
   renderMeetingList(state.meetings, firstId);
   selectMeeting(firstId).catch(logFailure);
+  resolveAskClaude().then(enableClaudeActions).catch(logFailure);
+}
+
+function enableClaudeActions(askClaude) {
+  if (!askClaude) {
+    return;
+  }
+  state.askClaude = askClaude;
+  renderMeeting(selectedMeeting());
 }
 
 start();
