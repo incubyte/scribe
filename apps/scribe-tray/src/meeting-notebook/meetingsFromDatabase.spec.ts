@@ -125,8 +125,8 @@ describe("the notebook shows meetings from its database", () => {
       "block block--screen",
       "block block--callout block--risk",
     ]);
-    expect(textsOf(notebook, ".todo__text")).toEqual(["Draft the pairing plan", "Share the QA rota"]);
-    expect(textsOf(notebook, ".todo__meta")).toEqual(["Owner: Me", "Owner: Awni · Due: Friday"]);
+    expect(textsOf(notebook, "#meeting-pane .todo__text")).toEqual(["Draft the pairing plan", "Share the QA rota"]);
+    expect(textsOf(notebook, "#meeting-pane .todo__meta")).toEqual(["Owner: Me", "Owner: Awni · Due: Friday"]);
   });
 
   it("adds a meeting written while the page is open without losing the selection", async () => {
@@ -238,7 +238,7 @@ describe("the notebook shows meetings from its database", () => {
 
     expect(listedMeetingTitles(notebook)).toEqual(["<b>Launch</b> review"]);
     expect(openMeetingTitle(notebook)).toBe("<b>Launch</b> review");
-    expect(textsOf(notebook, ".todo__text")).toEqual(['<img src="x" onerror="alert(1)">Ship it']);
+    expect(textsOf(notebook, "#meeting-pane .todo__text")).toEqual(['<img src="x" onerror="alert(1)">Ship it']);
     expect(notebook.document.querySelector("b, img")).toBeNull();
   });
 

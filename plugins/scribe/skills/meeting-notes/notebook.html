@@ -19,7 +19,8 @@
   --space-5: 24px;
 
   --radius-control: 12px;
-  --header-height: calc(var(--space-3) * 2 + 24px + 1px);
+  --tab-height: 32px;
+  --header-height: calc(var(--space-3) * 2 + var(--tab-height) + 1px);
 
   --surface: #ebfff6;
   --header-band: #014d43;
@@ -160,6 +161,37 @@ select {
   letter-spacing: -0.01em;
 }
 
+.notebook__tabs {
+  display: flex;
+  gap: var(--space-1);
+  margin-left: var(--space-4);
+}
+
+.tab {
+  min-height: var(--tab-height);
+  padding: var(--space-1) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--on-header);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 120ms ease-out;
+}
+
+.tab:hover {
+  background: rgb(235 255 246 / 0.12);
+}
+
+.tab[aria-selected="true"] {
+  background: rgb(235 255 246 / 0.2);
+  box-shadow: inset 0 -2px 0 var(--on-header);
+}
+
+.tab:focus-visible {
+  outline-color: var(--on-header);
+}
+
 .notebook__count {
   margin-left: auto;
   font-size: var(--text-sm);
@@ -228,6 +260,81 @@ select {
 .session[aria-current="true"] {
   background: var(--accent-soft);
   box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.todos-view {
+  flex: 1;
+  max-width: 760px;
+  padding: var(--space-5);
+}
+
+.filter {
+  display: flex;
+  gap: var(--space-1);
+  margin-bottom: var(--space-4);
+}
+
+.filter__option {
+  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--control-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.filter__option[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.todos-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.todo-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.todo-group__heading {
+  margin: 0;
+  padding-left: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.todo-group__owner {
+  margin: var(--space-2) 0 0;
+  padding-left: var(--space-2);
+  font-family: var(--font-heading);
+  font-size: var(--text-md);
+  font-weight: 650;
+  color: var(--heading);
+}
+
+.todo__meeting {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.todo__meeting-link {
+  color: var(--accent);
+  text-underline-offset: 2px;
+}
+
+.todo--highlight {
+  border-radius: var(--radius-control);
+  background: var(--accent-soft);
+  box-shadow: 0 0 0 var(--space-2) var(--accent-soft);
 }
 
 .session__title {
@@ -666,11 +773,41 @@ select {
     border-color: GrayText;
     color: GrayText;
   }
+
+  .tab[aria-selected="true"],
+  .filter__option[aria-pressed="true"] {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
+
+  .todo--highlight {
+    outline: 2px solid Highlight;
+  }
+}
+
+[hidden] {
+  display: none !important;
 }
 
 @media (max-width: 640px) {
+  :root {
+    --header-height: calc(var(--space-3) * 2 + 24px + var(--space-2) + var(--tab-height) + 1px);
+  }
+
   .notebook__header {
+    flex-wrap: wrap;
     padding: var(--space-3) var(--space-4);
+  }
+
+  .notebook__tabs {
+    order: 1;
+    flex: 1 0 100%;
+    margin-left: 0;
+  }
+
+  .todos-view {
+    max-width: none;
+    padding: var(--space-4);
   }
 
   .notebook__body {
@@ -711,12 +848,20 @@ select {
       <path d="M9 8h6M9 12h6M9 16h3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"></path>
     </svg>
     <h1 class="notebook__title">Scribe notebook</h1>
+    <div class="notebook__tabs" id="tabs" role="tablist" aria-label="Notebook views">
+      <button class="tab" type="button" role="tab" id="tab-meetings" aria-controls="panel-meetings" aria-selected="true">Meetings</button>
+      <button class="tab" type="button" role="tab" id="tab-todos" aria-controls="panel-todos" aria-selected="false" tabindex="-1">Todos</button>
+    </div>
     <p class="notebook__count" id="meeting-count"></p>
   </header>
-  <div class="notebook__body">
+  <div class="notebook__body" id="panel-meetings" role="tabpanel" aria-labelledby="tab-meetings">
     <nav class="sidebar" id="sidebar" aria-label="Meetings"></nav>
     <main id="meeting-pane"></main>
   </div>
+  <section class="todos-view" id="panel-todos" role="tabpanel" aria-labelledby="tab-todos" hidden>
+    <div class="filter" id="todo-filter" role="group" aria-label="Show todos"></div>
+    <div id="todos-list"></div>
+  </section>
 </div>
 <script>
 (function scribeNotebook() {
@@ -732,6 +877,24 @@ select {
   const TODO_READ_ONLY_REASON = "You can view this notebook but not tick todos.";
   const TODO_NOT_SAVED_MESSAGE = "Couldn't save that change. Try again.";
   const TODO_READ_ONLY_REASON_ID = "todo-read-only-reason";
+  const TODOS_TAB_LABEL = "Todos";
+  const NO_TODOS_MESSAGE = { open: "No open todos", done: "No done todos", all: "No todos yet" };
+  const GROUP_HEADINGS = { mine: "Mine", others: "Waiting on others", unassigned: "Unassigned" };
+  const FILTER_STORAGE_KEY = "scribe-notebook-todo-filter";
+  const MEETING_GONE_MESSAGE = "That meeting is no longer in the notebook";
+  const TODO_HIGHLIGHT_MILLISECONDS = 2000;
+  const MY_OWNER_NAME = "Me";
+  const UNASSIGNED_OWNER_NAMES = ["", "unassigned"];
+  const TAB_NAMES = ["meetings", "todos"];
+  const MEETING_SCOPE = "meeting";
+  const TODOS_SCOPE = "todos";
+  const TODOS_TAB_READ_ONLY_REASON_ID = "todos-tab-read-only-reason";
+  const TODO_FILTERS = {
+    open: { label: "Open", matches: (todo) => !todo.done },
+    done: { label: "Done", matches: (todo) => todo.done },
+    all: { label: "All", matches: () => true }
+  };
+  const DEFAULT_TODO_FILTER = "open";
   const DATABASE_UNAVAILABLE_MESSAGE = "This notebook needs Claude to load. Open it on claude.ai while signed in.";
 
   const COLLECTIONS = { meetings: "meetings", meetingIndex: "meeting_index", todos: "todos" };
@@ -798,9 +961,13 @@ select {
 
   const UNKNOWN_START = Number.MIN_SAFE_INTEGER;
 
-  function startTime(summary) {
-    const time = new Date(summary.started_at).getTime();
+  function timeOf(isoText) {
+    const time = new Date(isoText).getTime();
     return Number.isNaN(time) ? UNKNOWN_START : time;
+  }
+
+  function startTime(summary) {
+    return timeOf(summary.started_at);
   }
 
   function compareNewestFirst(left, right) {
@@ -832,6 +999,68 @@ select {
     return todos
       .filter((todo) => todo.meeting_id === meeting.id)
       .sort((left, right) => position(left) - position(right) || naturalOrder(left.todo_id, right.todo_id));
+  }
+
+  function ownerGroupOf(owner) {
+    const name = owner.trim();
+    if (name === MY_OWNER_NAME) {
+      return "mine";
+    }
+    return UNASSIGNED_OWNER_NAMES.includes(name.toLowerCase()) ? "unassigned" : "others";
+  }
+
+  function compareNewestMeetingFirst(left, right) {
+    return (
+      timeOf(right.meeting_started_at) - timeOf(left.meeting_started_at) ||
+      naturalOrder(right.meeting_id, left.meeting_id) ||
+      naturalOrder(left.todo_id, right.todo_id)
+    );
+  }
+
+  function orderTodosNewestMeetingFirst(todos) {
+    return [...todos].sort(compareNewestMeetingFirst);
+  }
+
+  function filterTodos(todos, filter) {
+    return todos.filter(TODO_FILTERS[filter].matches);
+  }
+
+  function countOpenTodos(todos) {
+    return filterTodos(todos, "open").length;
+  }
+
+  function groupByOwnerName(todos) {
+    const byName = new Map();
+    todos.forEach((todo) => {
+      const name = todo.owner.trim();
+      byName.set(name, [...(byName.get(name) ?? []), todo]);
+    });
+    return [...byName]
+      .sort(([left], [right]) => naturalOrder(left, right))
+      .map(([owner, ownedTodos]) => ({ owner, todos: ownedTodos }));
+  }
+
+  function groupTodosByOwner(todos) {
+    const byGroup = { mine: [], others: [], unassigned: [] };
+    todos.forEach((todo) => byGroup[ownerGroupOf(todo.owner)].push(todo));
+    return { mine: byGroup.mine, others: groupByOwnerName(byGroup.others), unassigned: byGroup.unassigned };
+  }
+
+  function readTodoFilter() {
+    try {
+      const stored = window.localStorage.getItem(FILTER_STORAGE_KEY);
+      return Object.hasOwn(TODO_FILTERS, stored) ? stored : DEFAULT_TODO_FILTER;
+    } catch (error) {
+      return DEFAULT_TODO_FILTER;
+    }
+  }
+
+  function saveTodoFilter(filter) {
+    try {
+      window.localStorage.setItem(FILTER_STORAGE_KEY, filter);
+    } catch (error) {
+      return;
+    }
   }
 
   async function useCapability(name) {
@@ -1000,7 +1229,7 @@ select {
       renderSpeakers(meeting.speakers),
       renderSummary(meeting.summary),
       renderBlocks(meeting.blocks),
-      renderTodos(meeting, todos)
+      renderTodos(todos)
     );
     showInPane(article);
   }
@@ -1262,12 +1491,12 @@ select {
     return typeof action.label === "string" && action.label !== "" && typeof action.prompt === "string" && action.prompt !== "";
   }
 
-  function renderActions(meeting, todo) {
+  function renderActions(todo, scope) {
     const wrapper = element("div", "todo__actions-group");
     const actions = element("div", "todo__actions");
     const output = element("div", "action-output");
     output.setAttribute("aria-live", "polite");
-    const reasonId = "reason-" + meeting.id + "-" + todo.todo_id;
+    const reasonId = [scope, "reason", todo.id].join("-");
     todo.actions.filter(isRunnableAction).forEach((action) => actions.append(buildActionButton(action, output, reasonId)));
     wrapper.append(actions);
     if (!canAskClaude() && actions.children.length > 0) {
@@ -1279,7 +1508,7 @@ select {
     return wrapper;
   }
 
-  function renderTodo(meeting, todo) {
+  function renderTodo(todo, scope) {
     const item = element("li", "item" + (todo.owner === "Me" ? " line--me" : ""));
     const body = element("div", "todo");
     const choice = element("label", "todo__choice");
@@ -1292,15 +1521,15 @@ select {
     const notSaved = element("p", "todo__error");
     notSaved.setAttribute("role", "alert");
     choice.append(checkbox, element("span", "todo__text", todo.text));
-    body.append(choice, notSaved, element("p", "todo__meta", describeTodo(todo)), renderActions(meeting, todo));
+    body.append(choice, notSaved, element("p", "todo__meta", describeTodo(todo)), renderActions(todo, scope));
     item.append(body);
     return item;
   }
 
-  function renderTodos(meeting, todos) {
+  function renderTodos(todos) {
     const panel = element("section", "panel panel--todos");
     const list = element("ul", "item-list");
-    todos.forEach((todo) => list.append(renderTodo(meeting, todo)));
+    todos.forEach((todo) => list.append(renderTodo(todo, MEETING_SCOPE)));
     panel.append(element("h3", "panel__heading", "Todos"), list);
     if (state.canWriteTodos === false) {
       lockReadOnlyChecks(panel, TODO_READ_ONLY_REASON_ID);
@@ -1322,18 +1551,17 @@ select {
     return Array.from(root.querySelectorAll(".todo__checkbox"));
   }
 
-  function checkboxOfTodo(root, todoDocId) {
-    return todoCheckboxes(root).find((checkbox) => checkbox.dataset.todoDocId === todoDocId);
+  function checkboxesOfTodo(root, todoDocId) {
+    return todoCheckboxes(root).filter((checkbox) => checkbox.dataset.todoDocId === todoDocId);
   }
 
   function patchTodoChecks(root, todos) {
     todos
       .filter((todo) => !state.pendingTicks.has(todo.id))
       .forEach((todo) => {
-        const checkbox = checkboxOfTodo(root, todo.id);
-        if (checkbox) {
+        checkboxesOfTodo(root, todo.id).forEach((checkbox) => {
           checkbox.checked = todo.done;
-        }
+        });
       });
   }
 
@@ -1345,6 +1573,9 @@ select {
   async function toggleTodoDone(todoDocId, done) {
     const isWriteInFlight = state.pendingTicks.has(todoDocId);
     state.pendingTicks.set(todoDocId, done);
+    checkboxesOfTodo(document, todoDocId).forEach((checkbox) => {
+      checkbox.checked = done;
+    });
     showTickMessage(todoDocId, "");
     if (!isWriteInFlight) {
       await flushTick(todoDocId);
@@ -1367,22 +1598,20 @@ select {
   }
 
   function undoTick(todoDocId) {
-    const checkbox = checkboxOfTodo(document, todoDocId);
-    if (checkbox) {
+    checkboxesOfTodo(document, todoDocId).forEach((checkbox) => {
       checkbox.checked = todoDoneState(state.todos, todoDocId);
-    }
+    });
     showTickMessage(todoDocId, TODO_NOT_SAVED_MESSAGE);
   }
 
   function showTickMessage(todoDocId, message) {
-    const notSaved = checkboxOfTodo(document, todoDocId)?.closest(".todo")?.querySelector(".todo__error");
-    if (notSaved) {
-      notSaved.textContent = message;
-    }
+    checkboxesOfTodo(document, todoDocId).forEach((checkbox) => {
+      checkbox.closest(".todo").querySelector(".todo__error").textContent = message;
+    });
   }
 
-  function replaceTodoPanel(meeting, todos) {
-    document.querySelector("#meeting-pane .panel--todos")?.replaceWith(renderTodos(meeting, todos));
+  function replaceTodoPanel(todos) {
+    document.querySelector("#meeting-pane .panel--todos")?.replaceWith(renderTodos(todos));
   }
 
   function logFailure(error) {
@@ -1394,6 +1623,9 @@ select {
     summaries: [],
     selectedId: null,
     selectedMeeting: null,
+    resolveMeetingShown: null,
+    activeTab: "meetings",
+    todoFilter: DEFAULT_TODO_FILTER,
     todos: [],
     canWriteTodos: null,
     pendingTicks: new Map(),
@@ -1413,6 +1645,7 @@ select {
     state.canWriteTodos = await resolveCanWriteTodos();
     state.askClaude = await resolveAskClaude();
     refreshSelectedTodos();
+    renderTodosList();
   }
 
   function showSummaries(summaries) {
@@ -1448,16 +1681,25 @@ select {
       return;
     }
     state.selectedMeeting = meeting;
-    if (!meeting) {
+    if (meeting) {
+      renderMeeting(meeting, todosOfMeeting(state.todos, meeting));
+    } else {
       showInPane();
-      return;
     }
-    renderMeeting(meeting, todosOfMeeting(state.todos, meeting));
+    settleMeetingShown(meeting);
+  }
+
+  function settleMeetingShown(meeting) {
+    const resolveShown = state.resolveMeetingShown;
+    state.resolveMeetingShown = null;
+    resolveShown?.(meeting);
   }
 
   function showTodos(todos) {
     state.todos = todos;
+    updateTodosTabCount(countOpenTodos(todos));
     syncSelectedTodos();
+    syncTodosList();
   }
 
   function syncSelectedTodos() {
@@ -1475,8 +1717,191 @@ select {
 
   function refreshSelectedTodos() {
     if (state.selectedMeeting) {
-      replaceTodoPanel(state.selectedMeeting, todosOfMeeting(state.todos, state.selectedMeeting));
+      replaceTodoPanel(todosOfMeeting(state.todos, state.selectedMeeting));
     }
+  }
+
+  function visibleTodos() {
+    return filterTodos(orderTodosNewestMeetingFirst(state.todos), state.todoFilter);
+  }
+
+  function updateTodosTabCount(openCount) {
+    document.getElementById("tab-todos").textContent = TODOS_TAB_LABEL + " (" + openCount + ")";
+  }
+
+  function syncTodosList() {
+    const list = document.getElementById("todos-list");
+    const todos = visibleTodos();
+    if (showsExactly(list, todos)) {
+      patchTodoChecks(list, todos);
+      return;
+    }
+    renderTodosList();
+  }
+
+  function renderTodosList() {
+    const todos = visibleTodos();
+    const list = document.getElementById("todos-list");
+    const heading = element("h2", "panel__heading visually-hidden", TODOS_TAB_LABEL);
+    const content = todos.length === 0 ? [renderNoTodos()] : renderOwnerGroups(groupTodosByOwner(todos));
+    const groups = element("div", "todos-list");
+    groups.append(heading, ...content);
+    list.replaceChildren(groups);
+    if (state.canWriteTodos === false) {
+      lockReadOnlyChecks(list, TODOS_TAB_READ_ONLY_REASON_ID);
+    }
+  }
+
+  function renderNoTodos() {
+    return element("p", "empty__body", NO_TODOS_MESSAGE[state.todoFilter]);
+  }
+
+  function renderOwnerGroups(grouped) {
+    return [
+      { heading: GROUP_HEADINGS.mine, todos: grouped.mine, owners: [] },
+      { heading: GROUP_HEADINGS.others, todos: grouped.others.flatMap(({ todos }) => todos), owners: grouped.others },
+      { heading: GROUP_HEADINGS.unassigned, todos: grouped.unassigned, owners: [] }
+    ]
+      .filter((group) => group.todos.length > 0)
+      .map(renderTodoGroup);
+  }
+
+  function renderTodoGroup({ heading, todos, owners }) {
+    const group = element("section", "todo-group");
+    group.append(element("h3", "todo-group__heading", heading + " (" + todos.length + ")"));
+    if (owners.length === 0) {
+      group.append(renderTodoItems(todos));
+    }
+    owners.forEach((owned) => {
+      group.append(element("h4", "todo-group__owner", owned.owner + " (" + owned.todos.length + ")"), renderTodoItems(owned.todos));
+    });
+    return group;
+  }
+
+  function renderTodoItems(todos) {
+    const list = element("ul", "item-list");
+    todos.forEach((todo) => {
+      const item = renderTodo(todo, TODOS_SCOPE);
+      item.querySelector(".todo").append(renderTodoMeetingLink(todo));
+      list.append(item);
+    });
+    return list;
+  }
+
+  function renderTodoMeetingLink(todo) {
+    const wrapper = element("p", "todo__meeting");
+    const link = element("a", "todo__meeting-link", meetingLinkText(todo));
+    const problem = element("span", "todo__error");
+    problem.setAttribute("role", "alert");
+    link.href = "#";
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      openTodoInMeeting(todo, problem);
+    });
+    wrapper.append(link, problem);
+    return wrapper;
+  }
+
+  function meetingLinkText(todo) {
+    return [meetingTitle({ title: todo.meeting_title }), formatStart(todo.meeting_started_at)].filter(Boolean).join(" · ");
+  }
+
+  function showMeetingNow(meetingId) {
+    if (state.selectedId === meetingId && state.selectedMeeting) {
+      return Promise.resolve(state.selectedMeeting);
+    }
+    return new Promise((resolve) => {
+      state.resolveMeetingShown = resolve;
+      selectMeeting(meetingId);
+    });
+  }
+
+  async function openTodoInMeeting(todo, problem) {
+    problem.textContent = "";
+    const meeting = await showMeetingNow(todo.meeting_id);
+    if (!meeting) {
+      problem.textContent = MEETING_GONE_MESSAGE;
+      followSelection(selectionWithin(state.summaries, state.selectedId));
+      return;
+    }
+    activateTab("meetings", false);
+    highlightTodo(todo.id);
+  }
+
+  function highlightTodo(todoDocId) {
+    const checkbox = checkboxesOfTodo(document.getElementById("panel-meetings"), todoDocId)[0];
+    if (!checkbox) {
+      return;
+    }
+    const highlighted = checkbox.closest(".todo");
+    highlighted.classList.add("todo--highlight");
+    highlighted.scrollIntoView({ block: "center" });
+    checkbox.focus();
+    window.setTimeout(() => highlighted.classList.remove("todo--highlight"), TODO_HIGHLIGHT_MILLISECONDS);
+  }
+
+  function activateTab(tabName, shouldFocus) {
+    state.activeTab = tabName;
+    TAB_NAMES.forEach((name) => {
+      const isActive = name === tabName;
+      const tab = document.getElementById("tab-" + name);
+      tab.setAttribute("aria-selected", String(isActive));
+      tab.tabIndex = isActive ? 0 : -1;
+      document.getElementById("panel-" + name).hidden = !isActive;
+    });
+    if (shouldFocus) {
+      document.getElementById("tab-" + tabName).focus();
+    }
+  }
+
+  function tabForKey(currentTab, key) {
+    const index = TAB_NAMES.indexOf(currentTab);
+    const last = TAB_NAMES.length - 1;
+    const targets = {
+      ArrowRight: TAB_NAMES[(index + 1) % TAB_NAMES.length],
+      ArrowLeft: TAB_NAMES[(index + last) % TAB_NAMES.length],
+      Home: TAB_NAMES[0],
+      End: TAB_NAMES[last]
+    };
+    return Object.hasOwn(targets, key) ? targets[key] : null;
+  }
+
+  function wireTabs() {
+    TAB_NAMES.forEach((name) => {
+      document.getElementById("tab-" + name).addEventListener("click", () => activateTab(name, false));
+    });
+    document.getElementById("tabs").addEventListener("keydown", (event) => {
+      const target = tabForKey(state.activeTab, event.key);
+      if (target) {
+        event.preventDefault();
+        activateTab(target, true);
+      }
+    });
+  }
+
+  function renderTodoFilter() {
+    const group = document.getElementById("todo-filter");
+    Object.entries(TODO_FILTERS).forEach(([name, { label }]) => {
+      const button = element("button", "filter__option", label);
+      button.type = "button";
+      button.dataset.filter = name;
+      button.addEventListener("click", () => chooseTodoFilter(name));
+      group.append(button);
+    });
+    markTodoFilter(state.todoFilter);
+  }
+
+  function markTodoFilter(current) {
+    document.querySelectorAll(".filter__option").forEach((button) => {
+      button.setAttribute("aria-pressed", String(button.dataset.filter === current));
+    });
+  }
+
+  function chooseTodoFilter(filter) {
+    state.todoFilter = filter;
+    saveTodoFilter(filter);
+    markTodoFilter(filter);
+    renderTodosList();
   }
 
   function showFailure(error) {
@@ -1504,6 +1929,10 @@ select {
     }
   }
 
+  state.todoFilter = readTodoFilter();
+  wireTabs();
+  renderTodoFilter();
+  renderTodosList();
   start().catch(showFailure);
 })();
 </script>

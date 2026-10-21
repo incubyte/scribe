@@ -269,15 +269,15 @@ The header gains two tabs, Meetings and Todos, with the open-todo count on the T
 
 **Acceptance criteria**
 
-- [ ] **5.5.1** The header shows Meetings and Todos tabs as an accessible tab list; the Todos tab label carries the number of open todos across all meetings.
-- [ ] **5.5.2** The Todos tab groups todos as Mine (owner `Me`), Waiting on others (named owners, one sub-group per name in alphabetical order) and Unassigned, each with its count; an empty group is not shown.
-- [ ] **5.5.3** Inside each group, todos from the newest meeting come first, then by their order within the meeting.
-- [ ] **5.5.4** The filter defaults to Open and offers Done and All; the choice is remembered for this viewer on this device.
-- [ ] **5.5.5** Each todo shows its text, due phrase when present, its AI actions and its meeting's title and date as a link.
-- [ ] **5.5.6** Following the meeting link opens the Meetings tab on that meeting, including one not yet loaded in the list, scrolls its todo into view, highlights it briefly and moves keyboard focus to its checkbox.
-- [ ] **5.5.7** Ticking or unticking a todo in either tab updates the other tab and the open count without a reload.
-- [ ] **5.5.8** With no todos matching the filter, the tab says so in one line ("No open todos").
-- [ ] **5.5.9** Under 640px wide, the tabs stay in the header and the todo list uses the full width.
+- [x] **5.5.1** The header shows Meetings and Todos tabs as an accessible tab list; the Todos tab label carries the number of open todos across all meetings.
+- [x] **5.5.2** The Todos tab groups todos as Mine (owner `Me`), Waiting on others (named owners, one sub-group per name in alphabetical order) and Unassigned, each with its count; an empty group is not shown.
+- [x] **5.5.3** Inside each group, todos from the newest meeting come first, then by their order within the meeting.
+- [x] **5.5.4** The filter defaults to Open and offers Done and All; the choice is remembered for this viewer on this device.
+- [x] **5.5.5** Each todo shows its text, due phrase when present, its AI actions and its meeting's title and date as a link.
+- [x] **5.5.6** Following the meeting link opens the Meetings tab on that meeting, including one not yet loaded in the list, scrolls its todo into view, highlights it briefly and moves keyboard focus to its checkbox.
+- [x] **5.5.7** Ticking or unticking a todo in either tab updates the other tab and the open count without a reload.
+- [x] **5.5.8** With no todos matching the filter, the tab says so in one line ("No open todos").
+- [x] **5.5.9** Under 640px wide, the tabs stay in the header and the todo list uses the full width.
 
 ### 5.6 Show older meetings 20 at a time
 
