@@ -69,3 +69,42 @@ fn losing_focus_after_the_folder_picker_closes_hides_the_popover_again() {
 
     assert!(guard.blur_should_hide(opened + Duration::from_secs(5)));
 }
+
+#[test]
+fn a_popover_opened_for_a_call_stays_open_when_focus_goes_elsewhere() {
+    let opened = Instant::now();
+    let mut guard = BlurGuard::default();
+    guard.shown_awaiting_focus(opened);
+
+    assert!(!guard.blur_should_hide(opened + Duration::from_secs(60)));
+}
+
+#[test]
+fn focus_arriving_straight_after_a_call_opened_the_popover_does_not_make_it_hide_on_blur() {
+    let opened = Instant::now();
+    let mut guard = BlurGuard::default();
+    guard.shown_awaiting_focus(opened);
+    guard.focused(opened + Duration::from_millis(50));
+
+    assert!(!guard.blur_should_hide(opened + Duration::from_secs(60)));
+}
+
+#[test]
+fn clicking_away_from_a_call_opened_popover_hides_it_once_it_was_clicked_into() {
+    let opened = Instant::now();
+    let mut guard = BlurGuard::default();
+    guard.shown_awaiting_focus(opened);
+    guard.focused(opened + Duration::from_secs(10));
+
+    assert!(guard.blur_should_hide(opened + Duration::from_secs(20)));
+}
+
+#[test]
+fn opening_from_the_tray_after_a_call_opened_popover_hides_on_blur_as_before() {
+    let opened = Instant::now();
+    let mut guard = BlurGuard::default();
+    guard.shown_awaiting_focus(opened);
+    guard.shown(opened + Duration::from_secs(30));
+
+    assert!(guard.blur_should_hide(opened + Duration::from_secs(40)));
+}

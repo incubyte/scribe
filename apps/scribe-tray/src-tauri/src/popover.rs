@@ -8,6 +8,11 @@ use crate::blur_guard::BlurGuard;
 
 const WINDOW_LABEL: &str = "popover";
 
+#[cfg(target_os = "macos")]
+const FALLBACK_POSITION: Position = Position::TopRight;
+#[cfg(not(target_os = "macos"))]
+const FALLBACK_POSITION: Position = Position::BottomRight;
+
 pub fn toggle<R: Runtime>(app: &AppHandle<R>) {
     let Some(window) = app.get_webview_window(WINDOW_LABEL) else {
         tracing::error!("the popover window is not configured");
@@ -20,15 +25,35 @@ pub fn toggle<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
+#[allow(dead_code)]
+pub fn open_for_call<R: Runtime>(app: &AppHandle<R>) {
+    let window = match popover_window(app) {
+        Ok(window) => window,
+        Err(error) => {
+            tracing::error!(%error, "the popover window is not configured");
+            return;
+        }
+    };
+    if window.is_visible().unwrap_or(false) {
+        return;
+    }
+    log_failure(place_at_tray(&window), "could not place the popover");
+    if window.show().is_err() {
+        tracing::warn!("could not show the popover for a call");
+        return;
+    }
+    with_guard(app, |guard| guard.shown_awaiting_focus(Instant::now()));
+}
+
 pub fn install_blur_hide<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
     app.manage(Mutex::new(BlurGuard::default()));
     let window = popover_window(app)?;
     let handle = app.clone();
     let target = window.clone();
-    window.on_window_event(move |event| {
-        if matches!(event, WindowEvent::Focused(false)) {
-            hide_after_blur(&handle, &target);
-        }
+    window.on_window_event(move |event| match event {
+        WindowEvent::Focused(false) => hide_after_blur(&handle, &target),
+        WindowEvent::Focused(true) => with_guard(&handle, |guard| guard.focused(Instant::now())),
+        _ => {}
     });
     Ok(())
 }
@@ -51,11 +76,17 @@ pub fn keep_open_during<R: Runtime, T>(app: &AppHandle<R>, show_dialog: impl FnO
 }
 
 fn show<R: Runtime>(app: &AppHandle<R>, window: &WebviewWindow<R>) -> tauri::Result<()> {
-    window.move_window_constrained(Position::TrayCenter)?;
+    log_failure(place_at_tray(window), "could not place the popover");
     window.show()?;
     window.set_focus()?;
     with_guard(app, |guard| guard.shown(Instant::now()));
     Ok(())
+}
+
+fn place_at_tray<R: Runtime>(window: &WebviewWindow<R>) -> tauri::Result<()> {
+    window
+        .move_window_constrained(Position::TrayCenter)
+        .or_else(|_| window.move_window(FALLBACK_POSITION))
 }
 
 fn hide_after_blur<R: Runtime>(app: &AppHandle<R>, window: &WebviewWindow<R>) {
