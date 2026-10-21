@@ -157,13 +157,13 @@ The owner opens the notebook and sees the same layout as today, a meeting list b
 
 **Acceptance criteria**
 
-- [ ] **5.1.1** The page lists every meeting record newest first by start time and selects the newest on open.
-- [ ] **5.1.2** The selected meeting shows its speakers, summary, every supported block kind and its todos, matching today's rendering of the same data.
-- [ ] **5.1.3** A meeting record created or replaced while the page is open appears or updates in the list within one refresh cycle, without a reload, and the selection is kept.
-- [ ] **5.1.4** With no meeting records, the page shows "No meetings yet" and how to add one.
-- [ ] **5.1.5** When the database is unavailable to this view, the page shows a one-line explanation and no meeting list, and logs no uncaught errors.
-- [ ] **5.1.6** Every piece of record text is rendered as text; a record whose text contains markup shows the markup literally.
-- [ ] **5.1.7** AI action buttons run through the page's ask-Claude capability and stay disabled, with the existing one-line reason, when it is unavailable.
+- [x] **5.1.1** The page lists every meeting record newest first by start time and selects the newest on open.
+- [x] **5.1.2** The selected meeting shows its speakers, summary, every supported block kind and its todos, matching today's rendering of the same data.
+- [x] **5.1.3** A meeting record created or replaced while the page is open appears or updates in the list within one refresh cycle, without a reload, and the selection is kept.
+- [x] **5.1.4** With no meeting records, the page shows "No meetings yet" and how to add one.
+- [x] **5.1.5** When the database is unavailable to this view, the page shows a one-line explanation and no meeting list, and logs no uncaught errors.
+- [x] **5.1.6** Every piece of record text is rendered as text; a record whose text contains markup shows the markup literally.
+- [x] **5.1.7** AI action buttons run through the page's ask-Claude capability and stay disabled, with the existing one-line reason, when it is unavailable.
 
 ### 5.2 Add a meeting to the one notebook from any chat
 

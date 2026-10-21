@@ -4,7 +4,11 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   plugins: [react()],
   clearScreen: false,
-  server: { port: 1420, strictPort: true },
+  server: {
+    port: 1420,
+    strictPort: true,
+    fs: { allow: [".", "../../plugins/scribe/skills/meeting-notes"] },
+  },
   build: { target: "es2022" },
   test: {
     environment: "jsdom",

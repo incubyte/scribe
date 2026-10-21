@@ -1,7 +1,7 @@
 {
   "name": "scribe",
   "displayName": "Scribe",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Recap your recent calls and write meeting notes from Scribe's local transcripts.",
   "author": {
     "name": "Incubyte"

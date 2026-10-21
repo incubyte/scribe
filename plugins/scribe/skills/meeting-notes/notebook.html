@@ -661,545 +661,672 @@ select {
     <main id="meeting-pane"></main>
   </div>
 </div>
-<script type="application/json" id="scribe-meetings">[]</script>
 <script>
-const FALLBACK_MEETING_TYPE = "Meeting";
+(function scribeNotebook() {
+  const FALLBACK_MEETING_TYPE = "Meeting";
+  const AI_UNAVAILABLE_REASON = "AI actions need Claude web or Desktop on a paid plan.";
+  const ACTION_FAILED_MESSAGE = "Couldn't run this action. Try again.";
+  const WORKING_LABEL = "Working…";
+  const UNTITLED_MEETING = "Untitled meeting";
+  const NO_MEETINGS_TITLE = "No meetings yet";
+  const NO_MEETINGS_HINT = "Run /meeting-notes in Claude to add your first meeting.";
+  const DATABASE_UNAVAILABLE_MESSAGE = "This notebook needs Claude to load. Open it on claude.ai while signed in.";
 
-const AI_UNAVAILABLE_REASON = "AI actions need Claude web or Desktop on a paid plan.";
-const ACTION_FAILED_MESSAGE = "Couldn't run this action. Try again.";
-const WORKING_LABEL = "Working…";
-const UNTITLED_MEETING = "Untitled meeting";
+  const COLLECTIONS = { meetings: "meetings", meetingIndex: "meeting_index", todos: "todos" };
 
-const state = { meetings: [], selectedId: null, ticked: new Map(), askClaude: null };
-
-function element(tagName, className, text) {
-  const node = document.createElement(tagName);
-  if (className) {
-    node.className = className;
+  function records(list) {
+    return Array.isArray(list) ? list.filter((entry) => entry !== null && typeof entry === "object") : [];
   }
-  if (text !== undefined) {
-    node.textContent = text;
+
+  function strings(list) {
+    return Array.isArray(list) ? list.filter((entry) => typeof entry === "string") : [];
   }
-  return node;
-}
 
-function records(list) {
-  return Array.isArray(list) ? list.filter((entry) => entry !== null && typeof entry === "object") : [];
-}
-
-function meetingTitle(meeting) {
-  return typeof meeting.title === "string" && meeting.title.trim() ? meeting.title : UNTITLED_MEETING;
-}
-
-function readMeetings() {
-  const island = document.getElementById("scribe-meetings");
-  try {
-    return records(JSON.parse(island.textContent));
-  } catch (error) {
-    return [];
+  function textOf(value) {
+    return typeof value === "string" ? value : "";
   }
-}
 
-function formatStart(startedAt) {
-  const date = new Date(startedAt);
-  if (Number.isNaN(date.getTime())) {
-    return "";
+  function numberOrNull(value) {
+    return typeof value === "number" ? value : null;
   }
-  return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-}
 
-function formatDuration(durationSeconds) {
-  if (typeof durationSeconds !== "number") {
-    return "";
+  function bodyOf(snapshot) {
+    const body = snapshot.data();
+    return body !== null && typeof body === "object" ? body : {};
   }
-  const minutes = Math.max(1, Math.round(durationSeconds / 60));
-  return minutes + " min";
-}
 
-function formatWhen(meeting) {
-  return [formatStart(meeting.started_at), formatDuration(meeting.duration_seconds)]
-    .filter(Boolean)
-    .join(" · ");
-}
-
-function renderMeetingList(meetings, selectedId) {
-  const sidebar = document.getElementById("sidebar");
-  sidebar.replaceChildren();
-  if (meetings.length === 0) {
-    return;
+  function asMeetingSummary(snapshot) {
+    const body = bodyOf(snapshot);
+    return {
+      id: snapshot.id,
+      title: textOf(body.title),
+      started_at: textOf(body.started_at),
+      duration_seconds: numberOrNull(body.duration_seconds),
+      type: textOf(body.type)
+    };
   }
-  sidebar.append(
-    element("h2", "sidebar__heading", "Meetings"),
-    buildMeetingSelect(meetings, selectedId),
-    buildMeetingButtons(meetings, selectedId)
-  );
-}
 
-function buildMeetingSelect(meetings, selectedId) {
-  const wrapper = element("div");
-  const label = element("label", "visually-hidden", "Choose a meeting");
-  label.htmlFor = "meeting-select";
-  const select = element("select", "sidebar__select");
-  select.id = "meeting-select";
-  meetings.forEach((meeting) => {
+  function asMeeting(snapshot) {
+    const body = bodyOf(snapshot);
+    return {
+      ...asMeetingSummary(snapshot),
+      summary: textOf(body.summary),
+      speakers: records(body.speakers),
+      blocks: records(body.blocks),
+      todo_ids: strings(body.todo_ids)
+    };
+  }
+
+  function asTodo(snapshot) {
+    const body = bodyOf(snapshot);
+    return {
+      id: snapshot.id,
+      meeting_id: textOf(body.meeting_id),
+      meeting_title: textOf(body.meeting_title),
+      meeting_started_at: textOf(body.meeting_started_at),
+      todo_id: textOf(body.todo_id),
+      text: textOf(body.text),
+      owner: textOf(body.owner),
+      due: textOf(body.due),
+      actions: records(body.actions),
+      done: body.done === true,
+      done_at: textOf(body.done_at) || null
+    };
+  }
+
+  const UNKNOWN_START = Number.MIN_SAFE_INTEGER;
+
+  function startTime(summary) {
+    const time = new Date(summary.started_at).getTime();
+    return Number.isNaN(time) ? UNKNOWN_START : time;
+  }
+
+  function compareNewestFirst(left, right) {
+    return startTime(right) - startTime(left) || naturalOrder(right.id, left.id);
+  }
+
+  function orderNewestFirst(summaries) {
+    return [...summaries].sort(compareNewestFirst);
+  }
+
+  function selectionWithin(summaries, selectedId) {
+    if (summaries.some((summary) => summary.id === selectedId)) {
+      return selectedId;
+    }
+    return summaries[0]?.id ?? null;
+  }
+
+  function naturalOrder(left, right) {
+    return left.localeCompare(right, undefined, { numeric: true });
+  }
+
+  function listedPosition(todoIds, todoId) {
+    const index = todoIds.indexOf(todoId);
+    return index === -1 ? todoIds.length : index;
+  }
+
+  function todosOfMeeting(todos, meeting) {
+    const position = (todo) => listedPosition(meeting.todo_ids, todo.todo_id);
+    return todos
+      .filter((todo) => todo.meeting_id === meeting.id)
+      .sort((left, right) => position(left) - position(right) || naturalOrder(left.todo_id, right.todo_id));
+  }
+
+  async function useCapability(name) {
+    if (typeof window.claude?.use !== "function") {
+      return null;
+    }
+    try {
+      return await window.claude.use(name);
+    } catch (error) {
+      logFailure(error);
+      return null;
+    }
+  }
+
+  async function resolveNotebookStore() {
+    const db = await useCapability("db");
+    return db ? createNotebookStore(db) : null;
+  }
+
+  function createNotebookStore(db) {
+    return {
+      watchMeetingIndex: (onChange, onError) =>
+        db.collection(COLLECTIONS.meetingIndex).onSnapshot((snapshot) => onChange(snapshot.docs.map(asMeetingSummary)), onError),
+      watchMeeting: (meetingId, onChange, onError) =>
+        db.collection(COLLECTIONS.meetings).doc(meetingId).onSnapshot((snapshot) => onChange(snapshot.exists ? asMeeting(snapshot) : null), onError),
+      watchTodos: (onChange, onError) =>
+        db.collection(COLLECTIONS.todos).onSnapshot((snapshot) => onChange(snapshot.docs.map(asTodo)), onError)
+    };
+  }
+
+  async function resolveAskClaude() {
+    const sample = await useCapability("sample");
+    return typeof sample === "function" ? (prompt) => sample(prompt) : null;
+  }
+
+  function completionText(completion) {
+    const text = completion?.text;
+    return typeof text === "string" ? text : "";
+  }
+
+  function element(tagName, className, text) {
+    const node = document.createElement(tagName);
+    if (className) {
+      node.className = className;
+    }
+    if (text !== undefined) {
+      node.textContent = text;
+    }
+    return node;
+  }
+
+  function meetingTitle(meeting) {
+    return typeof meeting.title === "string" && meeting.title.trim() ? meeting.title : UNTITLED_MEETING;
+  }
+
+  function formatStart(startedAt) {
+    const date = new Date(startedAt);
+    if (Number.isNaN(date.getTime())) {
+      return "";
+    }
+    return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  }
+
+  function formatDuration(durationSeconds) {
+    if (typeof durationSeconds !== "number") {
+      return "";
+    }
+    const minutes = Math.max(1, Math.round(durationSeconds / 60));
+    return minutes + " min";
+  }
+
+  function formatWhen(meeting) {
+    return [formatStart(meeting.started_at), formatDuration(meeting.duration_seconds)]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  function renderMeetingCount(count) {
+    document.getElementById("meeting-count").textContent = count === 1 ? "1 meeting" : count + " meetings";
+  }
+
+  function clearMeetingCount() {
+    document.getElementById("meeting-count").textContent = "";
+  }
+
+  function patchMeetingList(summaries) {
+    const sidebar = document.getElementById("sidebar");
+    if (summaries.length === 0) {
+      sidebar.replaceChildren();
+      return;
+    }
+    if (!sidebar.querySelector(".meeting-list")) {
+      sidebar.replaceChildren(element("h2", "sidebar__heading", "Meetings"), buildMeetingSelect(), element("ul", "meeting-list"));
+    }
+    document.getElementById("meeting-select").replaceChildren(...summaries.map(buildMeetingOption));
+    sidebar.querySelector(".meeting-list").replaceChildren(...summaries.map(buildMeetingButton));
+  }
+
+  function buildMeetingSelect() {
+    const wrapper = element("div");
+    const label = element("label", "visually-hidden", "Choose a meeting");
+    label.htmlFor = "meeting-select";
+    const select = element("select", "sidebar__select");
+    select.id = "meeting-select";
+    select.addEventListener("change", () => selectMeeting(select.value));
+    wrapper.append(label, select);
+    return wrapper;
+  }
+
+  function buildMeetingOption(meeting) {
     const option = element("option", "", meetingTitle(meeting) + " (" + formatWhen(meeting) + ")");
     option.value = meeting.id;
-    option.selected = meeting.id === selectedId;
-    select.append(option);
-  });
-  select.addEventListener("change", () => selectMeeting(select.value).catch(logFailure));
-  wrapper.append(label, select);
-  return wrapper;
-}
+    return option;
+  }
 
-function buildMeetingButtons(meetings, selectedId) {
-  const list = element("ul", "meeting-list");
-  meetings.forEach((meeting) => {
+  function buildMeetingButton(meeting) {
     const item = element("li");
     const button = element("button", "session");
     button.type = "button";
     button.dataset.meetingId = meeting.id;
-    button.setAttribute("aria-current", String(meeting.id === selectedId));
+    button.setAttribute("aria-current", "false");
     button.append(element("span", "session__title", meetingTitle(meeting)), element("span", "session__meta", formatWhen(meeting)));
-    button.addEventListener("click", () => selectMeeting(meeting.id).catch(logFailure));
+    button.addEventListener("click", () => selectMeeting(meeting.id));
     item.append(button);
-    list.append(item);
-  });
-  return list;
-}
-
-function renderMeeting(meeting) {
-  const pane = document.getElementById("meeting-pane");
-  pane.replaceChildren();
-  if (!meeting) {
-    pane.append(renderEmptyState());
-    return;
+    return item;
   }
-  const article = element("article", "meeting");
-  article.append(
-    renderMeetingHeader(meeting),
-    renderSpeakers(records(meeting.speakers)),
-    renderSummary(meeting.summary),
-    renderBlocks(records(meeting.blocks)),
-    renderTodos(meeting)
-  );
-  pane.append(article);
-}
 
-function renderEmptyState() {
-  const empty = element("section", "empty");
-  empty.append(
-    element("h2", "empty__title", "No meetings yet"),
-    element("p", "empty__body", "Ask Claude for notes from a call and it will appear here.")
-  );
-  return empty;
-}
-
-function meetingTypeLabel(meeting) {
-  return typeof meeting.type === "string" && meeting.type.trim() ? meeting.type : FALLBACK_MEETING_TYPE;
-}
-
-function renderMeetingHeader(meeting) {
-  const header = element("header", "meeting__header");
-  const meta = element("p", "meeting__meta");
-  meta.append(element("span", "badge", meetingTypeLabel(meeting)));
-  meta.append(element("span", "", formatWhen(meeting)));
-  header.append(element("h2", "meeting__title", meetingTitle(meeting)), meta);
-  return header;
-}
-
-function renderSummary(summary) {
-  const panel = element("section", "panel");
-  panel.append(element("h3", "panel__heading", "Summary"), element("p", "panel__body", summary || ""));
-  return panel;
-}
-
-function speakerDisplayName(speaker) {
-  if (speaker.label === "Me") {
-    return "Me";
-  }
-  if (speaker.confidence === "unknown" || !speaker.name) {
-    return "Them";
-  }
-  return speaker.name;
-}
-
-function speakerConfidenceNote(speaker) {
-  if (speaker.label === "Me") {
-    return "";
-  }
-  if (speaker.confidence === "likely") {
-    return " (inferred)";
-  }
-  if (speaker.confidence === "stated") {
-    return " (named in the call)";
-  }
-  return " (one or more people)";
-}
-
-function renderSpeaker(speaker) {
-  const item = element("li", "speaker");
-  const details = element("details");
-  const summary = element("summary", "speaker__name", speakerDisplayName(speaker));
-  summary.append(element("span", "speaker__confidence", speakerConfidenceNote(speaker)));
-  details.append(summary);
-  if (speaker.evidence) {
-    details.append(element("p", "speaker__evidence", speaker.evidence));
-  }
-  item.append(details);
-  return item;
-}
-
-function renderSpeakers(speakers) {
-  const panel = element("section", "panel");
-  const list = element("ul", "speakers");
-  speakers.forEach((speaker) => list.append(renderSpeaker(speaker)));
-  panel.append(element("h3", "panel__heading", "Speakers"), list);
-  return panel;
-}
-
-function textOf(value) {
-  return typeof value === "string" ? value : "";
-}
-
-function labelledBlock(className, label, text) {
-  const block = element("p", "block " + className);
-  if (label) {
-    block.append(element("span", "block__label", label));
-  }
-  block.append(textOf(text));
-  return block;
-}
-
-function renderHeadingBlock(block) {
-  return element("h3", "block block--heading", textOf(block.text));
-}
-
-function renderParagraphBlock(block) {
-  return element("p", "block", textOf(block.text));
-}
-
-function renderListBlock(block) {
-  const list = element("ul", "block item-list");
-  (Array.isArray(block.items) ? block.items : []).filter((text) => typeof text === "string").forEach((text) => {
-    const item = element("li", "item");
-    item.append(element("span", "item__text", text));
-    list.append(item);
-  });
-  return list;
-}
-
-function renderDecisionBlock(block) {
-  const by = textOf(block.by);
-  return labelledBlock("block--decision", by ? "Decision · " + by : "Decision", block.text);
-}
-
-function renderMetricBlock(block) {
-  const metric = element("p", "block block--metric");
-  metric.append(element("span", "block__label", textOf(block.label)), element("span", "block__figure", textOf(block.value)));
-  if (textOf(block.note)) {
-    metric.append(element("span", "block__note", block.note));
-  }
-  return metric;
-}
-
-function renderQuoteBlock(block) {
-  const quote = element("blockquote", "block block--quote", textOf(block.text));
-  if (textOf(block.speaker)) {
-    quote.append(element("span", "block__label", "— " + block.speaker));
-  }
-  return quote;
-}
-
-function tableCells(row) {
-  return Array.isArray(row) ? row.map((cell) => (typeof cell === "string" || typeof cell === "number" ? String(cell) : "")) : [];
-}
-
-function appendCells(row, cellTag, cells) {
-  cells.forEach((cell) => row.append(element(cellTag, "", cell)));
-  return row;
-}
-
-function renderTableBlock(block) {
-  const columns = tableCells(block.columns);
-  const table = element("table", "block__table");
-  const head = element("thead");
-  head.append(appendCells(element("tr"), "th", columns));
-  const body = element("tbody");
-  (Array.isArray(block.rows) ? block.rows : []).filter(Array.isArray).forEach((row) => body.append(appendCells(element("tr"), "td", tableCells(row))));
-  table.append(head, body);
-  const scroller = element("div", "block block__table-scroll");
-  scroller.append(table);
-  return scroller;
-}
-
-function renderScreenBlock(block) {
-  const screen = element("p", "block block--screen");
-  screen.append(element("span", "offset-chip", textOf(block.offset)), element("span", "", "Screen: " + textOf(block.caption)));
-  return screen;
-}
-
-function renderCalloutBlock(block) {
-  const isRisk = block.tone === "risk";
-  return labelledBlock("block--callout" + (isRisk ? " block--risk" : ""), isRisk ? "Risk" : "Note", block.text);
-}
-
-const BLOCK_RENDERERS = {
-  heading: renderHeadingBlock,
-  paragraph: renderParagraphBlock,
-  list: renderListBlock,
-  decision: renderDecisionBlock,
-  metric: renderMetricBlock,
-  quote: renderQuoteBlock,
-  table: renderTableBlock,
-  screen: renderScreenBlock,
-  callout: renderCalloutBlock
-};
-
-function renderBlocks(blocks) {
-  const wrapper = element("div", "block-list");
-  blocks
-    .filter((block) => Object.hasOwn(BLOCK_RENDERERS, block.kind))
-    .forEach((block) => wrapper.append(BLOCK_RENDERERS[block.kind](block)));
-  return wrapper;
-}
-
-function describeTodo(todo) {
-  return ["Owner: " + (todo.owner || "Unassigned"), todo.due ? "Due: " + todo.due : ""]
-    .filter(Boolean)
-    .join(" · ");
-}
-
-function canAskClaude() {
-  return state.askClaude !== null;
-}
-
-async function resolveAskClaude() {
-  if (typeof window.claude?.complete === "function") {
-    return (prompt) => window.claude.complete(prompt);
-  }
-  if (typeof window.claude?.use === "function") {
-    return window.claude.use("sample");
-  }
-  return null;
-}
-
-function completionText(completion) {
-  if (typeof completion === "string") {
-    return completion;
-  }
-  const text = completion?.text ?? completion?.completion;
-  return typeof text === "string" ? text : "";
-}
-
-async function runAction(action, outputElement) {
-  try {
-    const text = completionText(await state.askClaude(action.prompt));
-    if (!text.trim()) {
-      throw new Error("empty completion");
+  function markSelected(id) {
+    document.querySelectorAll(".session").forEach((button) => {
+      button.setAttribute("aria-current", String(button.dataset.meetingId === id));
+    });
+    const select = document.getElementById("meeting-select");
+    if (select && id !== null) {
+      select.value = id;
     }
-    renderActionResult(outputElement, text);
-  } catch (error) {
-    const failure = element("p", "action-output__text", ACTION_FAILED_MESSAGE);
-    failure.setAttribute("role", "alert");
-    outputElement.replaceChildren(failure);
   }
-}
 
-function renderActionResult(outputElement, text) {
-  outputElement.replaceChildren(element("p", "action-output__text", text));
-  if (typeof navigator.clipboard?.writeText === "function") {
-    outputElement.append(buildCopyButton(text));
+  function showInPane(...nodes) {
+    document.getElementById("meeting-pane").replaceChildren(...nodes);
   }
-}
 
-function buildCopyButton(text) {
-  const button = element("button", "button", "Copy");
-  button.type = "button";
-  button.addEventListener("click", async () => {
+  function renderMeeting(meeting, todos) {
+    const article = element("article", "meeting");
+    article.append(
+      renderMeetingHeader(meeting),
+      renderSpeakers(meeting.speakers),
+      renderSummary(meeting.summary),
+      renderBlocks(meeting.blocks),
+      renderTodos(meeting, todos)
+    );
+    showInPane(article);
+  }
+
+  function renderEmptyState() {
+    const empty = element("section", "empty");
+    empty.append(element("h2", "empty__title", NO_MEETINGS_TITLE), element("p", "empty__body", NO_MEETINGS_HINT));
+    return empty;
+  }
+
+  function renderUnavailableState() {
+    const unavailable = element("section", "empty");
+    unavailable.append(element("p", "empty__body", DATABASE_UNAVAILABLE_MESSAGE));
+    return unavailable;
+  }
+
+  function meetingTypeLabel(meeting) {
+    return typeof meeting.type === "string" && meeting.type.trim() ? meeting.type : FALLBACK_MEETING_TYPE;
+  }
+
+  function renderMeetingHeader(meeting) {
+    const header = element("header", "meeting__header");
+    const meta = element("p", "meeting__meta");
+    meta.append(element("span", "badge", meetingTypeLabel(meeting)));
+    meta.append(element("span", "", formatWhen(meeting)));
+    header.append(element("h2", "meeting__title", meetingTitle(meeting)), meta);
+    return header;
+  }
+
+  function renderSummary(summary) {
+    const panel = element("section", "panel");
+    panel.append(element("h3", "panel__heading", "Summary"), element("p", "panel__body", summary || ""));
+    return panel;
+  }
+
+  function speakerDisplayName(speaker) {
+    if (speaker.label === "Me") {
+      return "Me";
+    }
+    if (speaker.confidence === "unknown" || !speaker.name) {
+      return "Them";
+    }
+    return speaker.name;
+  }
+
+  function speakerConfidenceNote(speaker) {
+    if (speaker.label === "Me") {
+      return "";
+    }
+    if (speaker.confidence === "likely") {
+      return " (inferred)";
+    }
+    if (speaker.confidence === "stated") {
+      return " (named in the call)";
+    }
+    return " (one or more people)";
+  }
+
+  function renderSpeaker(speaker) {
+    const item = element("li", "speaker");
+    const details = element("details");
+    const summary = element("summary", "speaker__name", speakerDisplayName(speaker));
+    summary.append(element("span", "speaker__confidence", speakerConfidenceNote(speaker)));
+    details.append(summary);
+    if (speaker.evidence) {
+      details.append(element("p", "speaker__evidence", speaker.evidence));
+    }
+    item.append(details);
+    return item;
+  }
+
+  function renderSpeakers(speakers) {
+    const panel = element("section", "panel");
+    const list = element("ul", "speakers");
+    speakers.forEach((speaker) => list.append(renderSpeaker(speaker)));
+    panel.append(element("h3", "panel__heading", "Speakers"), list);
+    return panel;
+  }
+
+  function labelledBlock(className, label, text) {
+    const block = element("p", "block " + className);
+    if (label) {
+      block.append(element("span", "block__label", label));
+    }
+    block.append(textOf(text));
+    return block;
+  }
+
+  function renderHeadingBlock(block) {
+    return element("h3", "block block--heading", textOf(block.text));
+  }
+
+  function renderParagraphBlock(block) {
+    return element("p", "block", textOf(block.text));
+  }
+
+  function renderListBlock(block) {
+    const list = element("ul", "block item-list");
+    (Array.isArray(block.items) ? block.items : []).filter((text) => typeof text === "string").forEach((text) => {
+      const item = element("li", "item");
+      item.append(element("span", "item__text", text));
+      list.append(item);
+    });
+    return list;
+  }
+
+  function renderDecisionBlock(block) {
+    const by = textOf(block.by);
+    return labelledBlock("block--decision", by ? "Decision · " + by : "Decision", block.text);
+  }
+
+  function renderMetricBlock(block) {
+    const metric = element("p", "block block--metric");
+    metric.append(element("span", "block__label", textOf(block.label)), element("span", "block__figure", textOf(block.value)));
+    if (textOf(block.note)) {
+      metric.append(element("span", "block__note", block.note));
+    }
+    return metric;
+  }
+
+  function renderQuoteBlock(block) {
+    const quote = element("blockquote", "block block--quote", textOf(block.text));
+    if (textOf(block.speaker)) {
+      quote.append(element("span", "block__label", "— " + block.speaker));
+    }
+    return quote;
+  }
+
+  function tableCells(row) {
+    return Array.isArray(row) ? row.map((cell) => (typeof cell === "string" || typeof cell === "number" ? String(cell) : "")) : [];
+  }
+
+  function appendCells(row, cellTag, cells) {
+    cells.forEach((cell) => row.append(element(cellTag, "", cell)));
+    return row;
+  }
+
+  function renderTableBlock(block) {
+    const columns = tableCells(block.columns);
+    const table = element("table", "block__table");
+    const head = element("thead");
+    head.append(appendCells(element("tr"), "th", columns));
+    const body = element("tbody");
+    (Array.isArray(block.rows) ? block.rows : []).filter(Array.isArray).forEach((row) => body.append(appendCells(element("tr"), "td", tableCells(row))));
+    table.append(head, body);
+    const scroller = element("div", "block block__table-scroll");
+    scroller.append(table);
+    return scroller;
+  }
+
+  function renderScreenBlock(block) {
+    const screen = element("p", "block block--screen");
+    screen.append(element("span", "offset-chip", textOf(block.offset)), element("span", "", "Screen: " + textOf(block.caption)));
+    return screen;
+  }
+
+  function renderCalloutBlock(block) {
+    const isRisk = block.tone === "risk";
+    return labelledBlock("block--callout" + (isRisk ? " block--risk" : ""), isRisk ? "Risk" : "Note", block.text);
+  }
+
+  const BLOCK_RENDERERS = {
+    heading: renderHeadingBlock,
+    paragraph: renderParagraphBlock,
+    list: renderListBlock,
+    decision: renderDecisionBlock,
+    metric: renderMetricBlock,
+    quote: renderQuoteBlock,
+    table: renderTableBlock,
+    screen: renderScreenBlock,
+    callout: renderCalloutBlock
+  };
+
+  function renderBlocks(blocks) {
+    const wrapper = element("div", "block-list");
+    blocks
+      .filter((block) => Object.hasOwn(BLOCK_RENDERERS, block.kind))
+      .forEach((block) => wrapper.append(BLOCK_RENDERERS[block.kind](block)));
+    return wrapper;
+  }
+
+  function describeTodo(todo) {
+    return ["Owner: " + (todo.owner || "Unassigned"), todo.due ? "Due: " + todo.due : ""]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  function canAskClaude() {
+    return state.askClaude !== null;
+  }
+
+  async function runAction(action, outputElement) {
     try {
-      await navigator.clipboard.writeText(text);
-      button.textContent = "Copied";
+      const text = completionText(await state.askClaude(action.prompt));
+      if (!text.trim()) {
+        throw new Error("empty completion");
+      }
+      renderActionResult(outputElement, text);
     } catch (error) {
-      button.textContent = "Couldn't copy";
+      const failure = element("p", "action-output__text", ACTION_FAILED_MESSAGE);
+      failure.setAttribute("role", "alert");
+      outputElement.replaceChildren(failure);
     }
-  });
-  return button;
-}
+  }
 
-function buildActionButton(action, outputElement, reasonId) {
-  const button = element("button", "button", action.label);
-  button.type = "button";
-  if (!canAskClaude()) {
-    button.disabled = true;
-    button.setAttribute("aria-describedby", reasonId);
+  function renderActionResult(outputElement, text) {
+    outputElement.replaceChildren(element("p", "action-output__text", text));
+    if (typeof navigator.clipboard?.writeText === "function") {
+      outputElement.append(buildCopyButton(text));
+    }
+  }
+
+  function buildCopyButton(text) {
+    const button = element("button", "button", "Copy");
+    button.type = "button";
+    button.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(text);
+        button.textContent = "Copied";
+      } catch (error) {
+        button.textContent = "Couldn't copy";
+      }
+    });
     return button;
   }
-  button.addEventListener("click", async () => {
-    if (button.getAttribute("aria-disabled") === "true") {
+
+  function buildActionButton(action, outputElement, reasonId) {
+    const button = element("button", "button", action.label);
+    button.type = "button";
+    if (!canAskClaude()) {
+      button.disabled = true;
+      button.setAttribute("aria-describedby", reasonId);
+      return button;
+    }
+    button.addEventListener("click", async () => {
+      if (button.getAttribute("aria-disabled") === "true") {
+        return;
+      }
+      button.setAttribute("aria-disabled", "true");
+      button.setAttribute("aria-busy", "true");
+      button.textContent = WORKING_LABEL;
+      await runAction(action, outputElement);
+      button.textContent = action.label;
+      button.removeAttribute("aria-busy");
+      button.removeAttribute("aria-disabled");
+    });
+    return button;
+  }
+
+  function isRunnableAction(action) {
+    return typeof action.label === "string" && action.label !== "" && typeof action.prompt === "string" && action.prompt !== "";
+  }
+
+  function renderActions(meeting, todo) {
+    const wrapper = element("div", "todo__actions-group");
+    const actions = element("div", "todo__actions");
+    const output = element("div", "action-output");
+    output.setAttribute("aria-live", "polite");
+    const reasonId = "reason-" + meeting.id + "-" + todo.todo_id;
+    todo.actions.filter(isRunnableAction).forEach((action) => actions.append(buildActionButton(action, output, reasonId)));
+    wrapper.append(actions);
+    if (!canAskClaude() && actions.children.length > 0) {
+      const reason = element("p", "todo__reason", AI_UNAVAILABLE_REASON);
+      reason.id = reasonId;
+      wrapper.append(reason);
+    }
+    wrapper.append(output);
+    return wrapper;
+  }
+
+  function renderTodo(meeting, todo) {
+    const item = element("li", "item" + (todo.owner === "Me" ? " line--me" : ""));
+    const body = element("div", "todo");
+    const choice = element("label", "todo__choice");
+    const checkbox = element("input", "todo__checkbox");
+    checkbox.type = "checkbox";
+    checkbox.dataset.todoId = todo.todo_id;
+    checkbox.checked = todo.done;
+    choice.append(checkbox, element("span", "todo__text", todo.text));
+    body.append(choice, element("p", "todo__meta", describeTodo(todo)), renderActions(meeting, todo));
+    item.append(body);
+    return item;
+  }
+
+  function renderTodos(meeting, todos) {
+    const panel = element("section", "panel panel--todos");
+    const list = element("ul", "item-list");
+    todos.forEach((todo) => list.append(renderTodo(meeting, todo)));
+    panel.append(element("h3", "panel__heading", "Todos"), list);
+    return panel;
+  }
+
+  function replaceTodoPanel(meeting, todos) {
+    document.querySelector("#meeting-pane .panel--todos")?.replaceWith(renderTodos(meeting, todos));
+  }
+
+  function logFailure(error) {
+    console.error(error);
+  }
+
+  const state = {
+    store: null,
+    summaries: [],
+    selectedId: null,
+    selectedMeeting: null,
+    todos: [],
+    askClaude: null,
+    unwatchSelected: null,
+    unwatchNotebook: []
+  };
+
+  async function start() {
+    const store = await resolveNotebookStore();
+    if (!store) {
+      showUnavailable();
       return;
     }
-    button.setAttribute("aria-disabled", "true");
-    button.setAttribute("aria-busy", "true");
-    button.textContent = WORKING_LABEL;
-    await runAction(action, outputElement);
-    button.textContent = action.label;
-    button.removeAttribute("aria-busy");
-    button.removeAttribute("aria-disabled");
-  });
-  return button;
-}
-
-function isRunnableAction(action) {
-  return typeof action.label === "string" && action.label !== "" && typeof action.prompt === "string" && action.prompt !== "";
-}
-
-function renderActions(meeting, todo) {
-  const wrapper = element("div", "todo__actions-group");
-  const actions = element("div", "todo__actions");
-  const output = element("div", "action-output");
-  output.setAttribute("aria-live", "polite");
-  const reasonId = "reason-" + meeting.id + "-" + todo.id;
-  records(todo.actions).filter(isRunnableAction).forEach((action) => actions.append(buildActionButton(action, output, reasonId)));
-  wrapper.append(actions);
-  if (!canAskClaude() && actions.children.length > 0) {
-    const reason = element("p", "todo__reason", AI_UNAVAILABLE_REASON);
-    reason.id = reasonId;
-    wrapper.append(reason);
+    state.store = store;
+    state.unwatchNotebook = [store.watchMeetingIndex(showSummaries, showFailure), store.watchTodos(showTodos, showFailure)];
+    enableClaudeActions(await resolveAskClaude());
   }
-  wrapper.append(output);
-  return wrapper;
-}
 
-function tickedIds(meetingId) {
-  return state.ticked.get(meetingId) || new Set();
-}
-
-function renderTodo(meeting, todo) {
-  const item = element("li", "item" + (todo.owner === "Me" ? " line--me" : ""));
-  const body = element("div", "todo");
-  const choice = element("label", "todo__choice");
-  const checkbox = element("input", "todo__checkbox");
-  checkbox.type = "checkbox";
-  checkbox.dataset.todoId = todo.id;
-  checkbox.checked = tickedIds(meeting.id).has(todo.id);
-  checkbox.addEventListener("change", () => toggleTodo(meeting, todo, checkbox.checked));
-  choice.append(checkbox, element("span", "todo__text", todo.text));
-  body.append(choice, element("p", "todo__meta", describeTodo(todo)), renderActions(meeting, todo));
-  item.append(body);
-  return item;
-}
-
-function toggleTodo(meeting, todo, isChecked) {
-  const ticked = new Set(tickedIds(meeting.id));
-  if (isChecked) {
-    ticked.add(todo.id);
-  } else {
-    ticked.delete(todo.id);
+  function showSummaries(summaries) {
+    state.summaries = orderNewestFirst(summaries);
+    renderMeetingCount(state.summaries.length);
+    patchMeetingList(state.summaries);
+    followSelection(selectionWithin(state.summaries, state.selectedId));
   }
-  state.ticked.set(meeting.id, ticked);
-  saveTicked(meeting.id, ticked);
-}
 
-function tickedStorageKey(meetingId) {
-  return "ticked:" + meetingId;
-}
-
-function storedText(stored) {
-  return typeof stored === "string" ? stored : stored?.value;
-}
-
-async function loadTicked(meetingId) {
-  try {
-    const stored = await window.storage.get(tickedStorageKey(meetingId), false);
-    const ids = JSON.parse(storedText(stored));
-    return new Set(Array.isArray(ids) ? ids.filter((id) => typeof id === "string") : []);
-  } catch (error) {
-    return new Set();
+  function followSelection(id) {
+    if (id !== null && id === state.selectedId) {
+      markSelected(id);
+      return;
+    }
+    selectMeeting(id);
   }
-}
 
-function ignoreFailure() {
-  return undefined;
-}
-
-async function saveTicked(meetingId, ticked) {
-  await Promise.resolve()
-    .then(() => window.storage.set(tickedStorageKey(meetingId), JSON.stringify([...ticked]), false))
-    .catch(ignoreFailure);
-}
-
-function renderTodos(meeting) {
-  const panel = element("section", "panel");
-  const list = element("ul", "item-list");
-  records(meeting.todos).forEach((todo) => list.append(renderTodo(meeting, todo)));
-  panel.append(element("h3", "panel__heading", "Todos"), list);
-  return panel;
-}
-
-function markSelected(id) {
-  document.querySelectorAll(".session").forEach((button) => {
-    button.setAttribute("aria-current", String(button.dataset.meetingId === id));
-  });
-  const select = document.getElementById("meeting-select");
-  if (select && id !== null) {
-    select.value = id;
+  function selectMeeting(id) {
+    stopWatchingSelected();
+    state.selectedId = id;
+    state.selectedMeeting = null;
+    markSelected(id);
+    if (id === null) {
+      showInPane(renderEmptyState());
+      return;
+    }
+    showInPane();
+    state.unwatchSelected = state.store.watchMeeting(id, (meeting) => showSelectedMeeting(id, meeting), showFailure);
   }
-}
 
-function applyTicked(meetingId) {
-  const ticked = tickedIds(meetingId);
-  document.querySelectorAll(".todo__checkbox").forEach((checkbox) => {
-    checkbox.checked = ticked.has(checkbox.dataset.todoId);
-  });
-}
-
-function selectedMeeting() {
-  return state.meetings.find((meeting) => meeting.id === state.selectedId);
-}
-
-async function selectMeeting(id) {
-  state.selectedId = id;
-  markSelected(id);
-  renderMeeting(selectedMeeting());
-  if (id === null || state.ticked.has(id)) {
-    return;
+  function showSelectedMeeting(meetingId, meeting) {
+    if (meetingId !== state.selectedId) {
+      return;
+    }
+    state.selectedMeeting = meeting;
+    if (!meeting) {
+      showInPane();
+      return;
+    }
+    renderMeeting(meeting, todosOfMeeting(state.todos, meeting));
   }
-  const ticked = await loadTicked(id);
-  const unsaved = tickedIds(id);
-  state.ticked.set(id, new Set([...ticked, ...unsaved]));
-  if (state.selectedId === id) {
-    applyTicked(id);
+
+  function showTodos(todos) {
+    state.todos = todos;
+    refreshSelectedTodos();
   }
-}
 
-function logFailure(error) {
-  console.error(error);
-}
-
-function renderMeetingCount(count) {
-  document.getElementById("meeting-count").textContent = count === 1 ? "1 meeting" : count + " meetings";
-}
-
-function start() {
-  state.meetings = readMeetings();
-  renderMeetingCount(state.meetings.length);
-  const firstMeeting = state.meetings[0];
-  const firstId = firstMeeting ? firstMeeting.id : null;
-  renderMeetingList(state.meetings, firstId);
-  selectMeeting(firstId).catch(logFailure);
-  resolveAskClaude().then(enableClaudeActions).catch(logFailure);
-}
-
-function enableClaudeActions(askClaude) {
-  if (!askClaude) {
-    return;
+  function refreshSelectedTodos() {
+    if (state.selectedMeeting) {
+      replaceTodoPanel(state.selectedMeeting, todosOfMeeting(state.todos, state.selectedMeeting));
+    }
   }
-  state.askClaude = askClaude;
-  renderMeeting(selectedMeeting());
-}
 
-start();
+  function enableClaudeActions(askClaude) {
+    if (!askClaude) {
+      return;
+    }
+    state.askClaude = askClaude;
+    refreshSelectedTodos();
+  }
+
+  function showFailure(error) {
+    showUnavailable();
+    logFailure(error);
+  }
+
+  function showUnavailable() {
+    stopWatching();
+    clearMeetingCount();
+    patchMeetingList([]);
+    showInPane(renderUnavailableState());
+  }
+
+  function stopWatching() {
+    stopWatchingSelected();
+    state.unwatchNotebook.forEach((unwatch) => unwatch());
+    state.unwatchNotebook = [];
+  }
+
+  function stopWatchingSelected() {
+    if (state.unwatchSelected) {
+      state.unwatchSelected();
+      state.unwatchSelected = null;
+    }
+  }
+
+  start().catch(showFailure);
+})();
 </script>
 </body>
 </html>

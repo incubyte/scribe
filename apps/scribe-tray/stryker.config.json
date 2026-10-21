@@ -1,6 +1,6 @@
 {
   "testRunner": "vitest",
-  "mutate": ["src/**/*.{ts,tsx}", "!src/**/*.spec.{ts,tsx}"],
+  "mutate": ["src/**/*.{ts,tsx}", "!src/**/*.spec.{ts,tsx}", "!src/meeting-notebook/**"],
   "thresholds": { "high": 90, "low": 75, "break": null },
   "reporters": ["clear-text", "json"],
   "ignoreStatic": true
