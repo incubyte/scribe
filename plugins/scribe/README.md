@@ -31,6 +31,7 @@ If the marketplace install does not work, download `scribe-plugin.zip` from the 
 
 - `/recap` lists today's and yesterday's calls. Try `/recap last 3` or "recap my calls since Monday". In Claude Code it reads the calls in parallel with a small `call-summarizer` agent; in Claude Desktop it reads them one at a time.
 - `/meeting-notes` writes up one call. Try "meeting notes for my call with Priya". Use `/meeting-notes` with a row number from a recap in the same chat. Each call is added to your one Scribe notebook, from any chat.
+- Ask Claude to import your old Scribe notebooks, or to update your notebook page after a plugin update.
 
 You can also just ask in plain words, such as "what calls did I have this week?"
 

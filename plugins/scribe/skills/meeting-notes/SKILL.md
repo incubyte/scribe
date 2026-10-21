@@ -1,6 +1,6 @@
 ---
 name: meeting-notes
-description: Write up a call or meeting recorded by Scribe on this computer as notes with speakers, a summary and todos, kept in one Scribe notebook artifact shared by all your chats. Use when the user asks for meeting notes, notes from their last call, or to write up the call with someone. Accepts a row number from an earlier recap, a name or a topic.
+description: Write up a call or meeting recorded by Scribe on this computer as notes with speakers, a summary and todos, kept in one Scribe notebook artifact shared by all your chats. Use when the user asks for meeting notes, notes from their last call, or to write up the call with someone. Also use it to import old Scribe notebooks or update the notebook page. Accepts a row number from an earlier recap, a name or a topic.
 ---
 
 # Write meeting notes
@@ -102,6 +102,8 @@ The `<id>` is the transcript `id`. Each todo body has `todo_id` (the `id` from t
 
 Reply with one line that names the meeting you added and says how many meetings the notebook now holds.
 
+To import old notebooks or update the notebook page, follow the matching section of `notebook.md`.
+
 ## Rules
 
 - Never present a guessed name as fact. Every name other than `Me` carries a `confidence`.
@@ -110,3 +112,4 @@ Reply with one line that names the meeting you added and says how many meetings 
 - Never change another meeting's records when you write one meeting.
 - Give every todo 1 to 2 actions, each with a non-empty `label` and `prompt`.
 - Fetch at most 8 screenshots, and never transcribe a sensitive screen.
+- Never delete an artifact unless the user named it in their reply.

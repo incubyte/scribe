@@ -301,11 +301,11 @@ The owner asks Claude to import their old Scribe notebooks. The skill reads each
 
 **Acceptance criteria**
 
-- [ ] **5.7.1** Importing both legacy notebooks writes each distinct meeting once; a meeting id found in both, or already in the notebook, is skipped, and the skill reports the added and skipped counts.
-- [ ] **5.7.2** Imported todos start open, because legacy notebooks never saved ticks on published artifacts.
-- [ ] **5.7.3** The skill never deletes a legacy notebook on its own; it offers to, and deletes only the ones the owner confirms.
-- [ ] **5.7.4** Updating the notebook republishes the current template to the same URL with the same capabilities, and every meeting and done state is still there afterwards.
-- [ ] **5.7.5** An import that runs into the notebook's caps stops, reports what was added, and leaves earlier writes in place.
+- [x] **5.7.1** Importing both legacy notebooks writes each distinct meeting once; a meeting id found in both, or already in the notebook, is skipped, and the skill reports the added and skipped counts.
+- [x] **5.7.2** Imported todos start open, because legacy notebooks never saved ticks on published artifacts.
+- [x] **5.7.3** The skill never deletes a legacy notebook on its own; it offers to, and deletes only the ones the owner confirms.
+- [x] **5.7.4** Updating the notebook republishes the current template to the same URL with the same capabilities, and every meeting and done state is still there afterwards.
+- [x] **5.7.5** An import that runs into the notebook's caps stops, reports what was added, and leaves earlier writes in place.
 
 ## 6. NFRs & regulatory compliance
 
