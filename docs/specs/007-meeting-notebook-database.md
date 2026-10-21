@@ -51,6 +51,8 @@
 - **Legacy notebook** — a "Scribe notebook" artifact made before this spec, holding meetings in the page and declaring no database [3].
 - **Meeting record** — one call's notes: title, start time, duration, type, summary, speakers, blocks. Keyed by the transcript id [3].
 - **Todo record** — one follow-up from a meeting: text, owner, due phrase, AI actions, done state, plus the meeting's id, title and start time so the Todos tab needs no second lookup [5].
+- **Meeting summary** — one index row per meeting, at `meeting_index/<transcript id>`, with title, start time, duration and type; the skill writes it alongside each meeting. The page reads the whole index for the list, the exact count and paging, and opens a full meeting record only when that meeting is selected [1].
+- **Notebook marker** — the one record at `notebook/meta`, with the schema version and creation time, written once when the notebook is created. The skill identifies the notebook by reading it, and legacy notebooks are skipped because the database tool refuses them [1].
 - **Owner group** — how the Todos tab buckets todos: **Mine** (owner `Me`), **Waiting on others** (a named owner, sub-grouped by name), **Unassigned** [5].
 - **Theme** — the Incubyte palette and type, with light and dark variants [2].
 
@@ -64,17 +66,24 @@ meetings/2026-10-21-112155
   "blocks": [ { "kind": "decision", "text": "...", "by": "Me" } ],
   "todo_ids": ["t1", "t2"] }
 
+meeting_index/2026-10-21-112155
+{ "title": "Anthara stand-up on PRs and packs", "started_at": "2026-10-21T11:21:55+05:30",
+  "duration_seconds": 1293, "type": "Product stand-up" }
+
 todos/2026-10-21-112155--t1
 { "meeting_id": "2026-10-21-112155", "meeting_title": "Anthara stand-up on PRs and packs",
   "meeting_started_at": "2026-10-21T11:21:55+05:30", "todo_id": "t1",
   "text": "...", "owner": "Awni", "due": "",
   "actions": [ { "label": "Create ticket", "prompt": "..." } ],
   "done": false, "done_at": null }
+
+notebook/meta
+{ "schema": 1, "created_at": "2026-10-21T11:00:00+05:30" }
 ```
 
 ### 3.3 Kinds of events
 
-- **Meeting written** — the skill creates or replaces a meeting record and its todo records [3].
+- **Meeting written** — the skill creates or replaces a meeting record, its meeting summary and its todo records [3].
 - **Todo ticked** / **Todo unticked** — a Contributor or the owner changes a todo's done state from either tab [5].
 - **Older meetings requested** — the viewer asks for the next 20 meetings [5].
 - **Notebook imported** — the skill copies meetings from legacy notebooks into the notebook [5].
@@ -318,7 +327,7 @@ No regulated pack applies: the change touches meeting notes, not PHI, cardholder
 
 ### 6.3 Clean code and tests (Clean Code, Incubyte Engineering Standards)
 
-**6.3.1 Grouping, ordering, paging and the rewrite-keeps-done rule are covered by automated tests with business-language names and real assertions** — derived from rules: "assertions-in-tests", "Write test names in business language". Sources: [standards].
+**6.3.1 Grouping, ordering and paging are covered by automated tests with business-language names and real assertions; the rewrite-keeps-done rule is met by construction and checked by a scripted manual run of the skill** — derived from rules: "assertions-in-tests", "Write test names in business language". The rule lives in skill prose, not page code, so no automated test reaches it. By construction, the skill's updates for surviving todos never send `done` or `done_at` (AC 5.2.5). Sources: [standards].
 
 **6.3.2 Database access sits behind one store adapter in the page** — rendering and grouping logic never call the database directly. Derived from rule: "Small and focused classes" and the hexagonal style in [§7.2](#72-architectural-style). Sources: [standards, 3].
 
@@ -330,7 +339,7 @@ No regulated pack applies: the change touches meeting notes, not PHI, cardholder
 | WCAG SC 2.1.1 / 2.4.3 / 4.1.2 keyboard, focus, roles | Design Standards | 5.4, 5.5, 5.6 | AC 5.4.3, 5.5.1, 5.5.6 |
 | Output escaping | Incubyte Engineering Standards | 5.1, 5.5 | AC 5.1.6 |
 | Least-privilege access | Incubyte Engineering Standards | 5.2, 5.4 | AC 5.4.3; database access rules declared at publish (5.2.2) |
-| Tests with assertions, business names | Clean Code | 5.2, 5.4, 5.5, 5.6 | NFR 6.3.1 |
+| Tests with assertions, business names | Clean Code | 5.2, 5.4, 5.5, 5.6 | NFR 6.3.1; scripted manual run of the skill for rewrite-keeps-done (5.2) |
 
 ## 7. Architecture
 
@@ -385,13 +394,13 @@ sequenceDiagram
   participant Skill as Skill (any chat)
   participant DB as Notebook database
   participant Page as Notebook page (each viewer)
-  Skill->>DB: batch write meeting + todos
-  DB-->>Page: live update: meetings (newest 20 x n), todos (all)
+  Skill->>DB: batch write meeting summary + meeting + todos
+  DB-->>Page: live update: meeting index (all), selected meeting, todos (all)
   Page->>DB: update todos/<id> { done, done_at } on tick
   DB-->>Page: live update to every open page
 ```
 
-The page keeps one live subscription to the paged meeting list, one to the selected meeting, and one to the whole todos collection. Queries scan without indexes, which stays fast at the expected hundreds of meetings and low thousands of todos [1].
+The page keeps one live subscription to the whole meeting index, which feeds the list, the exact total and paging by slicing what is loaded; one to the selected meeting record only; and one to the whole todos collection. The database has no count query and scans without indexes, so the index is the cheapest way to get a total and a page. At the expected hundreds of meetings and low thousands of todos, those scans stay fast [1].
 
 ## 8. Open questions
 
@@ -422,3 +431,5 @@ The page keeps one live subscription to the paged meeting list, one to the selec
 ## Changelog
 
 - 2026-10-21 — Sapan Parikh — Initial spec from a live session. Supersedes plan 005 decision 4 (one notebook per conversation) [3, 5].
+- 2026-10-21 — Sapan Parikh — Deviation on slices 5.1, 5.2, 5.6: [§3.2](#32-kinds-of-data) listed two record kinds and [§7.4](#74-data-flow) subscribed to the paged meeting list → [§3.2](#32-kinds-of-data) lists four, adding the meeting summary (`meeting_index/<id>`) and notebook marker (`notebook/meta`), and the page subscribes to the whole index for the list, exact total and paging, opening `meetings/<id>` only for the selected meeting. Reason: the database has no count query and scans without indexes, so an index is the cheapest way to meet AC 5.6.3 and 5.6.4, and the marker avoids reading each candidate page ([§9](#9-deferred-follow-ups-and-accepted-limits), 9.3). Affects: AC 5.1.3, 5.6.3, 5.6.4 (wording unchanged); [§3.2](#32-kinds-of-data), [§3.3](#33-kinds-of-events), [§7.4](#74-data-flow).
+- 2026-10-21 — Sapan Parikh — Deviation on NFR 6.3.1: "grouping, ordering, paging and the rewrite-keeps-done rule are covered by automated tests" → grouping, ordering and paging are covered by automated tests, and the rewrite-keeps-done rule is met by construction and checked by a scripted manual run of the skill. Reason: the rule lives in skill prose, not page code, so no automated test can assert it. Affects: NFR 6.3.1, [§6.4](#64-control-coverage-matrix), AC 5.2.5 (wording unchanged).
