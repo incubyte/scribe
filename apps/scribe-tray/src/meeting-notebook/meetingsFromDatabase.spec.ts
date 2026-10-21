@@ -199,6 +199,69 @@ describe("the notebook shows meetings from its database", () => {
     expect(notebook.document.activeElement).toBe(todoCheckbox);
   });
 
+  it("keeps keyboard focus on a meeting row when the meeting list updates", async () => {
+    const runtime = createFakeClaudeRuntime();
+    seedMeeting(runtime.database, {
+      id: MONDAY_PLANNING,
+      meeting: aMeeting({ title: "Monday planning", started_at: "2026-10-20T09:00:00Z" }),
+    });
+    seedMeeting(runtime.database, {
+      id: TUESDAY_STANDUP,
+      meeting: aMeeting({ title: "Tuesday stand-up", started_at: "2026-10-21T11:21:55Z" }),
+    });
+    const notebook = await mountNotebook(runtime);
+    const mondayRow = meetingButton(notebook, "Monday planning");
+    mondayRow.focus();
+
+    writeMeeting(runtime.database, {
+      id: WEDNESDAY_DEMO,
+      meeting: aMeeting({ title: "Wednesday demo", started_at: "2026-10-22T14:00:00Z" }),
+    });
+    await notebook.settle();
+
+    expect(notebook.document.activeElement).toBe(mondayRow);
+    expect(listedMeetingTitles(notebook)).toEqual(["Wednesday demo", "Tuesday stand-up", "Monday planning"]);
+  });
+
+  it("shows the unavailable message in both tabs when a live update is refused", async () => {
+    const runtime = createFakeClaudeRuntime();
+    seedMeeting(runtime.database, {
+      id: TUESDAY_STANDUP,
+      meeting: aMeeting({ title: "Tuesday stand-up" }),
+      todos: [aTodo(TUESDAY_STANDUP, { text: "Review the open PRs" })],
+    });
+    const notebook = await mountNotebook(runtime);
+
+    runtime.database.failWatch("meeting_index", "permission_denied");
+    await notebook.settle();
+
+    const unavailableMessage = "This notebook needs Claude to load. Open it on claude.ai while signed in.";
+    expect(notebook.document.getElementById("meeting-pane")?.textContent).toBe(unavailableMessage);
+    expect(notebook.document.getElementById("todos-list")?.textContent).toContain(unavailableMessage);
+    expect(notebook.document.getElementById("todos-list")?.textContent).not.toContain("Review the open PRs");
+    expect(notebook.document.getElementById("todos-list")?.textContent).not.toContain("No open todos");
+    expect(notebook.errors).toEqual([]);
+  });
+
+  it("gives each AI action a name that says which todo it belongs to", async () => {
+    const runtime = createFakeClaudeRuntime();
+    seedMeeting(runtime.database, {
+      id: TUESDAY_STANDUP,
+      meeting: aMeeting({ title: "Tuesday stand-up" }),
+      todos: [
+        aTodo(TUESDAY_STANDUP, {
+          text: "Share the QA rota",
+          actions: [{ label: "Create ticket", prompt: "Write a ticket for sharing the QA rota." }],
+        }),
+      ],
+    });
+    const notebook = await mountNotebook(runtime);
+
+    const actionButton = onlyElement<HTMLButtonElement>(notebook, ".todo__actions .button");
+
+    expect(actionButton.getAttribute("aria-label")).toBe("Create ticket: Share the QA rota");
+  });
+
   it("invites you to add a meeting when the notebook is empty", async () => {
     const runtime = createFakeClaudeRuntime();
 

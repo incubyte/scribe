@@ -186,6 +186,50 @@ describe("the Todos tab lists every todo across meetings", () => {
     expect(meetingsTabCheckbox(notebook).closest(".todo")?.classList.contains("todo--highlight")).toBe(true);
   });
 
+  it("following the link of a todo from an older meeting reveals that meeting in the list", async () => {
+    const runtime = createFakeClaudeRuntime();
+    seedTodos(runtime, "2026-08-01-100000", "2026-08-01T10:00:00Z", [{ todo_id: "t1", text: "Ancient follow-up" }], "Ancient retro");
+    Array.from({ length: 22 }, (_, day) => day + 1).forEach((day) => {
+      const dayText = String(day).padStart(2, "0");
+      seedTodos(runtime, "2026-09-" + dayText + "-100000", "2026-09-" + dayText + "T10:00:00Z", [], "Daily " + day);
+    });
+    const notebook = await mountNotebook(runtime);
+    pressKeyOnTabs(notebook, "ArrowRight");
+
+    onlyElement<HTMLAnchorElement>(notebook, "#todos-list .todo__meeting-link").click();
+    await notebook.settle();
+
+    expect(onlyElement(notebook, "#meeting-pane .meeting__title").textContent).toBe("Ancient retro");
+    expect(onlyElement(notebook, '.session[aria-current="true"] .session__title').textContent).toBe("Ancient retro");
+    expect(onlyElement<HTMLSelectElement>(notebook, "#meeting-select").selectedOptions[0]?.textContent).toContain(
+      "Ancient retro",
+    );
+  });
+
+  it("ticking a todo under Open keeps keyboard focus on its checkbox", async () => {
+    const { notebook } = await openNotebookWith([{ todo_id: "t1" }, { todo_id: "t2" }]);
+    const box = todosTabCheckbox(notebook);
+    box.focus();
+
+    box.click();
+    await notebook.settle();
+
+    expect(notebook.document.activeElement).toBe(box);
+    expect(box.checked).toBe(true);
+    expect(onlyElement(notebook, "#tab-todos").textContent).toBe("Todos (1)");
+  });
+
+  it("a ticked todo leaves the Open list once the filter changes", async () => {
+    const { notebook } = await openNotebookWith([{ todo_id: "t1", text: "First" }, { todo_id: "t2", text: "Second" }]);
+    todosTabCheckbox(notebook).click();
+    await notebook.settle();
+
+    await chooseFilter(notebook, "All");
+    await chooseFilter(notebook, "Open");
+
+    expect(textsOf(notebook, "#todos-list .todo__text")).toEqual(["Second"]);
+  });
+
   it("a todo whose meeting was removed says so beside its link", async () => {
     const runtime = createFakeClaudeRuntime();
     runtime.database.seed("todos", "gone--t1", aTodo("gone", { meeting_title: "Removed sync" }));

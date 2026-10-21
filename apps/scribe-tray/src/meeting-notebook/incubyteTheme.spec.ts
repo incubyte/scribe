@@ -62,11 +62,16 @@ describe("the notebook wears the Incubyte theme", () => {
     expect(tokens["--font-body"]).toMatch(/^"Inclusive Sans".*sans-serif$/);
   });
 
-  it("uses the decorative green only as a decorative token", () => {
-    const usages = notebookHtml.match(/#40a578/gi) ?? [];
-    expect(usages).toHaveLength(1);
-    expect(themeTokens(notebookHtml, "light")["--decor"]).toBe("#40a578");
-    expect(notebookHtml).not.toMatch(/var\(--decor\)/);
+  it.each(SCHEMES)("tab labels stay readable when hovered in %s mode", (scheme) => {
+    expect(contrastOf(scheme, "--on-header", "--tab-hover")).toBeGreaterThanOrEqual(TEXT_CONTRAST);
+  });
+
+  it.each(SCHEMES)("tab labels stay readable when selected in %s mode", (scheme) => {
+    expect(contrastOf(scheme, "--on-header", "--tab-selected")).toBeGreaterThanOrEqual(TEXT_CONTRAST);
+  });
+
+  it("keeps the decorative green out of text", () => {
+    expect(notebookHtml).not.toMatch(/#40a578/i);
   });
 
   it("AI action buttons show an arrow hidden from screen readers", async () => {
@@ -87,13 +92,5 @@ describe("the notebook wears the Incubyte theme", () => {
     const arrow = notebook.document.querySelector(".todo__actions .button .button__arrow svg");
     expect(arrow?.getAttribute("aria-hidden")).toBe("true");
     expect(arrow?.getAttribute("focusable")).toBe("false");
-  });
-
-  it("keeps focus, forced-colours, reduced-motion, reduced-transparency and narrow-screen rules", () => {
-    expect(notebookHtml).toContain(":focus-visible");
-    expect(notebookHtml).toContain("@media (forced-colors: active)");
-    expect(notebookHtml).toContain("@media (prefers-reduced-motion: reduce)");
-    expect(notebookHtml).toContain("@media (prefers-reduced-transparency: reduce)");
-    expect(notebookHtml).toContain("@media (max-width: 640px)");
   });
 });

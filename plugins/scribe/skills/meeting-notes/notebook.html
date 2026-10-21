@@ -25,6 +25,8 @@
   --surface: #ebfff6;
   --header-band: #014d43;
   --on-header: #ebfff6;
+  --tab-hover: #1d6258;
+  --tab-selected: #307167;
   --glass: rgb(1 77 67 / 0.94);
   --heading: #014d43;
   --surface-sunken: rgb(1 77 67 / 0.05);
@@ -40,7 +42,6 @@
   --recording-soft: rgb(179 38 30 / 0.08);
   --button-fill: #d3fe73;
   --on-button: #014d43;
-  --decor: #40a578;
   --focus-ring: 3px solid var(--accent);
   --focus-ring-offset: 2px;
 
@@ -56,6 +57,8 @@
   :root {
     --surface: #062925;
     --header-band: #0c3a34;
+    --tab-hover: #27524b;
+    --tab-selected: #39615b;
     --glass: rgb(12 58 52 / 0.94);
     --heading: #ebfff6;
     --surface-sunken: rgb(235 255 246 / 0.06);
@@ -180,11 +183,11 @@ select {
 }
 
 .tab:hover {
-  background: rgb(235 255 246 / 0.12);
+  background: var(--tab-hover);
 }
 
 .tab[aria-selected="true"] {
-  background: rgb(235 255 246 / 0.2);
+  background: var(--tab-selected);
   box-shadow: inset 0 -2px 0 var(--on-header);
 }
 
@@ -197,6 +200,12 @@ select {
   font-size: var(--text-sm);
   font-variant-numeric: tabular-nums;
   color: var(--on-header);
+}
+
+.notebook__main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
 }
 
 .notebook__body {
@@ -858,22 +867,32 @@ select {
     </div>
     <p class="notebook__count" id="meeting-count"></p>
   </header>
-  <div class="notebook__body" id="panel-meetings" role="tabpanel" aria-labelledby="tab-meetings">
-    <nav class="sidebar" id="sidebar" aria-label="Meetings"></nav>
-    <main id="meeting-pane"></main>
-  </div>
-  <section class="todos-view" id="panel-todos" role="tabpanel" aria-labelledby="tab-todos" hidden>
-    <div class="filter" id="todo-filter" role="group" aria-label="Show todos"></div>
-    <div id="todos-list"></div>
-  </section>
+  <main class="notebook__main">
+    <div class="notebook__body" id="panel-meetings" role="tabpanel" aria-labelledby="tab-meetings">
+      <nav class="sidebar" id="sidebar" aria-label="Meetings"></nav>
+      <div id="meeting-pane"></div>
+    </div>
+    <section class="todos-view" id="panel-todos" role="tabpanel" aria-labelledby="tab-todos" hidden>
+      <div class="filter" id="todo-filter" role="group" aria-label="Show todos"></div>
+      <div id="todos-list"></div>
+    </section>
+  </main>
 </div>
 <script>
 (function scribeNotebook() {
   const FALLBACK_MEETING_TYPE = "Meeting";
   const AI_UNAVAILABLE_REASON = "AI actions need Claude web or Desktop on a paid plan.";
   const ACTION_FAILED_MESSAGE = "Couldn't run this action. Try again.";
-  const ARROW_ICON =
-    '<svg viewBox="0 0 10 10" aria-hidden="true" focusable="false"><path d="M2 5h6M5.5 2.5L8 5L5.5 7.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"></path></svg>';
+  const SVG_NAMESPACE = "http://www.w3.org/2000/svg";
+  const ARROW_ICON_ATTRIBUTES = { viewBox: "0 0 10 10", "aria-hidden": "true", focusable: "false" };
+  const ARROW_PATH_ATTRIBUTES = {
+    d: "M2 5h6M5.5 2.5L8 5L5.5 7.5",
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "1.4",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round"
+  };
   const WORKING_LABEL = "Working…";
   const UNTITLED_MEETING = "Untitled meeting";
   const NO_MEETINGS_TITLE = "No meetings yet";
@@ -996,6 +1015,10 @@ select {
     return { shown, hasOlder: ordered.length > shown.length };
   }
 
+  function pageContaining(index) {
+    return Math.floor(index / MEETINGS_PER_PAGE) + 1;
+  }
+
   function naturalOrder(left, right) {
     return left.localeCompare(right, undefined, { numeric: true });
   }
@@ -1036,8 +1059,16 @@ select {
     return todos.filter(TODO_FILTERS[filter].matches);
   }
 
+  function todosToShow(todos, filter, lingeringIds) {
+    return todos.filter((todo) => lingeringIds.has(todo.id) || TODO_FILTERS[filter].matches(todo));
+  }
+
   function countOpenTodos(todos) {
     return filterTodos(todos, "open").length;
+  }
+
+  function todoDoneState(todos, todoDocId) {
+    return todos.find((todo) => todo.id === todoDocId)?.done === true;
   }
 
   function groupByOwnerName(todos) {
@@ -1057,21 +1088,59 @@ select {
     return { mine: byGroup.mine, others: groupByOwnerName(byGroup.others), unassigned: byGroup.unassigned };
   }
 
-  function readTodoFilter() {
-    try {
-      const stored = window.localStorage.getItem(FILTER_STORAGE_KEY);
-      return Object.hasOwn(TODO_FILTERS, stored) ? stored : DEFAULT_TODO_FILTER;
-    } catch (error) {
-      return DEFAULT_TODO_FILTER;
-    }
+  function createPendingTicks() {
+    const choices = new Map();
+    return {
+      has: (todoDocId) => choices.has(todoDocId),
+      latest: (todoDocId) => choices.get(todoDocId),
+      choose(todoDocId, done) {
+        const isWriteInFlight = choices.has(todoDocId);
+        choices.set(todoDocId, done);
+        return isWriteInFlight;
+      },
+      isLatest: (todoDocId, done) => choices.get(todoDocId) === done,
+      settle: (todoDocId) => choices.delete(todoDocId)
+    };
   }
 
-  function saveTodoFilter(filter) {
-    try {
-      window.localStorage.setItem(FILTER_STORAGE_KEY, filter);
-    } catch (error) {
-      return;
+  function doneAtFor(done, nowIso) {
+    return done ? nowIso : null;
+  }
+
+  function meetingTitle(meeting) {
+    return typeof meeting.title === "string" && meeting.title.trim() ? meeting.title : UNTITLED_MEETING;
+  }
+
+  function formatStart(startedAt) {
+    const date = new Date(startedAt);
+    if (Number.isNaN(date.getTime())) {
+      return "";
     }
+    return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  }
+
+  function formatDuration(durationSeconds) {
+    if (typeof durationSeconds !== "number") {
+      return "";
+    }
+    const minutes = Math.max(1, Math.round(durationSeconds / 60));
+    return minutes + " min";
+  }
+
+  function formatWhen(meeting) {
+    return [formatStart(meeting.started_at), formatDuration(meeting.duration_seconds)]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  function describeTodo(todo) {
+    return ["Owner: " + (todo.owner || "Unassigned"), todo.due ? "Due: " + todo.due : ""]
+      .filter(Boolean)
+      .join(" · ");
+  }
+
+  function logFailure(error) {
+    console.error(error);
   }
 
   async function useCapability(name) {
@@ -1084,24 +1153,6 @@ select {
       logFailure(error);
       return null;
     }
-  }
-
-  async function resolveCanWriteTodos() {
-    const user = await useCapability("user");
-    if (typeof user?.can !== "function") {
-      return null;
-    }
-    try {
-      const allowed = await user.can("data.write");
-      return typeof allowed === "boolean" ? allowed : null;
-    } catch (error) {
-      logFailure(error);
-      return null;
-    }
-  }
-
-  function todoDoneState(todos, todoDocId) {
-    return todos.find((todo) => todo.id === todoDocId)?.done === true;
   }
 
   async function resolveNotebookStore() {
@@ -1132,6 +1183,35 @@ select {
     return typeof text === "string" ? text : "";
   }
 
+  async function resolveCanWriteTodos() {
+    const user = await useCapability("user");
+    if (typeof user?.can !== "function") {
+      return null;
+    }
+    try {
+      const allowed = await user.can("data.write");
+      return typeof allowed === "boolean" ? allowed : null;
+    } catch (error) {
+      logFailure(error);
+      return null;
+    }
+  }
+
+  function readTodoFilter() {
+    try {
+      const stored = window.localStorage.getItem(FILTER_STORAGE_KEY);
+      return Object.hasOwn(TODO_FILTERS, stored) ? stored : DEFAULT_TODO_FILTER;
+    } catch {
+      return DEFAULT_TODO_FILTER;
+    }
+  }
+
+  function saveTodoFilter(filter) {
+    try {
+      window.localStorage.setItem(FILTER_STORAGE_KEY, filter);
+    } catch {}
+  }
+
   function element(tagName, className, text) {
     const node = document.createElement(tagName);
     if (className) {
@@ -1143,30 +1223,10 @@ select {
     return node;
   }
 
-  function meetingTitle(meeting) {
-    return typeof meeting.title === "string" && meeting.title.trim() ? meeting.title : UNTITLED_MEETING;
-  }
-
-  function formatStart(startedAt) {
-    const date = new Date(startedAt);
-    if (Number.isNaN(date.getTime())) {
-      return "";
-    }
-    return date.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
-  }
-
-  function formatDuration(durationSeconds) {
-    if (typeof durationSeconds !== "number") {
-      return "";
-    }
-    const minutes = Math.max(1, Math.round(durationSeconds / 60));
-    return minutes + " min";
-  }
-
-  function formatWhen(meeting) {
-    return [formatStart(meeting.started_at), formatDuration(meeting.duration_seconds)]
-      .filter(Boolean)
-      .join(" · ");
+  function svgElement(tagName, attributes) {
+    const node = document.createElementNS(SVG_NAMESPACE, tagName);
+    Object.entries(attributes).forEach(([name, value]) => node.setAttribute(name, value));
+    return node;
   }
 
   function renderMeetingCount(count) {
@@ -1177,6 +1237,9 @@ select {
     document.getElementById("meeting-count").textContent = "";
   }
 
+  const MEETING_OPTIONS = { build: buildMeetingOption, update: updateMeetingOption };
+  const MEETING_ROWS = { build: buildMeetingRow, update: updateMeetingRow };
+
   function patchMeetingList(page) {
     const sidebar = document.getElementById("sidebar");
     if (page.shown.length === 0) {
@@ -1186,20 +1249,38 @@ select {
     if (!sidebar.querySelector(".meeting-list")) {
       sidebar.replaceChildren(element("h2", "sidebar__heading", "Meetings"), buildMeetingSelect(), element("ul", "meeting-list"));
     }
-    document.getElementById("meeting-select").replaceChildren(...page.shown.map(buildMeetingOption));
-    sidebar.querySelector(".meeting-list").replaceChildren(...page.shown.map(buildMeetingButton));
-    removeShowOlderButton();
-    if (page.hasOlder) {
+    reconcileMeetings(document.getElementById("meeting-select"), page.shown, MEETING_OPTIONS);
+    reconcileMeetings(sidebar.querySelector(".meeting-list"), page.shown, MEETING_ROWS);
+    syncShowOlderButton(sidebar, page.hasOlder);
+  }
+
+  function reconcileMeetings(parent, meetings, kind) {
+    removeMissingMeetings(parent, meetings);
+    const existing = new Map(Array.from(parent.children, (node) => [node.dataset.meetingId, node]));
+    meetings.forEach((meeting, index) => {
+      const node = existing.get(meeting.id) ?? kind.build(meeting);
+      kind.update(node, meeting);
+      if (parent.children[index] !== node) {
+        parent.insertBefore(node, parent.children[index] ?? null);
+      }
+    });
+  }
+
+  function removeMissingMeetings(parent, meetings) {
+    const kept = new Set(meetings.map((meeting) => meeting.id));
+    Array.from(parent.children)
+      .filter((node) => !kept.has(node.dataset.meetingId))
+      .forEach((node) => node.remove());
+  }
+
+  function syncShowOlderButton(sidebar, hasOlder) {
+    const existing = sidebar.querySelector(".show-older");
+    if (hasOlder && !existing) {
       sidebar.append(buildShowOlderButton(showOlderMeetings));
     }
-  }
-
-  function appendMeetingRows(meetings) {
-    document.querySelector(".meeting-list").append(...meetings.map(buildMeetingButton));
-  }
-
-  function appendMeetingOptions(meetings) {
-    document.getElementById("meeting-select").append(...meetings.map(buildMeetingOption));
+    if (!hasOlder) {
+      existing?.remove();
+    }
   }
 
   function buildShowOlderButton(onPress) {
@@ -1209,12 +1290,15 @@ select {
     return button;
   }
 
-  function removeShowOlderButton() {
-    document.querySelector("#sidebar .show-older")?.remove();
+  function isDisplayed(node) {
+    return window.getComputedStyle(node).display !== "none";
   }
 
-  function focusMeetingRow(index) {
-    document.querySelectorAll(".meeting-list .session")[index]?.focus();
+  function focusMeetingRowOrPicker(index) {
+    const list = document.querySelector(".meeting-list");
+    const row = list.querySelectorAll(".session")[index];
+    const target = row && isDisplayed(list) ? row : document.getElementById("meeting-select");
+    target.focus();
   }
 
   function buildMeetingSelect() {
@@ -1229,21 +1313,32 @@ select {
   }
 
   function buildMeetingOption(meeting) {
-    const option = element("option", "", meetingTitle(meeting) + " (" + formatWhen(meeting) + ")");
+    const option = element("option");
     option.value = meeting.id;
+    option.dataset.meetingId = meeting.id;
     return option;
   }
 
-  function buildMeetingButton(meeting) {
+  function updateMeetingOption(option, meeting) {
+    option.textContent = meetingTitle(meeting) + " (" + formatWhen(meeting) + ")";
+  }
+
+  function buildMeetingRow(meeting) {
     const item = element("li");
+    item.dataset.meetingId = meeting.id;
     const button = element("button", "session");
     button.type = "button";
     button.dataset.meetingId = meeting.id;
     button.setAttribute("aria-current", "false");
-    button.append(element("span", "session__title", meetingTitle(meeting)), element("span", "session__meta", formatWhen(meeting)));
+    button.append(element("span", "session__title"), element("span", "session__meta"));
     button.addEventListener("click", () => selectMeeting(meeting.id));
     item.append(button);
     return item;
+  }
+
+  function updateMeetingRow(item, meeting) {
+    item.querySelector(".session__title").textContent = meetingTitle(meeting);
+    item.querySelector(".session__meta").textContent = formatWhen(meeting);
   }
 
   function markSelected(id) {
@@ -1449,45 +1544,40 @@ select {
     return wrapper;
   }
 
-  function describeTodo(todo) {
-    return ["Owner: " + (todo.owner || "Unassigned"), todo.due ? "Due: " + todo.due : ""]
-      .filter(Boolean)
-      .join(" · ");
-  }
-
   function canAskClaude() {
     return state.askClaude !== null;
   }
 
-  async function runAction(action, outputElement) {
+  async function runAction(action, context) {
     try {
       const text = completionText(await state.askClaude(action.prompt));
       if (!text.trim()) {
         throw new Error("empty completion");
       }
-      renderActionResult(outputElement, text);
-    } catch (error) {
+      renderActionResult(context, text);
+    } catch {
       const failure = element("p", "action-output__text", ACTION_FAILED_MESSAGE);
       failure.setAttribute("role", "alert");
-      outputElement.replaceChildren(failure);
+      context.output.replaceChildren(failure);
     }
   }
 
-  function renderActionResult(outputElement, text) {
-    outputElement.replaceChildren(element("p", "action-output__text", text));
+  function renderActionResult(context, text) {
+    context.output.replaceChildren(element("p", "action-output__text", text));
     if (typeof navigator.clipboard?.writeText === "function") {
-      outputElement.append(buildCopyButton(text));
+      context.output.append(buildCopyButton(text, context.textId));
     }
   }
 
-  function buildCopyButton(text) {
+  function buildCopyButton(text, todoTextId) {
     const button = element("button", "button", "Copy");
     button.type = "button";
+    button.setAttribute("aria-describedby", todoTextId);
     button.addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText(text);
         button.textContent = "Copied";
-      } catch (error) {
+      } catch {
         button.textContent = "Couldn't copy";
       }
     });
@@ -1495,33 +1585,46 @@ select {
   }
 
   function buildArrowChip() {
+    const icon = svgElement("svg", ARROW_ICON_ATTRIBUTES);
+    icon.append(svgElement("path", ARROW_PATH_ATTRIBUTES));
     const chip = element("span", "button__arrow");
-    chip.innerHTML = ARROW_ICON;
+    chip.append(icon);
     return chip;
   }
 
-  function buildActionButton(action, outputElement, reasonId) {
+  function lockBusy(button, label) {
+    button.setAttribute("aria-disabled", "true");
+    button.setAttribute("aria-busy", "true");
+    label.textContent = WORKING_LABEL;
+  }
+
+  function releaseBusy(button, label, restingText) {
+    label.textContent = restingText;
+    button.removeAttribute("aria-busy");
+    button.removeAttribute("aria-disabled");
+  }
+
+  async function runWhileBusy(button, label, action, context) {
+    if (button.getAttribute("aria-disabled") === "true") {
+      return;
+    }
+    lockBusy(button, label);
+    await runAction(action, context);
+    releaseBusy(button, label, action.label);
+  }
+
+  function buildActionButton(action, context) {
     const button = element("button", "button");
     const label = element("span", "button__label", action.label);
     button.append(label, buildArrowChip());
     button.type = "button";
+    button.setAttribute("aria-label", action.label + ": " + context.todoText);
     if (!canAskClaude()) {
       button.disabled = true;
-      button.setAttribute("aria-describedby", reasonId);
+      button.setAttribute("aria-describedby", context.reasonId);
       return button;
     }
-    button.addEventListener("click", async () => {
-      if (button.getAttribute("aria-disabled") === "true") {
-        return;
-      }
-      button.setAttribute("aria-disabled", "true");
-      button.setAttribute("aria-busy", "true");
-      label.textContent = WORKING_LABEL;
-      await runAction(action, outputElement);
-      label.textContent = action.label;
-      button.removeAttribute("aria-busy");
-      button.removeAttribute("aria-disabled");
-    });
+    button.addEventListener("click", () => runWhileBusy(button, label, action, context));
     return button;
   }
 
@@ -1529,17 +1632,26 @@ select {
     return typeof action.label === "string" && action.label !== "" && typeof action.prompt === "string" && action.prompt !== "";
   }
 
+  function todoScopedId(scope, part, todo) {
+    return [scope, part, todo.id].join("-");
+  }
+
   function renderActions(todo, scope) {
     const wrapper = element("div", "todo__actions-group");
     const actions = element("div", "todo__actions");
     const output = element("div", "action-output");
     output.setAttribute("aria-live", "polite");
-    const reasonId = [scope, "reason", todo.id].join("-");
-    todo.actions.filter(isRunnableAction).forEach((action) => actions.append(buildActionButton(action, output, reasonId)));
+    const context = {
+      output,
+      todoText: todo.text,
+      textId: todoScopedId(scope, "text", todo),
+      reasonId: todoScopedId(scope, "reason", todo)
+    };
+    todo.actions.filter(isRunnableAction).forEach((action) => actions.append(buildActionButton(action, context)));
     wrapper.append(actions);
     if (!canAskClaude() && actions.children.length > 0) {
       const reason = element("p", "todo__reason", AI_UNAVAILABLE_REASON);
-      reason.id = reasonId;
+      reason.id = context.reasonId;
       wrapper.append(reason);
     }
     wrapper.append(output);
@@ -1554,11 +1666,13 @@ select {
     checkbox.type = "checkbox";
     checkbox.dataset.todoId = todo.todo_id;
     checkbox.dataset.todoDocId = todo.id;
-    checkbox.checked = state.pendingTicks.get(todo.id) ?? todo.done;
+    checkbox.checked = state.pendingTicks.latest(todo.id) ?? todo.done;
     checkbox.addEventListener("change", () => toggleTodoDone(todo.id, checkbox.checked));
     const notSaved = element("p", "todo__error");
     notSaved.setAttribute("role", "alert");
-    choice.append(checkbox, element("span", "todo__text", todo.text));
+    const text = element("span", "todo__text", todo.text);
+    text.id = todoScopedId(scope, "text", todo);
+    choice.append(checkbox, text);
     body.append(choice, notSaved, element("p", "todo__meta", describeTodo(todo)), renderActions(todo, scope));
     item.append(body);
     return item;
@@ -1608,31 +1722,11 @@ select {
     return shown.length === todos.length && todos.every((todo) => shown.includes(todo.id));
   }
 
-  async function toggleTodoDone(todoDocId, done) {
-    const isWriteInFlight = state.pendingTicks.has(todoDocId);
-    state.pendingTicks.set(todoDocId, done);
+  function showTickChoice(todoDocId, done) {
     checkboxesOfTodo(document, todoDocId).forEach((checkbox) => {
       checkbox.checked = done;
     });
     showTickMessage(todoDocId, "");
-    if (!isWriteInFlight) {
-      await flushTick(todoDocId);
-    }
-  }
-
-  async function flushTick(todoDocId) {
-    try {
-      let written;
-      do {
-        written = state.pendingTicks.get(todoDocId);
-        await state.store.setTodoDone(todoDocId, written, written ? new Date().toISOString() : null);
-      } while (state.pendingTicks.get(todoDocId) !== written);
-      state.pendingTicks.delete(todoDocId);
-    } catch (error) {
-      state.pendingTicks.delete(todoDocId);
-      undoTick(todoDocId);
-      logFailure(error);
-    }
   }
 
   function undoTick(todoDocId) {
@@ -1652,155 +1746,28 @@ select {
     document.querySelector("#meeting-pane .panel--todos")?.replaceWith(renderTodos(todos));
   }
 
-  function logFailure(error) {
-    console.error(error);
-  }
-
-  const state = {
-    store: null,
-    summaries: [],
-    pagesShown: 1,
-    selectedId: null,
-    selectedMeeting: null,
-    resolveMeetingShown: null,
-    activeTab: "meetings",
-    todoFilter: DEFAULT_TODO_FILTER,
-    todos: [],
-    canWriteTodos: null,
-    pendingTicks: new Map(),
-    askClaude: null,
-    unwatchSelected: null,
-    unwatchNotebook: []
-  };
-
-  async function start() {
-    const store = await resolveNotebookStore();
-    if (!store) {
-      showUnavailable();
-      return;
-    }
-    state.store = store;
-    state.unwatchNotebook = [store.watchMeetingIndex(showSummaries, showFailure), store.watchTodos(showTodos, showFailure)];
-    state.canWriteTodos = await resolveCanWriteTodos();
-    state.askClaude = await resolveAskClaude();
-    refreshSelectedTodos();
-    renderTodosList();
-  }
-
-  function showSummaries(summaries) {
-    state.summaries = orderNewestFirst(summaries);
-    renderMeetingCount(state.summaries.length);
-    patchMeetingList(pageOfMeetings(state.summaries, state.pagesShown));
-    followSelection(selectionWithin(state.summaries, state.selectedId));
-  }
-
-  function showOlderMeetings() {
-    const shownBefore = pageOfMeetings(state.summaries, state.pagesShown).shown.length;
-    state.pagesShown += 1;
-    const page = pageOfMeetings(state.summaries, state.pagesShown);
-    const newlyShown = page.shown.slice(shownBefore);
-    appendMeetingOptions(newlyShown);
-    appendMeetingRows(newlyShown);
-    markSelected(state.selectedId);
-    if (!page.hasOlder) {
-      removeShowOlderButton();
-      focusMeetingRow(shownBefore);
-    }
-  }
-
-  function followSelection(id) {
-    if (id !== null && id === state.selectedId) {
-      markSelected(id);
-      return;
-    }
-    selectMeeting(id);
-  }
-
-  function selectMeeting(id) {
-    stopWatchingSelected();
-    state.selectedId = id;
-    state.selectedMeeting = null;
-    markSelected(id);
-    if (id === null) {
-      showInPane(renderEmptyState());
-      return;
-    }
-    showInPane();
-    state.unwatchSelected = state.store.watchMeeting(id, (meeting) => showSelectedMeeting(id, meeting), showFailure);
-  }
-
-  function showSelectedMeeting(meetingId, meeting) {
-    if (meetingId !== state.selectedId) {
-      return;
-    }
-    state.selectedMeeting = meeting;
-    if (meeting) {
-      renderMeeting(meeting, todosOfMeeting(state.todos, meeting));
-    } else {
-      showInPane();
-    }
-    settleMeetingShown(meeting);
-  }
-
-  function settleMeetingShown(meeting) {
-    const resolveShown = state.resolveMeetingShown;
-    state.resolveMeetingShown = null;
-    resolveShown?.(meeting);
-  }
-
-  function showTodos(todos) {
-    state.todos = todos;
-    updateTodosTabCount(countOpenTodos(todos));
-    syncSelectedTodos();
-    syncTodosList();
-  }
-
-  function syncSelectedTodos() {
-    if (!state.selectedMeeting) {
-      return;
-    }
-    const todosOfSelected = todosOfMeeting(state.todos, state.selectedMeeting);
-    const panel = document.querySelector("#meeting-pane .panel--todos");
-    if (panel && showsExactly(panel, todosOfSelected)) {
-      patchTodoChecks(panel, todosOfSelected);
-      return;
-    }
-    refreshSelectedTodos();
-  }
-
-  function refreshSelectedTodos() {
-    if (state.selectedMeeting) {
-      replaceTodoPanel(todosOfMeeting(state.todos, state.selectedMeeting));
-    }
-  }
-
   function visibleTodos() {
-    return filterTodos(orderTodosNewestMeetingFirst(state.todos), state.todoFilter);
+    return todosToShow(orderTodosNewestMeetingFirst(state.todos), state.todoFilter, state.lingeringTickIds);
   }
 
   function updateTodosTabCount(openCount) {
     document.getElementById("tab-todos").textContent = TODOS_TAB_LABEL + " (" + openCount + ")";
   }
 
-  function syncTodosList() {
-    const list = document.getElementById("todos-list");
-    const todos = visibleTodos();
-    if (showsExactly(list, todos)) {
-      patchTodoChecks(list, todos);
-      return;
+  function todosListContent() {
+    if (state.isUnavailable) {
+      return [renderUnavailableState()];
     }
-    renderTodosList();
+    const todos = visibleTodos();
+    return todos.length === 0 ? [renderNoTodos()] : renderOwnerGroups(groupTodosByOwner(todos));
   }
 
   function renderTodosList() {
-    const todos = visibleTodos();
     const list = document.getElementById("todos-list");
-    const heading = element("h2", "panel__heading visually-hidden", TODOS_TAB_LABEL);
-    const content = todos.length === 0 ? [renderNoTodos()] : renderOwnerGroups(groupTodosByOwner(todos));
     const groups = element("div", "todos-list");
-    groups.append(heading, ...content);
+    groups.append(element("h2", "panel__heading visually-hidden", TODOS_TAB_LABEL), ...todosListContent());
     list.replaceChildren(groups);
-    if (state.canWriteTodos === false) {
+    if (state.canWriteTodos === false && !state.isUnavailable) {
       lockReadOnlyChecks(list, TODOS_TAB_READ_ONLY_REASON_ID);
     }
   }
@@ -1849,7 +1816,7 @@ select {
     link.href = "#";
     link.addEventListener("click", (event) => {
       event.preventDefault();
-      openTodoInMeeting(todo, problem);
+      openTodoInMeeting(todo, problem).catch(logFailure);
     });
     wrapper.append(link, problem);
     return wrapper;
@@ -1857,28 +1824,6 @@ select {
 
   function meetingLinkText(todo) {
     return [meetingTitle({ title: todo.meeting_title }), formatStart(todo.meeting_started_at)].filter(Boolean).join(" · ");
-  }
-
-  function showMeetingNow(meetingId) {
-    if (state.selectedId === meetingId && state.selectedMeeting) {
-      return Promise.resolve(state.selectedMeeting);
-    }
-    return new Promise((resolve) => {
-      state.resolveMeetingShown = resolve;
-      selectMeeting(meetingId);
-    });
-  }
-
-  async function openTodoInMeeting(todo, problem) {
-    problem.textContent = "";
-    const meeting = await showMeetingNow(todo.meeting_id);
-    if (!meeting) {
-      problem.textContent = MEETING_GONE_MESSAGE;
-      followSelection(selectionWithin(state.summaries, state.selectedId));
-      return;
-    }
-    activateTab("meetings", false);
-    highlightTodo(todo.id);
   }
 
   function highlightTodo(todoDocId) {
@@ -1919,19 +1864,6 @@ select {
     return Object.hasOwn(targets, key) ? targets[key] : null;
   }
 
-  function wireTabs() {
-    TAB_NAMES.forEach((name) => {
-      document.getElementById("tab-" + name).addEventListener("click", () => activateTab(name, false));
-    });
-    document.getElementById("tabs").addEventListener("keydown", (event) => {
-      const target = tabForKey(state.activeTab, event.key);
-      if (target) {
-        event.preventDefault();
-        activateTab(target, true);
-      }
-    });
-  }
-
   function renderTodoFilter() {
     const group = document.getElementById("todo-filter");
     Object.entries(TODO_FILTERS).forEach(([name, { label }]) => {
@@ -1950,11 +1882,222 @@ select {
     });
   }
 
+  const state = {
+    store: null,
+    summaries: [],
+    pagesShown: 1,
+    selectedId: null,
+    selectedMeeting: null,
+    meetingWaiter: null,
+    activeTab: "meetings",
+    todoFilter: DEFAULT_TODO_FILTER,
+    todos: [],
+    canWriteTodos: null,
+    pendingTicks: createPendingTicks(),
+    lingeringTickIds: new Set(),
+    nowIso: () => new Date().toISOString(),
+    askClaude: null,
+    isUnavailable: false,
+    unwatchSelected: null,
+    unwatchNotebook: []
+  };
+
+  async function start() {
+    const [store, canWriteTodos, askClaude] = await Promise.all([
+      resolveNotebookStore(),
+      resolveCanWriteTodos(),
+      resolveAskClaude()
+    ]);
+    if (!store) {
+      showUnavailable();
+      return;
+    }
+    state.store = store;
+    state.canWriteTodos = canWriteTodos;
+    state.askClaude = askClaude;
+    state.unwatchNotebook = [store.watchMeetingIndex(showSummaries, showFailure), store.watchTodos(showTodos, showFailure)];
+  }
+
+  function showSummaries(summaries) {
+    state.summaries = orderNewestFirst(summaries);
+    renderMeetingCount(state.summaries.length);
+    patchMeetingList(pageOfMeetings(state.summaries, state.pagesShown));
+    followSelection(selectionWithin(state.summaries, state.selectedId));
+  }
+
+  function showOlderMeetings() {
+    const shownBefore = pageOfMeetings(state.summaries, state.pagesShown).shown.length;
+    state.pagesShown += 1;
+    const page = pageOfMeetings(state.summaries, state.pagesShown);
+    patchMeetingList(page);
+    markSelected(state.selectedId);
+    if (!page.hasOlder) {
+      focusMeetingRowOrPicker(shownBefore);
+    }
+  }
+
+  function revealMeeting(meetingId) {
+    const pagesNeeded = pageContaining(state.summaries.findIndex((summary) => summary.id === meetingId));
+    if (pagesNeeded > state.pagesShown) {
+      state.pagesShown = pagesNeeded;
+      patchMeetingList(pageOfMeetings(state.summaries, state.pagesShown));
+    }
+  }
+
+  function followSelection(id) {
+    if (id !== null && id === state.selectedId) {
+      markSelected(id);
+      return;
+    }
+    selectMeeting(id);
+  }
+
+  function selectMeeting(id) {
+    stopWatchingSelected();
+    state.selectedId = id;
+    state.selectedMeeting = null;
+    markSelected(id);
+    if (id === null) {
+      showInPane(renderEmptyState());
+      return;
+    }
+    showInPane();
+    state.unwatchSelected = state.store.watchMeeting(id, (meeting) => showSelectedMeeting(id, meeting), showFailure);
+  }
+
+  function showSelectedMeeting(meetingId, meeting) {
+    if (meetingId !== state.selectedId) {
+      return;
+    }
+    state.selectedMeeting = meeting;
+    if (meeting) {
+      renderMeeting(meeting, todosOfMeeting(state.todos, meeting));
+    } else {
+      showInPane();
+    }
+    settleMeetingShown(meetingId, meeting);
+  }
+
+  function settleMeetingShown(meetingId, meeting) {
+    const waiter = state.meetingWaiter;
+    if (waiter?.meetingId !== meetingId) {
+      return;
+    }
+    state.meetingWaiter = null;
+    waiter.resolve(meeting);
+  }
+
+  function showTodos(todos) {
+    state.todos = todos;
+    updateTodosTabCount(countOpenTodos(todos));
+    syncSelectedTodos();
+    syncTodosList();
+  }
+
+  function syncSelectedTodos() {
+    if (!state.selectedMeeting) {
+      return;
+    }
+    const todosOfSelected = todosOfMeeting(state.todos, state.selectedMeeting);
+    const panel = document.querySelector("#meeting-pane .panel--todos");
+    if (panel && showsExactly(panel, todosOfSelected)) {
+      patchTodoChecks(panel, todosOfSelected);
+      return;
+    }
+    replaceTodoPanel(todosOfSelected);
+  }
+
+  function syncTodosList() {
+    const list = document.getElementById("todos-list");
+    const todos = visibleTodos();
+    if (showsExactly(list, todos)) {
+      patchTodoChecks(list, todos);
+      return;
+    }
+    renderTodosList();
+  }
+
+  async function toggleTodoDone(todoDocId, done) {
+    const isWriteInFlight = state.pendingTicks.choose(todoDocId, done);
+    state.lingeringTickIds.add(todoDocId);
+    showTickChoice(todoDocId, done);
+    if (!isWriteInFlight) {
+      await saveTick(todoDocId);
+    }
+  }
+
+  async function saveTick(todoDocId) {
+    try {
+      await saveLatestTick(todoDocId);
+    } catch (error) {
+      state.pendingTicks.settle(todoDocId);
+      undoTick(todoDocId);
+      logFailure(error);
+    }
+  }
+
+  async function saveLatestTick(todoDocId) {
+    let written;
+    do {
+      written = state.pendingTicks.latest(todoDocId);
+      await state.store.setTodoDone(todoDocId, written, doneAtFor(written, state.nowIso()));
+    } while (!state.pendingTicks.isLatest(todoDocId, written));
+    state.pendingTicks.settle(todoDocId);
+  }
+
+  function regroupTodos() {
+    state.lingeringTickIds.clear();
+    renderTodosList();
+  }
+
+  function switchTab(tabName, shouldFocus) {
+    activateTab(tabName, shouldFocus);
+    if (state.lingeringTickIds.size > 0) {
+      regroupTodos();
+    }
+  }
+
   function chooseTodoFilter(filter) {
     state.todoFilter = filter;
     saveTodoFilter(filter);
     markTodoFilter(filter);
-    renderTodosList();
+    regroupTodos();
+  }
+
+  function showMeetingNow(meetingId) {
+    if (state.selectedId === meetingId && state.selectedMeeting) {
+      return Promise.resolve(state.selectedMeeting);
+    }
+    return new Promise((resolve) => {
+      state.meetingWaiter = { meetingId, resolve };
+      selectMeeting(meetingId);
+    });
+  }
+
+  async function openTodoInMeeting(todo, problem) {
+    problem.textContent = "";
+    revealMeeting(todo.meeting_id);
+    const meeting = await showMeetingNow(todo.meeting_id);
+    if (!meeting) {
+      problem.textContent = MEETING_GONE_MESSAGE;
+      followSelection(selectionWithin(state.summaries, state.selectedId));
+      return;
+    }
+    switchTab("meetings", false);
+    highlightTodo(todo.id);
+  }
+
+  function wireTabs() {
+    TAB_NAMES.forEach((name) => {
+      document.getElementById("tab-" + name).addEventListener("click", () => switchTab(name, false));
+    });
+    document.getElementById("tabs").addEventListener("keydown", (event) => {
+      const target = tabForKey(state.activeTab, event.key);
+      if (target) {
+        event.preventDefault();
+        switchTab(target, true);
+      }
+    });
   }
 
   function showFailure(error) {
@@ -1964,9 +2107,16 @@ select {
 
   function showUnavailable() {
     stopWatching();
+    state.isUnavailable = true;
     clearMeetingCount();
+    updateTodosTabLabel();
     patchMeetingList(pageOfMeetings([], state.pagesShown));
     showInPane(renderUnavailableState());
+    renderTodosList();
+  }
+
+  function updateTodosTabLabel() {
+    document.getElementById("tab-todos").textContent = TODOS_TAB_LABEL;
   }
 
   function stopWatching() {

@@ -109,6 +109,18 @@ describe("the notebook lists meetings a page at a time", () => {
     expect(showOlderButton(notebook)).toBeNull();
   });
 
+  it("moves focus to the picker when the meeting list is hidden on a narrow screen", async () => {
+    const notebook = await openNotebookWith(25);
+    const hideList = notebook.document.createElement("style");
+    hideList.textContent = ".meeting-list { display: none; }";
+    notebook.document.head.append(hideList);
+
+    pressShowOlder(notebook);
+    await notebook.settle();
+
+    expect(notebook.document.activeElement?.id).toBe("meeting-select");
+  });
+
   it("with exactly 20 meetings there is nothing older to show", async () => {
     const notebook = await openNotebookWith(20);
 

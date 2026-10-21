@@ -21,13 +21,13 @@ export type FakeDocumentReference = {
   id: string;
   path: string;
   update(data: RecordBody): Promise<void>;
-  onSnapshot(next: (snapshot: FakeDocumentSnapshot) => void): Unsubscribe;
+  onSnapshot(next: (snapshot: FakeDocumentSnapshot) => void, onError?: (error: DbError) => void): Unsubscribe;
 };
 
 export type FakeCollectionReference = {
   path: string;
   doc(id: string): FakeDocumentReference;
-  onSnapshot(next: (snapshot: FakeQuerySnapshot) => void): Unsubscribe;
+  onSnapshot(next: (snapshot: FakeQuerySnapshot) => void, onError?: (error: DbError) => void): Unsubscribe;
 };
 
 export type FakeDb = {
@@ -40,6 +40,7 @@ export type FakeDatabase = {
   write(collection: string, id: string, data: RecordBody): void;
   read(collection: string, id: string): RecordBody | undefined;
   failNextUpdate(code: string): void;
+  failWatch(collection: string, code: string): void;
   db: FakeDb;
 };
 
@@ -62,8 +63,14 @@ type Scheduler = {
   isIdle(): boolean;
 };
 
-type Subscription = { collection: string; documentId?: string; deliver(): void };
+type Subscription = {
+  collection: string;
+  documentId?: string;
+  deliver(): void;
+  fail(error: DbError): void;
+};
 
+const ignoreError = (): void => undefined;
 const DEFAULT_ANSWER = "Here is what Claude drafted.";
 const CONFIRMED: SnapshotMetadata = { fromCache: false, hasPendingWrites: false };
 const DEFAULT_RUNTIME_OPTIONS: Required<RuntimeOptions> = {
@@ -155,20 +162,40 @@ class InMemoryDatabase implements FakeDatabase {
     this.pendingFailures.push(code);
   }
 
+  failWatch(collection: string, code: string): void {
+    [...this.subscriptions]
+      .filter((subscription) => subscription.collection === collection)
+      .forEach((subscription) => this.failLater(subscription, dbError(code, "The watch was refused.")));
+  }
+
   update(collection: string, id: string, patch: RecordBody): Promise<void> {
     return this.scheduler.later(() => this.applyUpdate(collection, id, patch));
   }
 
-  watchDocument(collection: string, id: string, next: (snapshot: FakeDocumentSnapshot) => void): Unsubscribe {
+  watchDocument(
+    collection: string,
+    id: string,
+    next: (snapshot: FakeDocumentSnapshot) => void,
+    onError: (error: DbError) => void = ignoreError,
+  ): Unsubscribe {
     return this.subscribe({
       collection,
       documentId: id,
       deliver: () => next(documentSnapshot(id, this.read(collection, id))),
+      fail: onError,
     });
   }
 
-  watchCollection(collection: string, next: (snapshot: FakeQuerySnapshot) => void): Unsubscribe {
-    return this.subscribe({ collection, deliver: () => next(querySnapshot(this.entriesInIdOrder(collection))) });
+  watchCollection(
+    collection: string,
+    next: (snapshot: FakeQuerySnapshot) => void,
+    onError: (error: DbError) => void = ignoreError,
+  ): Unsubscribe {
+    return this.subscribe({
+      collection,
+      deliver: () => next(querySnapshot(this.entriesInIdOrder(collection))),
+      fail: onError,
+    });
   }
 
   private applyUpdate(collection: string, id: string, patch: RecordBody): Promise<void> {
@@ -206,6 +233,14 @@ class InMemoryDatabase implements FakeDatabase {
     });
   }
 
+  private failLater(subscription: Subscription, error: DbError): void {
+    this.scheduler.schedule(() => {
+      if (this.subscriptions.delete(subscription)) {
+        subscription.fail(error);
+      }
+    });
+  }
+
   private documentsOf(collection: string): Map<string, RecordBody> {
     const documents = this.collections.get(collection) ?? new Map<string, RecordBody>();
     this.collections.set(collection, documents);
@@ -228,7 +263,7 @@ function collectionReference(database: InMemoryDatabase, collection: string): Fa
   return {
     path: collection,
     doc: (id) => documentReference(database, collection, id),
-    onSnapshot: (next) => database.watchCollection(collection, next),
+    onSnapshot: (next, onError) => database.watchCollection(collection, next, onError),
   };
 }
 
@@ -237,7 +272,7 @@ function documentReference(database: InMemoryDatabase, collection: string, id: s
     id,
     path: collection + "/" + id,
     update: (data) => database.update(collection, id, data),
-    onSnapshot: (next) => database.watchDocument(collection, id, next),
+    onSnapshot: (next, onError) => database.watchDocument(collection, id, next, onError),
   };
 }
 

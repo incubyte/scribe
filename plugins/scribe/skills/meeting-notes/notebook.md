@@ -10,7 +10,7 @@ If you have no artifact tools, or a publish or database call is refused for lack
 
 1. List your own artifacts and keep those titled exactly `Scribe notebook`, newest first.
 2. For each, get the database document `notebook/meta`. A refusal saying the artifact does not declare the database capability means a legacy notebook: skip it. The first one that answers is the notebook.
-3. If none answers, create the notebook.
+3. If none answers, create the notebook. A refusal of any other kind is not an answer: stop, report it in one line, and never create a notebook after an unexplained refusal.
 
 Never pick a notebook by title alone, and never read the page itself to decide.
 
@@ -46,7 +46,8 @@ A batch holds at most 50 entries. Never touch another meeting's records, and nev
 ## When a write is refused
 
 - A version conflict means the notebook changed since you read it. Re-read the same documents and send the batch once more. If it is refused again, reply in one line that the notebook changed while writing and to try again.
-- A document-count or size cap means the notebook is full. If the result shows some writes applied, delete the documents this run created, then reply in one line that the notebook is full.
+- A batch whose entries are pinned, which is any batch touching an existing document, is applied all-or-nothing, so a refused rewrite leaves nothing changed.
+- A document-count or size cap means the notebook is full. Only the unpinned batch of a brand-new meeting can apply partially. If the result shows some writes applied, delete exactly the documents that batch created, then reply in one line that the notebook is full.
 
 ## Reply
 
@@ -63,7 +64,7 @@ Old notebooks keep their meetings inside the page. Use this when the user asks t
 5. Take each meeting in turn. Skip it when its `id` is already in the notebook or came earlier in this import, whichever notebook it came from. Otherwise write it with one batch, as in Write the meeting, with these mappings:
    - `meetings/<id>` gets `title`, `started_at`, `duration_seconds`, `type`, `summary`, `speakers` and `blocks` as they are, and `todo_ids` from its todos in their order.
    - `meeting_index/<id>` gets `title`, `started_at`, `duration_seconds` and `type`.
-   - Each todo goes to `todos/<id>--<todo_id>`, with the old todo `id` as `todo_id`, its `text`, `owner`, `due` and `actions`, and `done` false and `done_at` null. Ticks in old notebooks were never saved, so every imported todo starts open.
+   - Each todo goes to `todos/<id>--<todo_id>` as the full todo record from Write the meeting: `meeting_id` the meeting's `id`, `meeting_title` its `title`, `meeting_started_at` its `started_at`, `todo_id` the old todo `id`, its `text`, `owner`, `due` and `actions`, and `done` false and `done_at` null. Ticks in old notebooks were never saved, so every imported todo starts open.
 6. If a batch is refused for a document-count or size cap, stop importing. Keep every earlier batch, delete only the documents the refused batch applied, and say which meetings were added before the stop.
 7. Reply `Added N meetings, skipped M already there.`
 
