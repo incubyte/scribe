@@ -8,6 +8,7 @@ The Scribe plugin gives Claude two commands for your calls: **recap** lists your
 - Claude Desktop restarted after connecting.
 - A paid Claude plan (web or Desktop) for the AI actions on todos.
 - Code execution turned on in Claude, so the notebook template can load.
+- A Claude that can publish artifacts (claude.ai/artifact links) for the notebook.
 
 ## Install
 
@@ -29,7 +30,7 @@ If the marketplace install does not work, download `scribe-plugin.zip` from the 
 ## Commands
 
 - `/recap` lists today's and yesterday's calls. Try `/recap last 3` or "recap my calls since Monday". In Claude Code it reads the calls in parallel with a small `call-summarizer` agent; in Claude Desktop it reads them one at a time.
-- `/meeting-notes` writes up one call. Try "meeting notes for my call with Priya". Use `/meeting-notes` with a row number from a recap in the same chat.
+- `/meeting-notes` writes up one call. Try "meeting notes for my call with Priya". Use `/meeting-notes` with a row number from a recap in the same chat. Each call is added to your one Scribe notebook, from any chat.
 
 You can also just ask in plain words, such as "what calls did I have this week?"
 

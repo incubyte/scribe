@@ -1,6 +1,6 @@
 ---
 name: meeting-notes
-description: Write up a call or meeting recorded by Scribe on this computer as notes with speakers, a summary and todos, kept in one Scribe notebook artifact. Use when the user asks for meeting notes, notes from their last call, or to write up the call with someone. Accepts a row number from an earlier recap, a name or a topic.
+description: Write up a call or meeting recorded by Scribe on this computer as notes with speakers, a summary and todos, kept in one Scribe notebook artifact shared by all your chats. Use when the user asks for meeting notes, notes from their last call, or to write up the call with someone. Accepts a row number from an earlier recap, a name or a topic.
 ---
 
 # Write meeting notes
@@ -78,13 +78,12 @@ An action is a `label` and a `prompt`. Choose actions that fit the call: "Create
 
 Write the prompt so it works alone: it states the task, names the owner and includes only the facts from the meeting that the task needs. Name the form of the output, for example "a 5-line email to Priya".
 
-## Build or update the notebook
+## Build the records
 
-Read `notebook.html` from this skill's folder. If you cannot read it, say the notebook needs code execution turned on, give the notes as plain markdown, and stop.
+A meeting is stored as records in the notebook's database, not in the page. Build these from your notes, then follow `notebook.md` beside this file to find the notebook and write them.
 
-Each meeting in the data island has these fields:
+The meeting body, written to `meetings/<id>`:
 
-- `id`: the transcript `id`.
 - `title`: a 3 to 6 word title you write from the content. Never use the stored `title`, because it is always the default `Call YYYY-MM-DD HH:MM` stamp.
 - `started_at` and `duration_seconds`: copied from `list_transcripts`.
 - `type`: the free short label.
@@ -97,24 +96,17 @@ Each meeting in the data island has these fields:
   - `table {columns[], rows[][]}`, for real tabular data only
   - `screen {offset, caption}`: a caption and offset only, because images cannot be embedded
   - `callout {tone, text}`, with `tone` either `info` or `risk`
-- `todos`: a list of `id`, `text`, `owner`, `due`, `actions`, where each action is `label` and `prompt`.
+- `todo_ids`: the todo ids in the order you wrote them.
 
-Make the artifact like this:
-
-1. If no Scribe notebook artifact exists in this conversation, create one titled `Scribe notebook` from the template, with the data island `<script type="application/json" id="scribe-meetings">` set to a one-meeting array holding the new meeting.
-2. If one exists, take the meetings array from the data island of the latest version of that artifact, which you wrote earlier in this conversation. Keep every meeting exactly as it is. Replace a meeting only when it has the same `id` as the new one, otherwise put the new meeting first. Then update that same artifact with the full template and the complete array.
-
-When you publish with an Artifact tool that takes `capabilities` (claude.ai/artifact links), pass `capabilities: {sample: {}}` when you create the notebook, or the AI action buttons stay disabled. Leave `capabilities` out when you update it, so the declaration carries forward.
-
-Start from the unmodified template file each time. Change only the data island. Never edit the template's markup, styles or script.
+The `<id>` is the transcript `id`. Each todo body has `todo_id` (the `id` from the todos section), `text`, `owner`, `due` and `actions`, where each action is `label` and `prompt`. `notebook.md` adds the fields the page needs to list the meeting and tick the todo.
 
 Reply with one line that names the meeting you added and says how many meetings the notebook now holds.
 
 ## Rules
 
 - Never present a guessed name as fact. Every name other than `Me` carries a `confidence`.
-- Never create a second notebook in the same conversation.
-- Never drop or change an earlier meeting when you update the notebook.
-- Write the JSON for the data island with `<` escaped as `<`, so transcript text can never close the script.
+- Never create a second notebook while one exists.
+- Never write to a notebook that declares no database.
+- Never change another meeting's records when you write one meeting.
 - Give every todo 1 to 2 actions, each with a non-empty `label` and `prompt`.
 - Fetch at most 8 screenshots, and never transcribe a sensitive screen.

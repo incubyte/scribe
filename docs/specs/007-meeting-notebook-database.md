@@ -192,16 +192,16 @@ sequenceDiagram
 
 **Acceptance criteria**
 
-- [ ] **5.2.1** Running the skill in two separate chats writes both meetings into the same notebook, and no second notebook is created.
-- [ ] **5.2.2** With no notebook that declares the database, the skill publishes the template titled "Scribe notebook" with the database and ask-Claude capabilities and writes the meeting into it.
-- [ ] **5.2.3** A legacy notebook is never chosen as the write target, even when it is the most recently opened.
-- [ ] **5.2.4** The meeting and its todos are written in one batch; a meeting with 6 todos is one meeting record and 6 todo records.
-- [ ] **5.2.5** Writing a meeting already in the notebook replaces its record; todos that keep their todo id keep their done state, and todos no longer present are deleted.
-- [ ] **5.2.6** Writing one meeting leaves every other meeting record and todo record unchanged.
-- [ ] **5.2.7** When a write is refused because the record changed since it was read, the skill re-reads and writes again once, and reports a failure in one line if the retry is also refused.
-- [ ] **5.2.8** When the notebook is full (document or size cap), the skill says so in one line and writes nothing partial.
-- [ ] **5.2.9** When the skill cannot publish artifacts or write the database in this Claude, it gives the notes as markdown and says the notebook needs a Claude that can publish artifacts.
-- [ ] **5.2.10** The skill's reply is one line naming the meeting and the notebook's meeting count, plus the notebook link when it was just created.
+- [x] **5.2.1** Running the skill in two separate chats writes both meetings into the same notebook, and no second notebook is created.
+- [x] **5.2.2** With no notebook that declares the database, the skill publishes the template titled "Scribe notebook" with the database and ask-Claude capabilities and writes the meeting into it.
+- [x] **5.2.3** A legacy notebook is never chosen as the write target, even when it is the most recently opened.
+- [x] **5.2.4** The meeting and its todos are written in one batch; a meeting with 6 todos is one meeting record and 6 todo records.
+- [x] **5.2.5** Writing a meeting already in the notebook replaces its record; todos that keep their todo id keep their done state, and todos no longer present are deleted.
+- [x] **5.2.6** Writing one meeting leaves every other meeting record and todo record unchanged.
+- [x] **5.2.7** When a write is refused because the record changed since it was read, the skill re-reads and writes again once, and reports a failure in one line if the retry is also refused.
+- [x] **5.2.8** When the notebook is full (document or size cap), the skill says so in one line and writes nothing partial.
+- [x] **5.2.9** When the skill cannot publish artifacts or write the database in this Claude, it gives the notes as markdown and says the notebook needs a Claude that can publish artifacts.
+- [x] **5.2.10** The skill's reply is one line naming the meeting and the notebook's meeting count, plus the notebook link when it was just created.
 
 ### 5.3 Wear the Incubyte theme
 
