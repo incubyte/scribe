@@ -581,6 +581,16 @@ select {
   cursor: not-allowed;
 }
 
+.todo__error {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+.todo__error:empty {
+  display: none;
+}
+
 .todo__reason {
   margin: 0;
   font-size: var(--text-sm);
@@ -719,6 +729,9 @@ select {
   const UNTITLED_MEETING = "Untitled meeting";
   const NO_MEETINGS_TITLE = "No meetings yet";
   const NO_MEETINGS_HINT = "Run /meeting-notes in Claude to add your first meeting.";
+  const TODO_READ_ONLY_REASON = "You can view this notebook but not tick todos.";
+  const TODO_NOT_SAVED_MESSAGE = "Couldn't save that change. Try again.";
+  const TODO_READ_ONLY_REASON_ID = "todo-read-only-reason";
   const DATABASE_UNAVAILABLE_MESSAGE = "This notebook needs Claude to load. Open it on claude.ai while signed in.";
 
   const COLLECTIONS = { meetings: "meetings", meetingIndex: "meeting_index", todos: "todos" };
@@ -833,6 +846,24 @@ select {
     }
   }
 
+  async function resolveCanWriteTodos() {
+    const user = await useCapability("user");
+    if (typeof user?.can !== "function") {
+      return null;
+    }
+    try {
+      const allowed = await user.can("data.write");
+      return typeof allowed === "boolean" ? allowed : null;
+    } catch (error) {
+      logFailure(error);
+      return null;
+    }
+  }
+
+  function todoDoneState(todos, todoDocId) {
+    return todos.find((todo) => todo.id === todoDocId)?.done === true;
+  }
+
   async function resolveNotebookStore() {
     const db = await useCapability("db");
     return db ? createNotebookStore(db) : null;
@@ -845,7 +876,9 @@ select {
       watchMeeting: (meetingId, onChange, onError) =>
         db.collection(COLLECTIONS.meetings).doc(meetingId).onSnapshot((snapshot) => onChange(snapshot.exists ? asMeeting(snapshot) : null), onError),
       watchTodos: (onChange, onError) =>
-        db.collection(COLLECTIONS.todos).onSnapshot((snapshot) => onChange(snapshot.docs.map(asTodo)), onError)
+        db.collection(COLLECTIONS.todos).onSnapshot((snapshot) => onChange(snapshot.docs.map(asTodo)), onError),
+      setTodoDone: (todoDocId, done, doneAt) =>
+        db.doc(COLLECTIONS.todos + "/" + todoDocId).update({ done, done_at: doneAt })
     };
   }
 
@@ -1253,9 +1286,13 @@ select {
     const checkbox = element("input", "todo__checkbox");
     checkbox.type = "checkbox";
     checkbox.dataset.todoId = todo.todo_id;
-    checkbox.checked = todo.done;
+    checkbox.dataset.todoDocId = todo.id;
+    checkbox.checked = state.pendingTicks.get(todo.id) ?? todo.done;
+    checkbox.addEventListener("change", () => toggleTodoDone(todo.id, checkbox.checked));
+    const notSaved = element("p", "todo__error");
+    notSaved.setAttribute("role", "alert");
     choice.append(checkbox, element("span", "todo__text", todo.text));
-    body.append(choice, element("p", "todo__meta", describeTodo(todo)), renderActions(meeting, todo));
+    body.append(choice, notSaved, element("p", "todo__meta", describeTodo(todo)), renderActions(meeting, todo));
     item.append(body);
     return item;
   }
@@ -1265,7 +1302,83 @@ select {
     const list = element("ul", "item-list");
     todos.forEach((todo) => list.append(renderTodo(meeting, todo)));
     panel.append(element("h3", "panel__heading", "Todos"), list);
+    if (state.canWriteTodos === false) {
+      lockReadOnlyChecks(panel, TODO_READ_ONLY_REASON_ID);
+    }
     return panel;
+  }
+
+  function lockReadOnlyChecks(root, reasonId) {
+    const reason = element("p", "todo__reason", TODO_READ_ONLY_REASON);
+    reason.id = reasonId;
+    root.querySelector(".panel__heading")?.after(reason);
+    root.querySelectorAll(".todo__checkbox").forEach((checkbox) => {
+      checkbox.disabled = true;
+      checkbox.setAttribute("aria-describedby", reasonId);
+    });
+  }
+
+  function todoCheckboxes(root) {
+    return Array.from(root.querySelectorAll(".todo__checkbox"));
+  }
+
+  function checkboxOfTodo(root, todoDocId) {
+    return todoCheckboxes(root).find((checkbox) => checkbox.dataset.todoDocId === todoDocId);
+  }
+
+  function patchTodoChecks(root, todos) {
+    todos
+      .filter((todo) => !state.pendingTicks.has(todo.id))
+      .forEach((todo) => {
+        const checkbox = checkboxOfTodo(root, todo.id);
+        if (checkbox) {
+          checkbox.checked = todo.done;
+        }
+      });
+  }
+
+  function showsExactly(root, todos) {
+    const shown = todoCheckboxes(root).map((checkbox) => checkbox.dataset.todoDocId);
+    return shown.length === todos.length && todos.every((todo) => shown.includes(todo.id));
+  }
+
+  async function toggleTodoDone(todoDocId, done) {
+    const isWriteInFlight = state.pendingTicks.has(todoDocId);
+    state.pendingTicks.set(todoDocId, done);
+    showTickMessage(todoDocId, "");
+    if (!isWriteInFlight) {
+      await flushTick(todoDocId);
+    }
+  }
+
+  async function flushTick(todoDocId) {
+    try {
+      let written;
+      do {
+        written = state.pendingTicks.get(todoDocId);
+        await state.store.setTodoDone(todoDocId, written, written ? new Date().toISOString() : null);
+      } while (state.pendingTicks.get(todoDocId) !== written);
+      state.pendingTicks.delete(todoDocId);
+    } catch (error) {
+      state.pendingTicks.delete(todoDocId);
+      undoTick(todoDocId);
+      logFailure(error);
+    }
+  }
+
+  function undoTick(todoDocId) {
+    const checkbox = checkboxOfTodo(document, todoDocId);
+    if (checkbox) {
+      checkbox.checked = todoDoneState(state.todos, todoDocId);
+    }
+    showTickMessage(todoDocId, TODO_NOT_SAVED_MESSAGE);
+  }
+
+  function showTickMessage(todoDocId, message) {
+    const notSaved = checkboxOfTodo(document, todoDocId)?.closest(".todo")?.querySelector(".todo__error");
+    if (notSaved) {
+      notSaved.textContent = message;
+    }
   }
 
   function replaceTodoPanel(meeting, todos) {
@@ -1282,6 +1395,8 @@ select {
     selectedId: null,
     selectedMeeting: null,
     todos: [],
+    canWriteTodos: null,
+    pendingTicks: new Map(),
     askClaude: null,
     unwatchSelected: null,
     unwatchNotebook: []
@@ -1295,7 +1410,9 @@ select {
     }
     state.store = store;
     state.unwatchNotebook = [store.watchMeetingIndex(showSummaries, showFailure), store.watchTodos(showTodos, showFailure)];
-    enableClaudeActions(await resolveAskClaude());
+    state.canWriteTodos = await resolveCanWriteTodos();
+    state.askClaude = await resolveAskClaude();
+    refreshSelectedTodos();
   }
 
   function showSummaries(summaries) {
@@ -1340,6 +1457,19 @@ select {
 
   function showTodos(todos) {
     state.todos = todos;
+    syncSelectedTodos();
+  }
+
+  function syncSelectedTodos() {
+    if (!state.selectedMeeting) {
+      return;
+    }
+    const todosOfSelected = todosOfMeeting(state.todos, state.selectedMeeting);
+    const panel = document.querySelector("#meeting-pane .panel--todos");
+    if (panel && showsExactly(panel, todosOfSelected)) {
+      patchTodoChecks(panel, todosOfSelected);
+      return;
+    }
     refreshSelectedTodos();
   }
 
@@ -1347,14 +1477,6 @@ select {
     if (state.selectedMeeting) {
       replaceTodoPanel(state.selectedMeeting, todosOfMeeting(state.todos, state.selectedMeeting));
     }
-  }
-
-  function enableClaudeActions(askClaude) {
-    if (!askClaude) {
-      return;
-    }
-    state.askClaude = askClaude;
-    refreshSelectedTodos();
   }
 
   function showFailure(error) {

@@ -235,11 +235,11 @@ Ticking a todo in the meeting view marks it done in the database. The tick survi
 
 **Acceptance criteria**
 
-- [ ] **5.4.1** Ticking a todo sets its record's `done` to true and `done_at` to the tick time; unticking sets `done` to false and clears `done_at`.
-- [ ] **5.4.2** After a reload, and in another viewer's open page, the todo shows the same state.
-- [ ] **5.4.3** A viewer without write access sees disabled checkboxes with an accessible reason, and no write is attempted.
-- [ ] **5.4.4** When a tick fails to save, the checkbox returns to its saved state and a one-line message says the change was not saved.
-- [ ] **5.4.5** Repeated ticks on one todo send one write at a time; the last state the viewer chose is the one saved.
+- [x] **5.4.1** Ticking a todo sets its record's `done` to true and `done_at` to the tick time; unticking sets `done` to false and clears `done_at`.
+- [x] **5.4.2** After a reload, and in another viewer's open page, the todo shows the same state.
+- [x] **5.4.3** A viewer without write access sees disabled checkboxes with an accessible reason, and no write is attempted.
+- [x] **5.4.4** When a tick fails to save, the checkbox returns to its saved state and a one-line message says the change was not saved.
+- [x] **5.4.5** Repeated ticks on one todo send one write at a time; the last state the viewer chose is the one saved.
 
 ### 5.5 See every todo in a Todos tab
 
