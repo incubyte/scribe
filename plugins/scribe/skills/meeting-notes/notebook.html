@@ -1659,7 +1659,7 @@ select {
   }
 
   function renderTodo(todo, scope) {
-    const item = element("li", "item" + (todo.owner === "Me" ? " line--me" : ""));
+    const item = element("li", "item" + (ownerGroupOf(todo.owner) === "mine" ? " line--me" : ""));
     const body = element("div", "todo");
     const choice = element("label", "todo__choice");
     const checkbox = element("input", "todo__checkbox");

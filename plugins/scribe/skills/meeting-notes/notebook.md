@@ -46,8 +46,8 @@ A batch holds at most 50 entries. Never touch another meeting's records, and nev
 ## When a write is refused
 
 - A version conflict means the notebook changed since you read it. Re-read the same documents and send the batch once more. If it is refused again, reply in one line that the notebook changed while writing and to try again.
-- A batch whose entries are pinned, which is any batch touching an existing document, is applied all-or-nothing, so a refused rewrite leaves nothing changed.
-- A document-count or size cap means the notebook is full. Only the unpinned batch of a brand-new meeting can apply partially. If the result shows some writes applied, delete exactly the documents that batch created, then reply in one line that the notebook is full.
+- The batch result says whether it was applied all-or-nothing or one write at a time. A refused all-or-nothing batch changed nothing.
+- A document-count or size cap means the notebook is full. If the result shows a batch applied one write at a time and stopped part-way, undo exactly the entries it applied: delete the documents it created, and set each document it changed or deleted back to the body you read before the batch. Then reply in one line that the notebook is full.
 
 ## Reply
 
