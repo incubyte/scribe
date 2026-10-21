@@ -1,4 +1,6 @@
 #[cfg(target_os = "macos")]
+mod call_probe;
+#[cfg(target_os = "macos")]
 mod capture;
 #[cfg(target_os = "macos")]
 mod device_watch;
@@ -13,5 +15,7 @@ mod system_output;
 #[cfg(target_os = "macos")]
 mod tap;
 
+#[cfg(target_os = "macos")]
+pub use call_probe::CoreAudioCallProbe;
 #[cfg(target_os = "macos")]
 pub use system_output::SystemOutputSource;
