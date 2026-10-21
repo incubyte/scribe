@@ -37,11 +37,10 @@ pub fn open_for_call<R: Runtime>(app: &AppHandle<R>) {
         return;
     }
     log_failure(place_at_tray(&window), "could not place the popover");
+    with_guard(app, |guard| guard.shown_awaiting_focus(Instant::now()));
     if window.show().is_err() {
         tracing::warn!("could not show the popover for a call");
-        return;
     }
-    with_guard(app, |guard| guard.shown_awaiting_focus(Instant::now()));
 }
 
 pub fn install_blur_hide<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
@@ -85,7 +84,10 @@ fn show<R: Runtime>(app: &AppHandle<R>, window: &WebviewWindow<R>) -> tauri::Res
 fn place_at_tray<R: Runtime>(window: &WebviewWindow<R>) -> tauri::Result<()> {
     window
         .move_window_constrained(Position::TrayCenter)
-        .or_else(|_| window.move_window(FALLBACK_POSITION))
+        .or_else(|error| {
+            tracing::debug!(%error, "tray position not known yet, using the fallback position");
+            window.move_window(FALLBACK_POSITION)
+        })
 }
 
 fn hide_after_blur<R: Runtime>(app: &AppHandle<R>, window: &WebviewWindow<R>) {

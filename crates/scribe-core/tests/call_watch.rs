@@ -50,6 +50,22 @@ fn a_release_one_millisecond_short_of_the_grace_keeps_the_same_call() {
 }
 
 #[test]
+fn retaking_the_microphone_during_a_brief_release_restarts_the_grace() {
+    let started = Instant::now();
+    let mut watch = CallWatch::new(GRACE);
+    watch.observe(true, started);
+    watch.mark_reported();
+    watch.observe(false, started);
+    watch.observe(true, started + Duration::from_secs(10));
+    watch.observe(false, started + Duration::from_secs(20));
+
+    watch.observe(false, started + GRACE);
+    watch.observe(true, started + GRACE);
+
+    assert!(!watch.is_start_due());
+}
+
+#[test]
 fn a_release_lasting_exactly_the_grace_ends_the_call() {
     let started = Instant::now();
     let mut watch = CallWatch::new(GRACE);

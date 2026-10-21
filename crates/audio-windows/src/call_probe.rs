@@ -4,7 +4,8 @@ use std::collections::HashMap;
 
 use scribe_core::ports::{CallProbe, CaptureError};
 use wasapi::{
-    Device, DeviceEnumerator, Direction, SessionState, WasapiError, deinitialize, initialize_mta,
+    AudioSessionEnumerator, DeviceCollection, DeviceEnumerator, Direction, SessionState,
+    WasapiError, deinitialize, initialize_mta,
 };
 use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::System::Diagnostics::ToolHelp::{
@@ -59,25 +60,54 @@ fn active_capture_pids() -> Result<Vec<u32>, CaptureError> {
 
 fn collect_capture_pids() -> Result<Vec<u32>, WasapiError> {
     let devices = DeviceEnumerator::new()?.get_device_collection(&Direction::Capture)?;
-    let mut pids = Vec::new();
-    for index in 0..devices.get_nbr_devices()? {
-        pids.extend(active_session_pids(&devices.get_device_at_index(index)?)?);
-    }
-    Ok(pids)
+    let device_count = devices.get_nbr_devices()?;
+    Ok((0..device_count)
+        .flat_map(|index| device_session_pids(&devices, index))
+        .collect())
 }
 
-fn active_session_pids(device: &Device) -> Result<Vec<u32>, WasapiError> {
-    let sessions = device
+fn device_session_pids(devices: &DeviceCollection, index: u32) -> Vec<u32> {
+    skip_unreadable(
+        active_session_pids(devices, index),
+        "skipping an unreadable capture device",
+    )
+    .unwrap_or_default()
+}
+
+fn active_session_pids(devices: &DeviceCollection, index: u32) -> Result<Vec<u32>, WasapiError> {
+    let sessions = devices
+        .get_device_at_index(index)?
         .get_iaudiosessionmanager()?
         .get_audiosessionenumerator()?;
-    let mut pids = Vec::new();
-    for index in 0..sessions.get_count()? {
-        let session = sessions.get_session(index)?;
-        if session.get_state()? == SessionState::Active {
-            pids.push(session.get_process_id()?);
-        }
+    Ok((0..sessions.get_count()?)
+        .filter_map(|session_index| active_session_pid(&sessions, session_index))
+        .filter(|pid| *pid != NO_PROCESS)
+        .collect())
+}
+
+fn active_session_pid(sessions: &AudioSessionEnumerator, index: i32) -> Option<u32> {
+    skip_unreadable(
+        active_process_id(sessions, index),
+        "skipping an unreadable audio session",
+    )
+    .flatten()
+}
+
+fn active_process_id(
+    sessions: &AudioSessionEnumerator,
+    index: i32,
+) -> Result<Option<u32>, WasapiError> {
+    let session = sessions.get_session(index)?;
+    if session.get_state()? == SessionState::Active {
+        return session.get_process_id().map(Some);
     }
-    Ok(pids.into_iter().filter(|pid| *pid != NO_PROCESS).collect())
+    Ok(None)
+}
+
+fn skip_unreadable<T>(outcome: Result<T, WasapiError>, message: &str) -> Option<T> {
+    outcome
+        .inspect_err(|error| tracing::debug!(%error, "{message}"))
+        .ok()
 }
 
 struct ProcessTable(HashMap<u32, (u32, String)>);
