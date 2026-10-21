@@ -238,6 +238,10 @@ select {
   list-style: none;
 }
 
+.show-older {
+  margin-top: var(--space-2);
+}
+
 .session {
   display: flex;
   flex-direction: column;
@@ -874,6 +878,8 @@ select {
   const UNTITLED_MEETING = "Untitled meeting";
   const NO_MEETINGS_TITLE = "No meetings yet";
   const NO_MEETINGS_HINT = "Run /meeting-notes in Claude to add your first meeting.";
+  const SHOW_OLDER_LABEL = "Show older meetings";
+  const MEETINGS_PER_PAGE = 20;
   const TODO_READ_ONLY_REASON = "You can view this notebook but not tick todos.";
   const TODO_NOT_SAVED_MESSAGE = "Couldn't save that change. Try again.";
   const TODO_READ_ONLY_REASON_ID = "todo-read-only-reason";
@@ -983,6 +989,11 @@ select {
       return selectedId;
     }
     return summaries[0]?.id ?? null;
+  }
+
+  function pageOfMeetings(ordered, pagesShown) {
+    const shown = ordered.slice(0, pagesShown * MEETINGS_PER_PAGE);
+    return { shown, hasOlder: ordered.length > shown.length };
   }
 
   function naturalOrder(left, right) {
@@ -1166,17 +1177,44 @@ select {
     document.getElementById("meeting-count").textContent = "";
   }
 
-  function patchMeetingList(summaries) {
+  function patchMeetingList(page) {
     const sidebar = document.getElementById("sidebar");
-    if (summaries.length === 0) {
+    if (page.shown.length === 0) {
       sidebar.replaceChildren();
       return;
     }
     if (!sidebar.querySelector(".meeting-list")) {
       sidebar.replaceChildren(element("h2", "sidebar__heading", "Meetings"), buildMeetingSelect(), element("ul", "meeting-list"));
     }
-    document.getElementById("meeting-select").replaceChildren(...summaries.map(buildMeetingOption));
-    sidebar.querySelector(".meeting-list").replaceChildren(...summaries.map(buildMeetingButton));
+    document.getElementById("meeting-select").replaceChildren(...page.shown.map(buildMeetingOption));
+    sidebar.querySelector(".meeting-list").replaceChildren(...page.shown.map(buildMeetingButton));
+    removeShowOlderButton();
+    if (page.hasOlder) {
+      sidebar.append(buildShowOlderButton(showOlderMeetings));
+    }
+  }
+
+  function appendMeetingRows(meetings) {
+    document.querySelector(".meeting-list").append(...meetings.map(buildMeetingButton));
+  }
+
+  function appendMeetingOptions(meetings) {
+    document.getElementById("meeting-select").append(...meetings.map(buildMeetingOption));
+  }
+
+  function buildShowOlderButton(onPress) {
+    const button = element("button", "button show-older", SHOW_OLDER_LABEL);
+    button.type = "button";
+    button.addEventListener("click", onPress);
+    return button;
+  }
+
+  function removeShowOlderButton() {
+    document.querySelector("#sidebar .show-older")?.remove();
+  }
+
+  function focusMeetingRow(index) {
+    document.querySelectorAll(".meeting-list .session")[index]?.focus();
   }
 
   function buildMeetingSelect() {
@@ -1621,6 +1659,7 @@ select {
   const state = {
     store: null,
     summaries: [],
+    pagesShown: 1,
     selectedId: null,
     selectedMeeting: null,
     resolveMeetingShown: null,
@@ -1651,8 +1690,22 @@ select {
   function showSummaries(summaries) {
     state.summaries = orderNewestFirst(summaries);
     renderMeetingCount(state.summaries.length);
-    patchMeetingList(state.summaries);
+    patchMeetingList(pageOfMeetings(state.summaries, state.pagesShown));
     followSelection(selectionWithin(state.summaries, state.selectedId));
+  }
+
+  function showOlderMeetings() {
+    const shownBefore = pageOfMeetings(state.summaries, state.pagesShown).shown.length;
+    state.pagesShown += 1;
+    const page = pageOfMeetings(state.summaries, state.pagesShown);
+    const newlyShown = page.shown.slice(shownBefore);
+    appendMeetingOptions(newlyShown);
+    appendMeetingRows(newlyShown);
+    markSelected(state.selectedId);
+    if (!page.hasOlder) {
+      removeShowOlderButton();
+      focusMeetingRow(shownBefore);
+    }
   }
 
   function followSelection(id) {
@@ -1912,7 +1965,7 @@ select {
   function showUnavailable() {
     stopWatching();
     clearMeetingCount();
-    patchMeetingList([]);
+    patchMeetingList(pageOfMeetings([], state.pagesShown));
     showInPane(renderUnavailableState());
   }
 

@@ -287,11 +287,11 @@ The meeting list shows the newest 20 meetings. When more exist, a "Show older me
 
 **Acceptance criteria**
 
-- [ ] **5.6.1** With more than 20 meetings, the list shows the newest 20 and a "Show older meetings" button.
-- [ ] **5.6.2** Each press adds the next 20 older meetings to the end of the list and keeps the current selection and scroll position.
-- [ ] **5.6.3** The button is absent when every meeting is shown, including at exactly 20 meetings.
-- [ ] **5.6.4** The meeting count in the header shows the total number of meetings, not the number loaded.
-- [ ] **5.6.5** The under-640px meeting picker lists the loaded meetings and offers the same "Show older meetings" step.
+- [x] **5.6.1** With more than 20 meetings, the list shows the newest 20 and a "Show older meetings" button.
+- [x] **5.6.2** Each press adds the next 20 older meetings to the end of the list and keeps the current selection and scroll position.
+- [x] **5.6.3** The button is absent when every meeting is shown, including at exactly 20 meetings.
+- [x] **5.6.4** The meeting count in the header shows the total number of meetings, not the number loaded.
+- [x] **5.6.5** The under-640px meeting picker lists the loaded meetings and offers the same "Show older meetings" step.
 
 ### 5.7 Import old notebooks and upgrade the page
 
