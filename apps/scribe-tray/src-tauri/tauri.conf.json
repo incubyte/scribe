@@ -19,10 +19,7 @@
         "decorations": false,
         "transparent": true,
         "windowEffects": {
-          "effects": [
-            "popover",
-            "mica"
-          ],
+          "effects": ["popover", "mica"],
           "state": "active",
           "radius": 12
         },
