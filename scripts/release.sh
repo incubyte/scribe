@@ -7,6 +7,9 @@ windows_target="x86_64-pc-windows-msvc"
 version="$(jq -r .version "$tray/src-tauri/tauri.conf.json")"
 tag="v$version"
 plugin_zip="$root/target/release/scribe-plugin.zip"
+dmg="$root/target/release/bundle/dmg/Scribe_${version}_aarch64.dmg"
+signing_identity="Developer ID Application: Sapankumar Parikh H (V92DDD85J3)"
+notary_profile="scribe-notary"
 export PATH="/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/lld/bin:$PATH"
 
 require_clean_main() {
@@ -20,9 +23,23 @@ require_clean_main() {
   fi
 }
 
+require_notary_credentials() {
+  if ! xcrun notarytool history --keychain-profile "$notary_profile" > /dev/null 2>&1; then
+    echo "Store notarization credentials first: xcrun notarytool store-credentials $notary_profile" >&2
+    exit 1
+  fi
+}
+
 build_macos() {
   bash "$tray/scripts/stage-sidecar.sh"
-  (cd "$tray" && npx tauri build --bundles dmg --config src-tauri/tauri.ci.conf.json)
+  (cd "$tray" && APPLE_SIGNING_IDENTITY="$signing_identity" \
+    npx tauri build --bundles dmg --config src-tauri/tauri.ci.conf.json)
+}
+
+notarize_macos() {
+  xcrun notarytool submit "$dmg" --keychain-profile "$notary_profile" --wait
+  xcrun stapler staple "$dmg"
+  spctl --assess --type open --context context:primary-signature --verbose "$dmg"
 }
 
 build_windows() {
@@ -60,7 +77,6 @@ tag_release() {
 }
 
 publish_assets() {
-  local dmg="$root/target/release/bundle/dmg/Scribe_${version}_aarch64.dmg"
   local installer="$root/target/$windows_target/release/bundle/nsis/Scribe_${version}_x64-setup.exe"
   if ! gh release view "$tag" > /dev/null 2>&1; then
     gh release create "$tag" --draft --title "Scribe $tag" --notes-file "$root/scripts/release-notes.md"
@@ -69,7 +85,9 @@ publish_assets() {
 }
 
 require_clean_main
+require_notary_credentials
 build_macos
+notarize_macos
 build_windows
 build_plugin_zip
 tag_release

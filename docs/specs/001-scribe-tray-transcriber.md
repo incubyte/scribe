@@ -610,7 +610,7 @@ Greenfield — every module is new.
 
 **9.4 Encryption at rest and Intel Macs.** Both are out of scope for v1 and not yet decided. Awaiting: product decision.
 
-**9.5 Code-signing identities.** An Apple Developer ID (signing and notarisation) and a Windows Authenticode certificate are needed for 6.5.4. Awaiting: Incubyte account owners. Also blocks the manual checks for system-audio permission (AC 5.4.1, 5.4.3, 5.4.4).
+**9.5 Code-signing identities.** An Apple Developer ID (signing and notarisation) and a Windows Authenticode certificate are needed for 6.5.4. Apple: resolved on 2026-10-22 with a personal Developer ID (ADR 8). Windows: awaiting Incubyte account owners. Also blocks the manual checks for system-audio permission (AC 5.4.1, 5.4.3, 5.4.4).
 
 **9.6 Deferred LOW review findings (end-of-spec review, 2026-10-18).** Recorded, not fixed:
 - Provisioner rename and marker write are not atomic; re-hash a pinned-size file with no marker instead of re-downloading it.

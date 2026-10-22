@@ -30,4 +30,4 @@ Releases are built on this Mac (no CI minutes):
 
 `scripts/release.sh` also validates the Claude plugin and uploads `scribe-plugin.zip`; the manual `release.yml` fallback does neither.
 
-`.github/workflows/release.yml` is a manual fallback that builds the Windows installer on GitHub for an existing tag. Builds are ad-hoc signed (macOS) and unsigned (Windows) until signing certificates exist. Keep `src-tauri/Entitlements.plist` with the audio-input entitlement whenever signing changes, or the microphone stops working. Decisions behind this are ADR 4 to ADR 6 in `docs/ARCHITECTURE.md`.
+`.github/workflows/release.yml` is a manual fallback that builds the Windows installer on GitHub for an existing tag. macOS builds are signed with a Developer ID and notarized, which needs the certificate in the keychain and a one-time `xcrun notarytool store-credentials scribe-notary`; Windows builds are unsigned. Keep `src-tauri/Entitlements.plist` with the audio-input entitlement whenever signing changes, or the microphone stops working. Decisions behind this are ADR 4 to ADR 6 and ADR 8 in `docs/ARCHITECTURE.md`.

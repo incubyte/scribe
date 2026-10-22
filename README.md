@@ -31,9 +31,9 @@ Download the latest build from the [Releases page](https://github.com/incubyte/s
 | macOS | `Scribe_<version>_aarch64.dmg` | Apple Silicon, macOS 26 or later |
 | Windows | `Scribe_<version>_x64-setup.exe` | 64-bit Windows 10 (2004) or later |
 
-Builds are not signed with a developer certificate yet, so each platform asks you to confirm the first launch:
+The macOS build is signed and notarized by Apple. The Windows build is not signed yet, so Windows asks you to confirm the first launch:
 
-- **macOS:** open Scribe once, then go to System Settings → Privacy & Security and choose **Open Anyway**. Allow the **Microphone** and **System Audio Recording** permissions when Scribe asks for them, and **Screen Recording** the first time you take a screenshot. macOS asks you to reconfirm Screen Recording about once a month.
+- **macOS:** open Scribe. Allow the **Microphone** and **System Audio Recording** permissions when Scribe asks for them, and **Screen Recording** the first time you take a screenshot. macOS asks you to reconfirm Screen Recording about once a month.
 - **Windows:** on the SmartScreen prompt, choose **More info → Run anyway**. The installer also installs the Microsoft Visual C++ runtime if your computer does not have it yet, and on first launch Scribe downloads its speech model (about 670 MB).
 
 ## Use

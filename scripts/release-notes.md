@@ -1,4 +1,2 @@
-Unsigned build. On first launch:
-
-- macOS (Apple Silicon, macOS 26 or later): open System Settings → Privacy & Security and choose Open Anyway for Scribe.
-- Windows: on the SmartScreen prompt choose More info → Run anyway.
+- macOS (Apple Silicon, macOS 26 or later): signed and notarized by Apple. If you used an earlier version, allow the Microphone, System Audio Recording and Screen Recording permissions again when Scribe asks; this happens once.
+- Windows: unsigned. On the SmartScreen prompt, choose More info → Run anyway.
