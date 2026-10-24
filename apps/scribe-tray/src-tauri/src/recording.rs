@@ -73,6 +73,10 @@ impl RecordingController {
         self.recorder().state()
     }
 
+    fn is_recording(&self) -> bool {
+        self.state() == RecorderState::Recording
+    }
+
     pub fn live_session(&self) -> Option<LiveSession> {
         self.live.current()
     }
@@ -151,6 +155,11 @@ struct StatePayload {
 #[derive(Clone, Serialize)]
 struct StartFailedPayload {
     reason_kind: &'static str,
+}
+
+pub fn is_recording<R: Runtime>(app: &AppHandle<R>) -> bool {
+    app.try_state::<RecordingController>()
+        .is_some_and(|controller| controller.is_recording())
 }
 
 pub fn publish_state<R: Runtime>(app: &AppHandle<R>) {

@@ -6,17 +6,13 @@ use tauri_plugin_updater::{Update, UpdaterExt};
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 
-#[derive(Debug, thiserror::Error)]
-pub enum FeedError {
-    #[error(transparent)]
-    Updater(#[from] tauri_plugin_updater::Error),
-}
-
-pub fn newer_release<R: Runtime>(app: &AppHandle<R>) -> Result<Option<Update>, FeedError> {
+pub fn newer_release<R: Runtime>(
+    app: &AppHandle<R>,
+) -> tauri_plugin_updater::Result<Option<Update>> {
     let updater = app.updater_builder().timeout(REQUEST_TIMEOUT).build()?;
-    Ok(block_on(updater.check())?)
+    block_on(updater.check())
 }
 
-pub fn download(update: &Update) -> Result<Vec<u8>, FeedError> {
-    Ok(block_on(update.download(|_, _| {}, || {}))?)
+pub fn download(update: &Update) -> tauri_plugin_updater::Result<Vec<u8>> {
+    block_on(update.download(|_, _| {}, || {}))
 }

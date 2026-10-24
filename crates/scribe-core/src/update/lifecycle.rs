@@ -11,11 +11,6 @@ impl ReleaseVersion {
     pub fn new(text: impl Into<String>) -> Self {
         Self(text.into())
     }
-
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
 }
 
 impl fmt::Display for ReleaseVersion {
@@ -24,14 +19,52 @@ impl fmt::Display for ReleaseVersion {
     }
 }
 
+struct StagedUpdate<P> {
+    version: ReleaseVersion,
+    package: P,
+    failed_install_at: Option<Instant>,
+}
+
+impl<P> StagedUpdate<P> {
+    fn is_install_due(&self, now: Instant) -> bool {
+        self.failed_install_at
+            .is_none_or(|failed| now.saturating_duration_since(failed) >= CHECK_INTERVAL)
+    }
+}
+
 enum Phase<P> {
     UpToDate,
-    Downloading(ReleaseVersion),
-    Ready {
+    Downloading {
         version: ReleaseVersion,
-        package: P,
-        failed_install_at: Option<Instant>,
+        previous: Option<StagedUpdate<P>>,
     },
+    Ready(StagedUpdate<P>),
+    Installing(ReleaseVersion),
+    Installed,
+}
+
+impl<P> Phase<P> {
+    fn installable(&self) -> Option<&StagedUpdate<P>> {
+        match self {
+            Phase::Ready(staged)
+            | Phase::Downloading {
+                previous: Some(staged),
+                ..
+            } => Some(staged),
+            _ => None,
+        }
+    }
+
+    fn into_installable(self) -> Result<StagedUpdate<P>, Self> {
+        match self {
+            Phase::Ready(staged)
+            | Phase::Downloading {
+                previous: Some(staged),
+                ..
+            } => Ok(staged),
+            other => Err(other),
+        }
+    }
 }
 
 pub struct UpdateLifecycle<P> {
@@ -55,72 +88,85 @@ impl<P> UpdateLifecycle<P> {
     pub fn begin_download(&mut self, version: &ReleaseVersion) -> bool {
         let starts = match &self.phase {
             Phase::UpToDate => true,
-            Phase::Downloading(_) => false,
-            Phase::Ready { version: ready, .. } => ready != version,
+            Phase::Ready(staged) => &staged.version != version,
+            Phase::Downloading { .. } | Phase::Installing(_) | Phase::Installed => false,
         };
         if starts {
-            self.phase = Phase::Downloading(version.clone());
+            let previous = self.take_phase().into_installable().ok();
+            self.phase = Phase::Downloading {
+                version: version.clone(),
+                previous,
+            };
         }
         starts
     }
 
     pub fn finish_download(&mut self, package: P) {
-        if let Phase::Downloading(version) = &self.phase {
-            self.phase = Phase::Ready {
+        if let Phase::Downloading { version, .. } = &self.phase {
+            self.phase = Phase::Ready(StagedUpdate {
                 version: version.clone(),
                 package,
                 failed_install_at: None,
-            };
+            });
         }
     }
 
     pub fn abandon_download(&mut self) {
-        if matches!(self.phase, Phase::Downloading(_)) {
-            self.phase = Phase::UpToDate;
+        if let Phase::Downloading { .. } = self.phase {
+            self.phase = self
+                .take_phase()
+                .into_installable()
+                .map_or(Phase::UpToDate, Phase::Ready);
         }
     }
 
     #[must_use]
-    pub fn is_ready(&self) -> bool {
-        matches!(self.phase, Phase::Ready { .. })
+    pub fn is_update_waiting(&self, now: Instant) -> bool {
+        self.is_installed()
+            || self
+                .phase
+                .installable()
+                .is_some_and(|staged| staged.is_install_due(now))
     }
 
-    pub fn record_failed_install(&mut self, now: Instant) {
-        if let Phase::Ready {
-            failed_install_at, ..
-        } = &mut self.phase
-        {
-            *failed_install_at = Some(now);
+    pub fn claim_install(&mut self) -> Option<P> {
+        match self.take_phase().into_installable() {
+            Ok(staged) => {
+                self.phase = Phase::Installing(staged.version);
+                Some(staged.package)
+            }
+            Err(unchanged) => {
+                self.phase = unchanged;
+                None
+            }
+        }
+    }
+
+    pub fn release_failed_install(&mut self, package: P, now: Instant) {
+        match self.take_phase() {
+            Phase::Installing(version) => {
+                self.phase = Phase::Ready(StagedUpdate {
+                    version,
+                    package,
+                    failed_install_at: Some(now),
+                });
+            }
+            unchanged => self.phase = unchanged,
+        }
+    }
+
+    pub fn finish_install(&mut self) {
+        if let Phase::Installing(_) = self.phase {
+            self.phase = Phase::Installed;
         }
     }
 
     #[must_use]
-    pub fn is_install_due(&self, now: Instant) -> bool {
-        match &self.phase {
-            Phase::Ready {
-                failed_install_at, ..
-            } => failed_install_at
-                .is_none_or(|failed| now.saturating_duration_since(failed) >= CHECK_INTERVAL),
-            _ => false,
-        }
+    pub fn is_installed(&self) -> bool {
+        matches!(self.phase, Phase::Installed)
     }
 
-    #[must_use]
-    pub fn ready_version(&self) -> Option<&ReleaseVersion> {
-        match &self.phase {
-            Phase::Ready { version, .. } => Some(version),
-            _ => None,
-        }
-    }
-
-    #[must_use]
-    pub fn package_to_install(&self) -> Option<P>
-    where
-        P: Clone,
-    {
-        match &self.phase {
-            Phase::Ready { package, .. } => Some(package.clone()),
-            _ => None,
-        }
+    fn take_phase(&mut self) -> Phase<P> {
+        std::mem::replace(&mut self.phase, Phase::UpToDate)
     }
 }

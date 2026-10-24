@@ -2,7 +2,7 @@ use crate::recording::RecorderState;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InstallConditions {
-    pub install_due: bool,
+    pub update_waiting: bool,
     pub recorder: RecorderState,
     pub in_call: bool,
     pub popover_open: bool,
@@ -24,7 +24,7 @@ pub enum InstallMoment {
 
 #[must_use]
 pub fn install_moment(conditions: &InstallConditions) -> InstallMoment {
-    if !conditions.install_due {
+    if !conditions.update_waiting {
         return InstallMoment::Wait(WaitReason::NothingReady);
     }
     if conditions.recorder == RecorderState::Recording {

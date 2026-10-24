@@ -168,7 +168,7 @@ pub fn show_restart_to_update<R: Runtime>(app: &AppHandle<R>) {
     if menu.get(MENU_RESTART_TO_UPDATE).is_some() {
         return;
     }
-    let recording = is_recording(app);
+    let recording = recording::is_recording(app);
     log_failure(
         insert_restart_to_update(app, menu, !recording),
         "could not add the restart to update menu item",
@@ -205,11 +205,6 @@ fn enable_restart_to_update<R: Runtime>(app: &AppHandle<R>, enabled: bool) {
             "could not update the restart to update menu item",
         );
     }
-}
-
-fn is_recording<R: Runtime>(app: &AppHandle<R>) -> bool {
-    app.try_state::<RecordingController>()
-        .is_some_and(|controller| controller.state() == RecorderState::Recording)
 }
 
 pub fn show_elapsed<R: Runtime>(app: &AppHandle<R>, elapsed: Duration) {

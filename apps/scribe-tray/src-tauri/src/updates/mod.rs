@@ -14,11 +14,10 @@ use tauri_plugin_updater::Update;
 
 use crate::call_watch::CallPresence;
 use crate::popover;
-use crate::recording::RecordingController;
+use crate::recording::{self, RecordingController};
 use crate::tray;
 
 use controller::{StagedPackage, UpdateController};
-pub use install::AfterInstall;
 
 const THREAD_NAME: &str = "update-check";
 const TICK_INTERVAL: Duration = Duration::from_secs(30);
@@ -38,16 +37,17 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) {
 }
 
 pub fn install_on_quit<R: Runtime>(app: &AppHandle<R>) {
-    install::install_staged(app, AfterInstall::Exit);
+    install::install_before_exit(app);
 }
 
 pub fn restart_to_update<R: Runtime>(app: &AppHandle<R>) {
-    let recording = app
-        .try_state::<RecordingController>()
-        .is_some_and(|recorder| recorder.state() == RecorderState::Recording);
-    if !recording {
-        install::install_staged(app, AfterInstall::Relaunch);
+    if is_free_to_restart(app) {
+        install::install_and_relaunch(app, is_free_to_restart);
     }
+}
+
+fn is_free_to_restart<R: Runtime>(app: &AppHandle<R>) -> bool {
+    !recording::is_recording(app)
 }
 
 fn check_forever<R: Runtime>(app: &AppHandle<R>) {
@@ -67,16 +67,24 @@ fn tick<R: Runtime>(app: &AppHandle<R>, schedule: &mut CheckSchedule, now: Insta
 }
 
 fn install_if_idle<R: Runtime>(app: &AppHandle<R>, now: Instant) {
-    if install_moment(&current_conditions(app, now)) == InstallMoment::Now {
-        install::install_staged(app, AfterInstall::Relaunch);
+    if is_install_moment(app, now) {
+        install::install_and_relaunch(app, is_install_moment_now);
     }
+}
+
+fn is_install_moment_now<R: Runtime>(app: &AppHandle<R>) -> bool {
+    is_install_moment(app, Instant::now())
+}
+
+fn is_install_moment<R: Runtime>(app: &AppHandle<R>, now: Instant) -> bool {
+    install_moment(&current_conditions(app, now)) == InstallMoment::Now
 }
 
 fn current_conditions<R: Runtime>(app: &AppHandle<R>, now: Instant) -> InstallConditions {
     InstallConditions {
-        install_due: app
+        update_waiting: app
             .try_state::<UpdateController>()
-            .is_some_and(|controller| controller.is_install_due(now)),
+            .is_some_and(|controller| controller.is_update_waiting(now)),
         recorder: app
             .try_state::<RecordingController>()
             .map_or(RecorderState::Locked, |recorder| recorder.state()),

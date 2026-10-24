@@ -4,12 +4,11 @@ use std::time::{Duration, Instant};
 
 use scribe_core::call::{CALL_END_GRACE, CallWatch};
 use scribe_core::ports::CallProbe;
-use scribe_core::recording::RecorderState;
 use tauri::{AppHandle, Manager, Runtime};
 
 use crate::call_probes;
 use crate::popover;
-use crate::recording::RecordingController;
+use crate::recording;
 
 const POLL_INTERVAL: Duration = Duration::from_secs(2);
 const THREAD_NAME: &str = "call-watch";
@@ -65,7 +64,7 @@ fn open_if_call_started<R: Runtime>(app: &AppHandle<R>, watch: &mut CallWatch) {
 }
 
 fn open_unless_recording<R: Runtime>(app: &AppHandle<R>) {
-    if app.state::<RecordingController>().state() == RecorderState::Recording {
+    if recording::is_recording(app) {
         tracing::info!("a call started while recording; the popover stays as it is");
         return;
     }

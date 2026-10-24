@@ -4,7 +4,6 @@ use std::time::Instant;
 use scribe_core::update::{ReleaseVersion, UpdateLifecycle};
 use tauri_plugin_updater::Update;
 
-#[derive(Clone)]
 pub struct StagedPackage {
     pub update: Update,
     pub bytes: Arc<[u8]>,
@@ -33,16 +32,24 @@ impl UpdateController {
         self.lifecycle().abandon_download();
     }
 
-    pub fn package_to_install(&self) -> Option<StagedPackage> {
-        self.lifecycle().package_to_install()
+    pub fn is_update_waiting(&self, now: Instant) -> bool {
+        self.lifecycle().is_update_waiting(now)
     }
 
-    pub fn is_install_due(&self, now: Instant) -> bool {
-        self.lifecycle().is_install_due(now)
+    pub fn claim_install(&self) -> Option<StagedPackage> {
+        self.lifecycle().claim_install()
     }
 
-    pub fn record_failed_install(&self, now: Instant) {
-        self.lifecycle().record_failed_install(now);
+    pub fn release_failed_install(&self, package: StagedPackage, now: Instant) {
+        self.lifecycle().release_failed_install(package, now);
+    }
+
+    pub fn finish_install(&self) {
+        self.lifecycle().finish_install();
+    }
+
+    pub fn is_installed(&self) -> bool {
+        self.lifecycle().is_installed()
     }
 
     fn lifecycle(&self) -> MutexGuard<'_, UpdateLifecycle<StagedPackage>> {
