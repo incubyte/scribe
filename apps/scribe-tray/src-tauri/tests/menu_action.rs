@@ -54,3 +54,11 @@ fn connect_claude_desktop_id_maps_to_connecting_claude_desktop() {
         Some(MenuAction::ConnectClaudeDesktop)
     );
 }
+
+#[test]
+fn restart_to_update_id_maps_to_restarting_to_install_the_update() {
+    assert_eq!(
+        MenuAction::from_id("restart-to-update"),
+        Some(MenuAction::RestartToUpdate)
+    );
+}

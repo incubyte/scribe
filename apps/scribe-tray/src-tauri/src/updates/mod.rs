@@ -15,6 +15,7 @@ use tauri_plugin_updater::Update;
 use crate::call_watch::CallPresence;
 use crate::popover;
 use crate::recording::RecordingController;
+use crate::tray;
 
 pub use install::AfterInstall;
 use controller::{StagedPackage, UpdateController};
@@ -38,6 +39,15 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) {
 
 pub fn install_on_quit<R: Runtime>(app: &AppHandle<R>) {
     install::install_staged(app, AfterInstall::Exit);
+}
+
+pub fn restart_to_update<R: Runtime>(app: &AppHandle<R>) {
+    let recording = app
+        .try_state::<RecordingController>()
+        .is_some_and(|recorder| recorder.state() == RecorderState::Recording);
+    if !recording {
+        install::install_staged(app, AfterInstall::Relaunch);
+    }
 }
 
 fn check_forever<R: Runtime>(app: &AppHandle<R>) {
@@ -83,12 +93,13 @@ fn check_and_stage<R: Runtime>(app: &AppHandle<R>) {
         Ok(None) => tracing::debug!("no newer release is available"),
         Ok(Some(update)) => {
             let version = ReleaseVersion::new(update.version.clone());
-            download_and_stage(&app.state::<UpdateController>(), update, &version);
+            download_and_stage(app, update, &version);
         }
     }
 }
 
-fn download_and_stage(controller: &UpdateController, update: Update, version: &ReleaseVersion) {
+fn download_and_stage<R: Runtime>(app: &AppHandle<R>, update: Update, version: &ReleaseVersion) {
+    let controller = app.state::<UpdateController>();
     if !controller.begin_download(version) {
         return;
     }
@@ -103,6 +114,7 @@ fn download_and_stage(controller: &UpdateController, update: Update, version: &R
                 bytes: bytes.into(),
             });
             tracing::info!(version = %version, "an update is ready");
+            tray::show_restart_to_update(app);
         }
     }
 }

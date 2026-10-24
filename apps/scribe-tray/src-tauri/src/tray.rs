@@ -4,7 +4,7 @@ use std::time::Duration;
 use scribe_core::recording::RecorderState;
 use store_markdown::{MarkdownTranscriptStore, StoreError};
 use tauri::image::Image;
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::menu::{Menu, MenuItem, MenuItemKind, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_opener::OpenerExt;
@@ -13,7 +13,7 @@ use crate::claude_desktop_connect;
 use crate::mcp_clipboard;
 use crate::menu_action::{
     MENU_CONNECT_CLAUDE_DESKTOP, MENU_COPY_MCP_CONFIG, MENU_OPEN_FOLDER, MENU_PRIVACY, MENU_QUIT,
-    MENU_TOGGLE_RECORDING, MenuAction,
+    MENU_RESTART_TO_UPDATE, MENU_TOGGLE_RECORDING, MenuAction,
 };
 use crate::popover;
 use crate::privacy;
@@ -29,6 +29,10 @@ const IDLE_ICON: Image<'static> = tauri::include_image!("icons/tray-idle.png");
 const RECORDING_ICON: Image<'static> = tauri::include_image!("icons/tray-recording.png");
 
 struct RecordingMenuItem<R: Runtime>(MenuItem<R>);
+
+struct TrayMenu<R: Runtime>(Menu<R>);
+
+const RESTART_TO_UPDATE_LABEL: &str = "Restart to update";
 
 pub fn install<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<TrayIcon<R>> {
     TrayIconBuilder::with_id(TRAY_ID)
@@ -90,6 +94,7 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
         ],
     )?;
     app.manage(RecordingMenuItem(toggle));
+    app.manage(TrayMenu(menu.clone()));
     Ok(menu)
 }
 
@@ -148,6 +153,59 @@ pub fn show_recorder_state<R: Runtime>(app: &AppHandle<R>, state: RecorderState)
             show_look(app, &RECORDING_LOOK);
         }
     }
+    enable_restart_to_update(app, state != RecorderState::Recording);
+}
+
+pub fn show_restart_to_update<R: Runtime>(app: &AppHandle<R>) {
+    let Some(tray_menu) = app.try_state::<TrayMenu<R>>() else {
+        return;
+    };
+    let menu = &tray_menu.inner().0;
+    if menu.get(MENU_RESTART_TO_UPDATE).is_some() {
+        return;
+    }
+    let recording = is_recording(app);
+    log_failure(
+        insert_restart_to_update(app, menu, !recording),
+        "could not add the restart to update menu item",
+    );
+}
+
+fn insert_restart_to_update<R: Runtime>(
+    app: &AppHandle<R>,
+    menu: &Menu<R>,
+    enabled: bool,
+) -> tauri::Result<()> {
+    let item = MenuItem::with_id(
+        app,
+        MENU_RESTART_TO_UPDATE,
+        RESTART_TO_UPDATE_LABEL,
+        enabled,
+        None::<&str>,
+    )?;
+    let quit_position = menu
+        .items()?
+        .iter()
+        .position(|existing| existing.id() == MENU_QUIT)
+        .unwrap_or(0);
+    menu.insert(&item, quit_position)
+}
+
+fn enable_restart_to_update<R: Runtime>(app: &AppHandle<R>, enabled: bool) {
+    let Some(tray_menu) = app.try_state::<TrayMenu<R>>() else {
+        return;
+    };
+    if let Some(MenuItemKind::MenuItem(item)) = tray_menu.inner().0.get(MENU_RESTART_TO_UPDATE) {
+        log_failure(
+            item.set_enabled(enabled),
+            "could not update the restart to update menu item",
+        );
+    }
+}
+
+fn is_recording<R: Runtime>(app: &AppHandle<R>) -> bool {
+    app.try_state::<RecordingController>()
+        .is_some_and(|controller| controller.state() == RecorderState::Recording)
 }
 
 pub fn show_elapsed<R: Runtime>(app: &AppHandle<R>, elapsed: Duration) {
@@ -225,6 +283,7 @@ fn dispatch<R: Runtime>(app: &AppHandle<R>, id: &str) {
             claude_desktop_connect::connect_claude_desktop(app);
         }
         Some(MenuAction::ShowPrivacy) => show_privacy(app),
+        Some(MenuAction::RestartToUpdate) => updates::restart_to_update(app),
         Some(MenuAction::Quit) => quit(app),
         None => {}
     }
