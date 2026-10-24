@@ -1,8 +1,12 @@
-use std::time::Instant;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Manager, Runtime};
 
 use super::controller::{StagedPackage, UpdateController};
+
+const RUNNING_INSTALL_PATIENCE: Duration = Duration::from_secs(120);
+const RUNNING_INSTALL_POLL: Duration = Duration::from_millis(100);
 
 #[derive(Debug, Clone, Copy)]
 enum AfterInstall {
@@ -12,7 +16,15 @@ enum AfterInstall {
 
 pub fn install_before_exit<R: Runtime>(app: &AppHandle<R>) {
     if let Some(controller) = app.try_state::<UpdateController>() {
+        wait_for_running_install(&controller);
         install_claimed(&controller, AfterInstall::Exit);
+    }
+}
+
+fn wait_for_running_install(controller: &UpdateController) {
+    let deadline = Instant::now() + RUNNING_INSTALL_PATIENCE;
+    while controller.is_installing() && Instant::now() < deadline {
+        thread::sleep(RUNNING_INSTALL_POLL);
     }
 }
 

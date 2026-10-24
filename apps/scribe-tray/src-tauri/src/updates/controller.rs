@@ -52,6 +52,10 @@ impl UpdateController {
         self.lifecycle().is_installed()
     }
 
+    pub fn is_installing(&self) -> bool {
+        self.lifecycle().is_installing()
+    }
+
     fn lifecycle(&self) -> MutexGuard<'_, UpdateLifecycle<StagedPackage>> {
         self.lifecycle
             .lock()

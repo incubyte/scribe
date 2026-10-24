@@ -60,7 +60,8 @@ None of these is user data. No audio, transcript, screenshot or identifier ever 
 - **Up to date** — the last check found nothing newer, or no check has completed.
 - **Downloading** — an update was found and its archive is being fetched.
 - **Update ready** — an update is staged and waits for an install moment.
-- **Installing** — the archive is being applied; Scribe exits as part of it.
+- **Installing** — the archive is being applied; only one install runs at a time, and quitting waits for it to finish.
+- **Installed** — on macOS, the new version is in place but a recording or call started during the install, so Scribe relaunches once it is idle again (or when the user picks "Restart to update"); quitting just exits.
 
 ```mermaid
 stateDiagram-v2
@@ -70,6 +71,8 @@ stateDiagram-v2
   Downloading --> UpToDate: download or signature failed
   UpdateReady --> Installing: quit / idle / Restart to update
   Installing --> [*]: Scribe exits and the new version starts
+  Installing --> Installed: macOS, Scribe became busy during the install
+  Installed --> [*]: relaunch once idle, or quit
   Installing --> UpdateReady: install failed
 ```
 
@@ -403,4 +406,5 @@ graph LR
 
 - 2026-10-22 — Sapan Parikh with Claude — Initial spec from the auto-update research and spec-writing session [1].
 - 2026-10-23 — Sapan Parikh with Claude — Made clear that idle install is the main update path and quitting is a fallback.
+- 2026-10-24 — Sapan Parikh with Claude — Added the Installed state and quit waiting for a running install, from the end-of-spec review.
 - 2026-10-24 — Sapan Parikh with Claude — "Restart to update" is also disabled and does nothing during a call, so invariant 4.1 holds for every install path (AC 5.6.3).

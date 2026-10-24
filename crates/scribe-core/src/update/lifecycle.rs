@@ -166,6 +166,11 @@ impl<P> UpdateLifecycle<P> {
         matches!(self.phase, Phase::Installed)
     }
 
+    #[must_use]
+    pub fn is_installing(&self) -> bool {
+        matches!(self.phase, Phase::Installing(_))
+    }
+
     fn take_phase(&mut self) -> Phase<P> {
         std::mem::replace(&mut self.phase, Phase::UpToDate)
     }

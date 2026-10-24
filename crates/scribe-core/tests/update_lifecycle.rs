@@ -215,3 +215,34 @@ fn an_install_nobody_claimed_does_not_count_as_installed() {
 
     assert!(!lifecycle.is_installed());
 }
+
+#[test]
+fn an_install_in_progress_is_reported_until_it_finishes() {
+    let mut lifecycle = ready_with_0_5_0();
+
+    let package = lifecycle.claim_install();
+
+    assert!(package.is_some());
+    assert!(lifecycle.is_installing());
+    lifecycle.finish_install();
+    assert!(!lifecycle.is_installing());
+}
+
+#[test]
+fn a_failed_install_is_no_longer_reported_as_in_progress() {
+    let mut lifecycle = ready_with_0_5_0();
+    let package = lifecycle
+        .claim_install()
+        .expect("a ready update can be claimed");
+
+    lifecycle.release_failed_install(package, Instant::now());
+
+    assert!(!lifecycle.is_installing());
+}
+
+#[test]
+fn a_ready_update_is_not_reported_as_installing() {
+    let lifecycle = ready_with_0_5_0();
+
+    assert!(!lifecycle.is_installing());
+}
