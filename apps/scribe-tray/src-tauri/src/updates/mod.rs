@@ -51,7 +51,12 @@ pub fn refresh_restart_item<R: Runtime>(app: &AppHandle<R>) {
 }
 
 fn is_free_to_restart<R: Runtime>(app: &AppHandle<R>) -> bool {
-    !recording::is_recording(app)
+    !recording::is_recording(app) && !is_in_call(app)
+}
+
+fn is_in_call<R: Runtime>(app: &AppHandle<R>) -> bool {
+    app.try_state::<CallPresence>()
+        .is_none_or(|presence| presence.is_in_call())
 }
 
 fn check_forever<R: Runtime>(app: &AppHandle<R>) {
@@ -92,9 +97,7 @@ fn current_conditions<R: Runtime>(app: &AppHandle<R>, now: Instant) -> InstallCo
         recorder: app
             .try_state::<RecordingController>()
             .map_or(RecorderState::Locked, |recorder| recorder.state()),
-        in_call: app
-            .try_state::<CallPresence>()
-            .is_none_or(|presence| presence.is_in_call()),
+        in_call: is_in_call(app),
         popover_open: popover::is_open(app),
     }
 }

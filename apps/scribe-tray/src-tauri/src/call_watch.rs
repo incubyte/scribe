@@ -9,6 +9,7 @@ use tauri::{AppHandle, Manager, Runtime};
 use crate::call_probes;
 use crate::popover;
 use crate::recording;
+use crate::updates;
 
 const POLL_INTERVAL: Duration = Duration::from_secs(2);
 const THREAD_NAME: &str = "call-watch";
@@ -21,8 +22,9 @@ impl CallPresence {
         self.0.load(Ordering::Relaxed)
     }
 
-    fn publish(&self, in_call: bool) {
-        self.0.store(in_call, Ordering::Relaxed);
+    fn publish(&self, in_call: bool) -> bool {
+        let was_in_call = self.0.swap(in_call, Ordering::Relaxed);
+        was_in_call != in_call
     }
 }
 
@@ -47,11 +49,18 @@ fn watch_forever<R: Runtime>(app: &AppHandle<R>, probe: &dyn CallProbe, watch: &
         match probe.call_app_holds_microphone() {
             Ok(holds_microphone) => {
                 watch.observe(holds_microphone, Instant::now());
-                app.state::<CallPresence>().publish(watch.is_in_call());
+                publish_presence(app, watch);
                 open_if_call_started(app, watch);
             }
             Err(error) => tracing::debug!(%error, "could not read which apps hold the microphone"),
         }
+    }
+}
+
+fn publish_presence<R: Runtime>(app: &AppHandle<R>, watch: &CallWatch) {
+    let presence_changed = app.state::<CallPresence>().publish(watch.is_in_call());
+    if presence_changed {
+        updates::refresh_restart_item(app);
     }
 }
 

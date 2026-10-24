@@ -1,6 +1,6 @@
 # Spec: Keep Scribe up to date on its own, the way Chrome does, without ever interrupting a call
 
-> Owned by: Sapan Parikh  ·  Started: 2026-10-22  ·  Last revised: 2026-10-22  ·  Spec UUID: 72fde7d0-4a8a-48f8-a9ea-28b402819342
+> Owned by: Sapan Parikh  ·  Started: 2026-10-22  ·  Last revised: 2026-10-24  ·  Spec UUID: 72fde7d0-4a8a-48f8-a9ea-28b402819342
 > Anthara spec — slice-decomposed, categorically-framed. Feeds /anthara:create-ticket and /anthara:plan-implementer.
 
 ---
@@ -242,7 +242,7 @@ flowchart LR
 
 ### 5.6 Show "Restart to update" while an update waits
 
-While an update is ready, the tray menu shows **Restart to update** above **Quit Scribe**. Choosing it installs and relaunches straight away, unless Scribe is recording, in which case the item is disabled. The item disappears once the new version runs.
+While an update is ready, the tray menu shows **Restart to update** above **Quit Scribe**. Choosing it installs and relaunches straight away, unless Scribe is recording or a call is underway, in which case the item is disabled. The item disappears once the new version runs.
 
 - **Touches types:** Update ready, Install moment.
 - **Preserves invariants:** [4.1](#4-invariants).
@@ -267,7 +267,7 @@ While an update is ready, the tray menu shows **Restart to update** above **Quit
 
 - [ ] **5.6.1** The item is absent while Scribe is Up to date or Downloading, and appears within a few seconds of Update ready.
 - [ ] **5.6.2** Choosing it installs and relaunches; Scribe comes back as the new version without the item.
-- [ ] **5.6.3** While recording, the item is shown disabled.
+- [ ] **5.6.3** While recording or during a call, the item is shown disabled.
 - [ ] **5.6.4** The item works the same on macOS and Windows.
 
 **Verification (slice complete when these pass):**
@@ -403,3 +403,4 @@ graph LR
 
 - 2026-10-22 — Sapan Parikh with Claude — Initial spec from the auto-update research and spec-writing session [1].
 - 2026-10-23 — Sapan Parikh with Claude — Made clear that idle install is the main update path and quitting is a fallback.
+- 2026-10-24 — Sapan Parikh with Claude — "Restart to update" is also disabled and does nothing during a call, so invariant 4.1 holds for every install path (AC 5.6.3).
