@@ -120,12 +120,12 @@ sequenceDiagram
 
 - [ ] **5.1.1** A release run uploads `Scribe_<version>_aarch64.app.tar.gz` (or Tauri's equivalent macOS updater archive name) and `latest.json` to the draft release, next to the existing assets.
 - [ ] **5.1.2** `latest.json` has `version` equal to `tauri.conf.json`'s version, and `platforms.darwin-aarch64` and `platforms.windows-x86_64`, each with a `url` that downloads the matching asset of that release and a `signature` equal to the contents of the matching `.sig` file.
-- [ ] **5.1.3** Each archive's signature verifies against the public key in `tauri.conf.json`, checked by the script before upload.
+- [x] **5.1.3** Each archive's signature verifies against the public key in `tauri.conf.json`, checked by the script before upload.
 - [ ] **5.1.4** The macOS app inside the updater archive is the same signed build that was notarized in the `.dmg`, and Gatekeeper reports it as "Notarized Developer ID" when the script checks it after extracting.
-- [ ] **5.1.5** When the key file is missing, or the Keychain has no password for it, the script stops before building and names what to set up, the same way it does for the notary profile.
-- [ ] **5.1.6** `npm run tauri build` without the private key in the environment still produces a working bundle (invariant 4.7), and CI stays green.
-- [ ] **5.1.7** The private key, its password and the `.sig` contents are never written to the repository or printed in full to the terminal.
-- [ ] **5.1.8** An ADR in `docs/ARCHITECTURE.md` records the updater choice, the key's location and backup, and that losing the key ends updates for existing installs; `CLAUDE.md`'s Releasing section lists the key as a prerequisite.
+- [x] **5.1.5** When the key file is missing, or the Keychain has no password for it, the script stops before building and names what to set up, the same way it does for the notary profile.
+- [x] **5.1.6** `npm run tauri build` without the private key in the environment still produces a working bundle (invariant 4.7), and CI stays green.
+- [x] **5.1.7** The private key, its password and the `.sig` contents are never written to the repository or printed in full to the terminal.
+- [x] **5.1.8** An ADR in `docs/ARCHITECTURE.md` records the updater choice, the key's location and backup, and that losing the key ends updates for existing installs; `CLAUDE.md`'s Releasing section lists the key as a prerequisite.
 
 **Verification (slice complete when these pass):**
 

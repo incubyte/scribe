@@ -22,7 +22,10 @@ CI layout and its reasons are ADR 2 and ADR 3 in `docs/ARCHITECTURE.md`.
 
 ## Releasing
 
-Releases are built on this Mac (no CI minutes):
+Releases are built on this Mac (no CI minutes). One-time prerequisites besides the Windows tooling below:
+
+- The update signing key: `npx tauri signer generate -w ~/.tauri/scribe-update.key` in `apps/scribe-tray`, then `security add-generic-password -a "$USER" -s scribe-update-key -w` with the same password. Back both up in the password manager; losing them ends updates for every installed copy (ADR 9).
+- `brew install minisign`, which `scripts/release.sh` uses to verify update signatures before it tags.
 
 1. Bump `version` in `apps/scribe-tray/src-tauri/tauri.conf.json` and commit it on `main`.
 2. Run `scripts/release.sh`. It builds the macOS `.dmg` and cross-compiles the Windows installer (needs `cargo install cargo-xwin` and `brew install llvm lld nsis`), tags `v<version>`, and uploads both to a draft GitHub Release.

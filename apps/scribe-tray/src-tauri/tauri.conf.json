@@ -54,5 +54,17 @@
       "signingIdentity": "-",
       "entitlements": "Entitlements.plist"
     }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDA4NjlBQzE3MzNDMzFEMjcKUldRbkhjTXpGNnhwQ0tUMlBPOWl4bDdyUndLd3dNU0VKWXVNTEw3YTlSR2J1OW8raGQ4QzJrUnEK",
+      "endpoints": [
+        "https://github.com/incubyte/scribe/releases/latest/download/latest.json"
+      ],
+      "requireSignedVersion": true,
+      "windows": {
+        "installMode": "quiet"
+      }
+    }
   }
 }
