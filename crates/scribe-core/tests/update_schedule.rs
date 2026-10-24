@@ -38,3 +38,37 @@ fn a_check_just_after_launch_is_not_due_again_straight_away() {
 
     assert!(!schedule.is_check_due(checked_at));
 }
+
+#[test]
+fn a_check_asked_for_soon_is_due_at_that_moment_even_within_the_interval() {
+    let checked_at = Instant::now();
+    let soon = checked_at + Duration::from_secs(600);
+    let mut schedule = CheckSchedule::new(INTERVAL);
+    schedule.mark_checked(checked_at);
+
+    schedule.check_soon(soon);
+
+    assert!(schedule.is_check_due(soon));
+}
+
+#[test]
+fn a_check_asked_for_soon_is_not_due_before_that_moment() {
+    let checked_at = Instant::now();
+    let soon = checked_at + Duration::from_secs(600);
+    let mut schedule = CheckSchedule::new(INTERVAL);
+    schedule.mark_checked(checked_at);
+
+    schedule.check_soon(soon);
+
+    assert!(!schedule.is_check_due(checked_at + Duration::from_millis(599_999)));
+}
+
+#[test]
+fn asking_for_a_check_soon_never_postpones_one_already_due() {
+    let launched_at = Instant::now();
+    let mut schedule = CheckSchedule::new(INTERVAL);
+
+    schedule.check_soon(launched_at + Duration::from_secs(30));
+
+    assert!(schedule.is_check_due(launched_at));
+}

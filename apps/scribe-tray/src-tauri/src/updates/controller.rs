@@ -13,6 +13,7 @@ pub struct StagedPackage {
 pub struct UpdateController {
     lifecycle: Mutex<UpdateLifecycle<StagedPackage>>,
     quitting: AtomicBool,
+    woke: AtomicBool,
 }
 
 impl UpdateController {
@@ -20,6 +21,7 @@ impl UpdateController {
         Self {
             lifecycle: Mutex::new(UpdateLifecycle::new()),
             quitting: AtomicBool::new(false),
+            woke: AtomicBool::new(false),
         }
     }
 
@@ -29,6 +31,14 @@ impl UpdateController {
 
     pub fn is_quitting(&self) -> bool {
         self.quitting.load(Ordering::Acquire)
+    }
+
+    pub fn note_wake(&self) {
+        self.woke.store(true, Ordering::Release);
+    }
+
+    pub fn take_wake(&self) -> bool {
+        self.woke.swap(false, Ordering::AcqRel)
     }
 
     pub fn begin_download(&self, version: &ReleaseVersion) -> bool {

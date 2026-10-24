@@ -50,7 +50,7 @@ Two prerequisites landed on 2026-10-22: the repository is public, so GitHub Rele
 None of these is user data. No audio, transcript, screenshot or identifier ever enters them.
 
 ### 3.3 Kinds of events
-- **Update check** — at launch and every hour after; one HTTPS GET of the manifest [1].
+- **Update check** — at launch, every hour after, and about 30 seconds after the computer wakes from sleep; one HTTPS GET of the manifest [1].
 - **Update found** — the manifest names a version newer than the running one [4].
 - **Update staged** — the archive downloaded and its signature verified.
 - **Install moment** — Scribe quits, Scribe becomes idle with an update staged, or the user picks "Restart to update".
@@ -152,6 +152,7 @@ Once a user is on an updater-enabled version, Scribe checks the manifest at laun
 - [ ] **5.2.3** When the manifest lists the running version or an older one, nothing is downloaded.
 - [ ] **5.2.4** When the network is down, the manifest returns 404 or is malformed, or a download is cut off, Scribe logs one line with the reason, keeps running as before and tries again at the next hourly check.
 - [ ] **5.2.5** When an archive's signature does not verify, it is discarded, the failure is logged as an error naming the version, and nothing installs.
+- [ ] **5.2.10** About 30 seconds after the computer wakes from sleep, Scribe checks the manifest again, even when the hour has not passed; the hour counts only time the computer is awake, so without this a laptop that sleeps often could go days between checks.
 - [x] **5.2.6** While an update is Downloading or Update ready, later checks do not start a second download of the same version.
 - [x] **5.2.7** Update checks start in `start_scribe` before the recorder, screenshots and call watching, and a failure in any of those does not stop the checks (invariant 4.5).
 - [x] **5.2.8** The requests carry no query parameters or custom headers, and the popover's webview has no updater permission; only the Rust shell can check, download or install.
@@ -406,5 +407,6 @@ graph LR
 
 - 2026-10-22 — Sapan Parikh with Claude — Initial spec from the auto-update research and spec-writing session [1].
 - 2026-10-23 — Sapan Parikh with Claude — Made clear that idle install is the main update path and quitting is a fallback.
+- 2026-10-24 — Sapan Parikh with Claude — Scribe also checks shortly after the computer wakes (AC 5.2.10), found while testing 0.5.0 to 0.5.1.
 - 2026-10-24 — Sapan Parikh with Claude — Added the Installed state and quit waiting for a running install, from the end-of-spec review.
 - 2026-10-24 — Sapan Parikh with Claude — "Restart to update" is also disabled and does nothing during a call, so invariant 4.1 holds for every install path (AC 5.6.3).

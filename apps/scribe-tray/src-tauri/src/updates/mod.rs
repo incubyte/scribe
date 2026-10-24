@@ -8,7 +8,8 @@ use std::time::{Duration, Instant};
 
 use scribe_core::recording::RecorderState;
 use scribe_core::update::{
-    CHECK_INTERVAL, CheckSchedule, InstallConditions, InstallMoment, ReleaseVersion, install_moment,
+    CHECK_DELAY_AFTER_WAKE, CHECK_INTERVAL, CheckSchedule, InstallConditions, InstallMoment,
+    ReleaseVersion, install_moment,
 };
 use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_updater::Update;
@@ -27,6 +28,7 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) {
         return;
     }
     app.manage(UpdateController::new());
+    check_after_wake(app);
     let handle = app.clone();
     let spawned = thread::Builder::new()
         .name(THREAD_NAME.to_owned())
@@ -59,6 +61,15 @@ fn is_in_call<R: Runtime>(app: &AppHandle<R>) -> bool {
         .is_none_or(|presence| presence.is_in_call())
 }
 
+#[cfg(any(target_os = "macos", windows))]
+fn check_after_wake<R: Runtime>(app: &AppHandle<R>) {
+    let app = app.clone();
+    crate::power::on_did_wake(move || app.state::<UpdateController>().note_wake());
+}
+
+#[cfg(not(any(target_os = "macos", windows)))]
+fn check_after_wake<R: Runtime>(_app: &AppHandle<R>) {}
+
 fn check_forever<R: Runtime>(app: &AppHandle<R>) {
     let mut schedule = CheckSchedule::new(CHECK_INTERVAL);
     loop {
@@ -68,6 +79,9 @@ fn check_forever<R: Runtime>(app: &AppHandle<R>) {
 }
 
 fn tick<R: Runtime>(app: &AppHandle<R>, schedule: &mut CheckSchedule, now: Instant) {
+    if app.state::<UpdateController>().take_wake() {
+        schedule.check_soon(now + CHECK_DELAY_AFTER_WAKE);
+    }
     if schedule.is_check_due(now) {
         schedule.mark_checked(now);
         check_and_stage(app);
