@@ -26,6 +26,7 @@ use crate::webview;
 
 const STATE_EVENT: &str = "recorder://state";
 const START_FAILED_EVENT: &str = "recording://start-failed";
+const APP_DATA_TRANSCRIPTS_FOLDER: &str = "Transcripts";
 
 pub struct RecordingController {
     recorder: Mutex<Recorder>,
@@ -192,9 +193,7 @@ fn report_start_failure<R: Runtime>(app: &AppHandle<R>, error: &StartError) {
 }
 
 pub fn install<R: Runtime>(app: &AppHandle<R>) -> Result<(), StoreError> {
-    let store = Arc::new(MarkdownTranscriptStore::new(
-        TranscriptsFolder::configured_by(settings_path(app).as_deref())?,
-    ));
+    let store = Arc::new(MarkdownTranscriptStore::new(transcripts_folder(app)?));
     mark_abandoned_sessions(&store);
     app.manage(LiveFeed::default());
     let listener: Arc<dyn RecordingListener> = Arc::new(TrayRecordingListener::spawn(app.clone()));
@@ -208,6 +207,24 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) -> Result<(), StoreError> {
     model_setup::install(app);
     stop_before_sleep(app);
     Ok(())
+}
+
+fn transcripts_folder<R: Runtime>(app: &AppHandle<R>) -> Result<TranscriptsFolder, StoreError> {
+    TranscriptsFolder::configured_by(settings_path(app).as_deref())
+        .or_else(|error| app_data_transcripts_folder(app, error))
+}
+
+fn app_data_transcripts_folder<R: Runtime>(
+    app: &AppHandle<R>,
+    error: StoreError,
+) -> Result<TranscriptsFolder, StoreError> {
+    let Ok(app_data) = app.path().app_data_dir() else {
+        return Err(error);
+    };
+    tracing::warn!(%error, "keeping transcripts in the app data folder");
+    Ok(TranscriptsFolder::at(
+        app_data.join(APP_DATA_TRANSCRIPTS_FOLDER),
+    ))
 }
 
 fn settings_path<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {

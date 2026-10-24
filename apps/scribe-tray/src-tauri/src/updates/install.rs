@@ -16,6 +16,7 @@ enum AfterInstall {
 
 pub fn install_before_exit<R: Runtime>(app: &AppHandle<R>) {
     if let Some(controller) = app.try_state::<UpdateController>() {
+        controller.begin_quitting();
         wait_for_running_install(&controller);
         install_claimed(&controller, AfterInstall::Exit);
     }
@@ -38,6 +39,9 @@ pub fn install_and_relaunch<R: Runtime>(
     let installed =
         controller.is_installed() || install_claimed(&controller, AfterInstall::Relaunch);
     if !installed {
+        return;
+    }
+    if controller.is_quitting() {
         return;
     }
     if may_relaunch(app) {

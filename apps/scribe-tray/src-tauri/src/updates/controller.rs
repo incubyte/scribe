@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Instant;
 
@@ -11,13 +12,23 @@ pub struct StagedPackage {
 
 pub struct UpdateController {
     lifecycle: Mutex<UpdateLifecycle<StagedPackage>>,
+    quitting: AtomicBool,
 }
 
 impl UpdateController {
     pub fn new() -> Self {
         Self {
             lifecycle: Mutex::new(UpdateLifecycle::new()),
+            quitting: AtomicBool::new(false),
         }
+    }
+
+    pub fn begin_quitting(&self) {
+        self.quitting.store(true, Ordering::Release);
+    }
+
+    pub fn is_quitting(&self) -> bool {
+        self.quitting.load(Ordering::Acquire)
     }
 
     pub fn begin_download(&self, version: &ReleaseVersion) -> bool {
