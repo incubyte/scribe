@@ -310,3 +310,4 @@ The build agent checks `~/.tauri/scribe-update.key.pub` exists; if it does not, 
 
 ## Escalation log
 
+- 2026-10-24 — review fixes — `excellent → best`. The end-of-spec review found concurrency gaps (two installs could overlap; conditions not re-checked before a macOS relaunch) and a startup-ordering High against invariant 4.5. The fix needs a new install-claim phase in the core lifecycle and thread-safe relaunch handling, so it runs on `best`. Sapan decided "Restart to update" is also blocked during calls (invariant 4.1 stays as written).

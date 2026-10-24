@@ -230,28 +230,30 @@ pub fn show_idle_tooltip<R: Runtime>(app: &AppHandle<R>) {
 }
 
 fn enable_toggle<R: Runtime>(app: &AppHandle<R>, label: &str) {
-    let toggle = relabel_toggle(app, label);
-    log_failure(
-        toggle.set_enabled(true),
-        "could not update the recording menu item",
-    );
+    if let Some(toggle) = relabel_toggle(app, label) {
+        log_failure(
+            toggle.set_enabled(true),
+            "could not update the recording menu item",
+        );
+    }
 }
 
 fn disable_toggle<R: Runtime>(app: &AppHandle<R>, label: &str) {
-    let toggle = relabel_toggle(app, label);
-    log_failure(
-        toggle.set_enabled(false),
-        "could not update the recording menu item",
-    );
+    if let Some(toggle) = relabel_toggle(app, label) {
+        log_failure(
+            toggle.set_enabled(false),
+            "could not update the recording menu item",
+        );
+    }
 }
 
-fn relabel_toggle<'a, R: Runtime>(app: &'a AppHandle<R>, label: &str) -> &'a MenuItem<R> {
-    let toggle = &app.state::<RecordingMenuItem<R>>().inner().0;
+fn relabel_toggle<R: Runtime>(app: &AppHandle<R>, label: &str) -> Option<MenuItem<R>> {
+    let toggle = app.try_state::<RecordingMenuItem<R>>()?.inner().0.clone();
     log_failure(
         toggle.set_text(label),
         "could not update the recording menu item",
     );
-    toggle
+    Some(toggle)
 }
 
 fn show_look<R: Runtime>(app: &AppHandle<R>, look: &TrayLook) {
@@ -302,7 +304,9 @@ fn toggle_recording<R: Runtime>(app: &AppHandle<R>) {
 }
 
 fn quit<R: Runtime>(app: &AppHandle<R>) {
-    app.state::<RecordingController>().stop();
+    if let Some(recorder) = app.try_state::<RecordingController>() {
+        recorder.stop();
+    }
     updates::install_on_quit(app);
     app.exit(0);
 }

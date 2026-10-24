@@ -26,6 +26,8 @@ mod tray_listener;
 mod updates;
 mod webview;
 
+use std::fmt::Display;
+
 use tauri::{AppHandle, Builder, Runtime};
 
 pub fn run() -> tauri::Result<()> {
@@ -33,7 +35,8 @@ pub fn run() -> tauri::Result<()> {
         .setup(|app| {
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
-            start_scribe(app.handle())
+            start_scribe(app.handle());
+            Ok(())
         })
         .run(tauri::generate_context!())
 }
@@ -81,14 +84,33 @@ fn with_plugins<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         .plugin(screenshots::plugin())
 }
 
-fn start_scribe<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::error::Error>> {
+fn start_scribe<R: Runtime>(app: &AppHandle<R>) {
     updates::install(app);
-    tray::install(app)?;
-    recording::install(app)?;
-    screenshots::install(app);
-    recording::publish_state(app);
-    popover::install_blur_hide(app)?;
+    log_startup_failure(tray::install(app).map(drop), "could not show the tray icon");
+    start_recorder(app);
+    log_startup_failure(
+        popover::install_blur_hide(app),
+        "could not hide the popover when it loses focus",
+    );
     call_watch::install(app);
-    privacy::show_statement_until_acknowledged(app)?;
-    Ok(())
+    log_startup_failure(
+        privacy::show_statement_until_acknowledged(app),
+        "could not show the privacy statement",
+    );
+}
+
+fn start_recorder<R: Runtime>(app: &AppHandle<R>) {
+    match recording::install(app) {
+        Ok(()) => {
+            screenshots::install(app);
+            recording::publish_state(app);
+        }
+        Err(error) => tracing::error!(%error, "could not start the recorder"),
+    }
+}
+
+fn log_startup_failure<E: Display>(outcome: Result<(), E>, message: &str) {
+    if let Err(error) = outcome {
+        tracing::error!(%error, "{message}");
+    }
 }
