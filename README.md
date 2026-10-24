@@ -24,7 +24,7 @@ You are responsible for telling the people on a call that you are transcribing i
 
 ## Install
 
-Download the latest build from the [Releases page](https://github.com/incubyte/scribe/releases). The repository is private, so you need access to `incubyte/scribe` and a GitHub login.
+Download the latest build from the [Releases page](https://github.com/incubyte/scribe/releases).
 
 | Platform | File | Requirements |
 |---|---|---|
@@ -69,7 +69,7 @@ Then ask things like "List my recent Scribe calls" or "Search my Scribe transcri
 
 ### Install the Claude plugin
 
-The Scribe plugin adds two commands to Claude: `/recap` lists your recent calls with a summary of each, and `/meeting-notes` writes one call up as notes with todos, added to your one Scribe notebook from any chat (it needs a Claude that can publish artifacts). Connect Scribe to Claude Desktop first (see above). The repository is private, so Claude needs GitHub connected with access to `incubyte/scribe`.
+The Scribe plugin adds two commands to Claude: `/recap` lists your recent calls with a summary of each, and `/meeting-notes` writes one call up as notes with todos, added to your one Scribe notebook from any chat (it needs a Claude that can publish artifacts). Connect Scribe to Claude Desktop first (see above).
 
 - **Claude Code:** run `/plugin marketplace add incubyte/scribe`, then `/plugin install scribe@scribe`.
 - **Claude Desktop:** open **Customize**, then **Plugins**, click **Add marketplace**, enter `incubyte/scribe`, and install **Scribe**.

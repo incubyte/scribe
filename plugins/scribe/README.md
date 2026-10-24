@@ -12,8 +12,6 @@ The Scribe plugin gives Claude two commands for your calls: **recap** lists your
 
 ## Install
 
-This repository is private. Installing needs GitHub connected to Claude with access to `incubyte/scribe`.
-
 **Claude Code**
 
 1. Run `/plugin marketplace add incubyte/scribe`.

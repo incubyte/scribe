@@ -229,7 +229,7 @@ flowchart LR
 **Acceptance criteria**
 
 - [ ] **5.5.1** With an update ready and Scribe idle, it installs and relaunches within two minutes, shows no window or notification, and comes back with the tray icon in its normal state.
-- [x] **5.5.2** While recording, no install starts; once the recording stops and Scribe is otherwise idle, the install follows within two minutes.
+- [ ] **5.5.2** While recording, no install starts; once the recording stops and Scribe is otherwise idle, the install follows within two minutes.
 - [x] **5.5.3** While a call app holds the microphone, including the 30-second grace after it lets go, no install starts, even when Scribe is not recording.
 - [x] **5.5.4** While the popover is open, no install starts.
 - [x] **5.5.5** An install that fails leaves Scribe running the old version with the update still ready, and is retried at most once per hourly check.
