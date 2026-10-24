@@ -53,16 +53,16 @@ require_update_signing_key() {
   fi
 }
 
-export_update_signing_key() {
-  export TAURI_SIGNING_PRIVATE_KEY="$update_key_path"
-  TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$(security find-generic-password -s "$update_key_service" -w)"
-  export TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+tauri_build_signed() {
+  TAURI_SIGNING_PRIVATE_KEY="$update_key_path" \
+    TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$(security find-generic-password -s "$update_key_service" -w)" \
+    npx tauri build "$@"
 }
 
 build_macos() {
   bash "$tray/scripts/stage-sidecar.sh"
   (cd "$tray" && APPLE_SIGNING_IDENTITY="$signing_identity" \
-    npx tauri build --bundles app,dmg --config src-tauri/tauri.ci.conf.json --config "$release_config")
+    tauri_build_signed --bundles app,dmg --config src-tauri/tauri.ci.conf.json --config "$release_config")
 }
 
 notarize_macos() {
@@ -90,16 +90,22 @@ verify_update_signature() {
   base64 -d < "$file.sig" > "$keys/update.minisig"
   verification="$(minisign -V -p "$keys/update.pub" -m "$file" -x "$keys/update.minisig" 2>&1 || true)"
   rm -rf "$keys"
-  if [[ "$verification" != *"Signature and comment signature verified"* || "$verification" != *"version:$version"* ]]; then
+  if [[ "$verification" != *"Signature and comment signature verified"* ]] || ! names_release_version "$verification"; then
     echo "Update signature check failed for $(basename "$file") (expected version:$version)." >&2
     exit 1
   fi
 }
 
+names_release_version() {
+  local tab=$'\t' newline=$'\n'
+  local pattern="version:${version//./\\.}([$tab$newline]|\$)"
+  [[ "$1" =~ $pattern ]]
+}
+
 build_windows() {
   bash "$tray/scripts/fetch-vc-redist.sh"
   bash "$tray/scripts/stage-sidecar.sh" "$windows_target"
-  (cd "$tray" && npx tauri build --runner cargo-xwin --target "$windows_target" --bundles nsis \
+  (cd "$tray" && tauri_build_signed --runner cargo-xwin --target "$windows_target" --bundles nsis \
     --config src-tauri/tauri.ci.conf.json --config "$release_config")
 }
 
@@ -154,7 +160,6 @@ publish_assets() {
 require_clean_main
 require_notary_credentials
 require_update_signing_key
-export_update_signing_key
 build_macos
 notarize_macos
 verify_macos_update_archive
