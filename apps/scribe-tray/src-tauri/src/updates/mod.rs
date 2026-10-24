@@ -1,4 +1,5 @@
 mod controller;
+mod install;
 mod release_feed;
 
 use std::thread;
@@ -8,6 +9,7 @@ use scribe_core::update::{CHECK_INTERVAL, CheckSchedule, ReleaseVersion};
 use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_updater::Update;
 
+pub use install::AfterInstall;
 use controller::{StagedPackage, UpdateController};
 
 const THREAD_NAME: &str = "update-check";
@@ -25,6 +27,10 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) {
     if let Err(error) = spawned {
         tracing::error!(%error, "could not start checking for updates");
     }
+}
+
+pub fn install_on_quit<R: Runtime>(app: &AppHandle<R>) {
+    install::install_staged(app, AfterInstall::Exit);
 }
 
 fn check_forever<R: Runtime>(app: &AppHandle<R>) {

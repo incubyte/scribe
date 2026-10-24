@@ -173,9 +173,9 @@ Quitting is a fallback install moment, not the main one: the main one is Scribe 
 
 - [ ] **5.3.1** With an update ready on macOS, Quit Scribe replaces the installed `Scribe.app` with the new version and exits; launching Scribe afterwards runs the new version with its Microphone, System Audio Recording and Screen Recording grants intact.
 - [ ] **5.3.2** With an update ready on Windows, Quit Scribe runs the installer in `quiet` mode, with no UAC prompt and no installer window, and Scribe exits; the next launch runs the new version.
-- [ ] **5.3.3** Quitting while recording stops and saves the recording exactly as today before any install starts.
+- [x] **5.3.3** Quitting while recording stops and saves the recording exactly as today before any install starts.
 - [ ] **5.3.4** When the install fails, Scribe still exits, the old version stays usable, the failure is logged, and the next run downloads the update again.
-- [ ] **5.3.5** With no update ready, Quit Scribe exits immediately as today.
+- [x] **5.3.5** With no update ready, Quit Scribe exits immediately as today.
 
 **Verification (slice complete when these pass):**
 

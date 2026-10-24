@@ -20,6 +20,7 @@ use crate::privacy;
 use crate::recording::{self, RecordingController};
 use crate::recording_label::{START_RECORDING, stop_recording_label};
 use crate::tray_anchor::ScreenArea;
+use crate::updates;
 
 const TRAY_ID: &str = "main";
 const IDLE_TOOLTIP: &str = "Scribe";
@@ -239,6 +240,7 @@ fn toggle_recording<R: Runtime>(app: &AppHandle<R>) {
 
 fn quit<R: Runtime>(app: &AppHandle<R>) {
     app.state::<RecordingController>().stop();
+    updates::install_on_quit(app);
     app.exit(0);
 }
 

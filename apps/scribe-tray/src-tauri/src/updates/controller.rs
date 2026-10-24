@@ -4,7 +4,6 @@ use scribe_core::update::{ReleaseVersion, UpdateLifecycle};
 use tauri_plugin_updater::Update;
 
 #[derive(Clone)]
-#[expect(dead_code, reason = "read by the install slices")]
 pub struct StagedPackage {
     pub update: Update,
     pub bytes: Arc<[u8]>,
@@ -31,6 +30,10 @@ impl UpdateController {
 
     pub fn abandon(&self) {
         self.lifecycle().abandon_download();
+    }
+
+    pub fn package_to_install(&self) -> Option<StagedPackage> {
+        self.lifecycle().package_to_install()
     }
 
     fn lifecycle(&self) -> MutexGuard<'_, UpdateLifecycle<StagedPackage>> {
