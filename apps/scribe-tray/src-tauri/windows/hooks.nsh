@@ -1,5 +1,10 @@
 !define VC_RUNTIME_KEY "SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64"
 !define VC_REDIST_URL "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+!define SCRIBE_MCP_EXE "scribe-mcp.exe"
+
+!macro NSIS_HOOK_PREINSTALL
+  !insertmacro CheckIfAppIsRunning "$INSTDIR\${SCRIBE_MCP_EXE}" "Scribe"
+!macroend
 
 !macro NSIS_HOOK_POSTINSTALL
   SetRegView 64

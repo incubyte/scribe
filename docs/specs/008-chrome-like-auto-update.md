@@ -195,8 +195,8 @@ Claude Desktop and Claude Code run `scribe-mcp.exe` straight from Scribe's insta
 **Acceptance criteria**
 
 - [ ] **5.4.1** With Claude Desktop connected and `scribe-mcp.exe` running, an update installed on quit finishes, and the install folder holds the new `scribe-mcp.exe`.
-- [ ] **5.4.2** Only `scribe-mcp.exe` processes started from Scribe's install folder are stopped; nothing else is touched.
-- [ ] **5.4.3** When no `scribe-mcp.exe` is running, the installer behaves as today, including the Visual C++ runtime step from ADR 6.
+- [x] **5.4.2** Only `scribe-mcp.exe` processes started from Scribe's install folder are stopped; nothing else is touched.
+- [x] **5.4.3** When no `scribe-mcp.exe` is running, the installer behaves as today, including the Visual C++ runtime step from ADR 6.
 - [ ] **5.4.4** After the update, Claude Desktop lists Scribe's five tools again, either on its own or after Claude restarts; which of the two it is gets recorded in the README.
 
 **Verification (slice complete when these pass):**
