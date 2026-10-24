@@ -18,7 +18,7 @@ Scribe is a small tray app for macOS and Windows that transcribes your calls wit
 
 ## Privacy
 
-Audio, transcripts, and screenshots never leave your computer through Scribe. Audio is processed in memory and is never written to disk, and only the transcript text is saved. Screenshots are saved only while a call is being recorded; at other times they go to the clipboard only. An AI app connected through MCP receives a scaled copy of a screenshot only when it asks for one. The only network traffic is a one-time download of the speech model on Windows (and Apple's speech model install on macOS).
+Audio, transcripts, and screenshots never leave your computer through Scribe. Audio is processed in memory and is never written to disk, and only the transcript text is saved. Screenshots are saved only while a call is being recorded; at other times they go to the clipboard only. An AI app connected through MCP receives a scaled copy of a screenshot only when it asks for one. The only network traffic is a one-time download of the speech model on Windows (and Apple's speech model install on macOS), and an hourly check of GitHub for a newer Scribe release, which sends nothing about you or your calls.
 
 You are responsible for telling the people on a call that you are transcribing it. Recording and transcription laws differ by country and state, and some require everyone's consent.
 

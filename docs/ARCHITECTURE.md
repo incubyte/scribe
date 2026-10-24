@@ -61,7 +61,7 @@ graph LR
 
 ## 5. Cross-cutting concerns
 
-- **Privacy:** no outbound traffic except speech-model asset fetches; audio is memory-only and never on disk.
+- **Privacy:** no outbound traffic except speech-model asset fetches and the hourly update check against GitHub's latest release, which sends no query parameters, custom headers or user data; audio is memory-only and never on disk.
 - **Logging:** session ids and file names only; transcript text is never logged.
 - **Errors:** typed `Result` errors; no `null`/sentinel returns; validate and fail fast at boundaries (MCP input, file parsing, device events).
 - **Validation:** MCP messages capped at 1 MB; ids rejected if they contain path separators or `..`; search is literal, never regex.

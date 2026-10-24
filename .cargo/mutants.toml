@@ -15,6 +15,7 @@ exclude_globs = [
     "apps/scribe-tray/src-tauri/src/call_watch.rs",
     "apps/scribe-tray/src-tauri/src/call_probes.rs",
     "apps/scribe-tray/src-tauri/src/popover.rs",
+    "apps/scribe-tray/src-tauri/src/updates/**",
     "crates/audio-macos/src/call_probe.rs",
     "crates/audio-windows/src/call_probe.rs",
 ]

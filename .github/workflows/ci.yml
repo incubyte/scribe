@@ -39,10 +39,10 @@ jobs:
           mkdir -p "$HOME/.config" "$HOME/Documents"
           echo 'XDG_DOCUMENTS_DIR="$HOME/Documents"' > "$HOME/.config/user-dirs.dirs"
       - run: cargo test $PORTABLE_CRATES
-      - name: Only the Parakeet adapter may depend on an HTTP client
+      - name: Only the Parakeet adapter and the updater may depend on an HTTP client
         shell: bash
         run: |
-          dependents=$(cargo tree -e normal -i reqwest --depth 1 --prefix none 2>/dev/null | tail -n +2 | grep -v '^stt-parakeet ' || true)
+          dependents=$(cargo tree -e normal -i reqwest --depth 1 --prefix none 2>/dev/null | tail -n +2 | grep -v -E '^(stt-parakeet|tauri-plugin-updater) ' || true)
           if [ -n "$dependents" ]; then
             echo "An HTTP client is reachable from: $dependents"
             exit 1

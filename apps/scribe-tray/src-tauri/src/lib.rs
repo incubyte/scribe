@@ -23,6 +23,7 @@ pub mod transcripts_location;
 mod tray;
 pub mod tray_anchor;
 mod tray_listener;
+mod updates;
 mod webview;
 
 use tauri::{AppHandle, Builder, Runtime};
@@ -76,10 +77,12 @@ fn with_plugins<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_positioner::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(screenshots::plugin())
 }
 
 fn start_scribe<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::error::Error>> {
+    updates::install(app);
     tray::install(app)?;
     recording::install(app)?;
     screenshots::install(app);

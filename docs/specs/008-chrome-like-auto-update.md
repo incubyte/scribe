@@ -149,10 +149,10 @@ Once a user is on an updater-enabled version, Scribe checks the manifest at laun
 - [ ] **5.2.3** When the manifest lists the running version or an older one, nothing is downloaded.
 - [ ] **5.2.4** When the network is down, the manifest returns 404 or is malformed, or a download is cut off, Scribe logs one line with the reason, keeps running as before and tries again at the next hourly check.
 - [ ] **5.2.5** When an archive's signature does not verify, it is discarded, the failure is logged as an error naming the version, and nothing installs.
-- [ ] **5.2.6** While an update is Downloading or Update ready, later checks do not start a second download of the same version.
-- [ ] **5.2.7** Update checks start in `start_scribe` before the recorder, screenshots and call watching, and a failure in any of those does not stop the checks (invariant 4.5).
-- [ ] **5.2.8** The requests carry no query parameters or custom headers, and the popover's webview has no updater permission; only the Rust shell can check, download or install.
-- [ ] **5.2.9** The README's sentence that the speech-model download is the only network traffic now also names the hourly update check to GitHub and says it sends nothing about the user or their calls.
+- [x] **5.2.6** While an update is Downloading or Update ready, later checks do not start a second download of the same version.
+- [x] **5.2.7** Update checks start in `start_scribe` before the recorder, screenshots and call watching, and a failure in any of those does not stop the checks (invariant 4.5).
+- [x] **5.2.8** The requests carry no query parameters or custom headers, and the popover's webview has no updater permission; only the Rust shell can check, download or install.
+- [x] **5.2.9** The README's sentence that the speech-model download is the only network traffic now also names the hourly update check to GitHub and says it sends nothing about the user or their calls.
 
 **Verification (slice complete when these pass):**
 
