@@ -1,2 +1,3 @@
+- Scribe now keeps itself up to date. It checks for a new version every hour and installs it when you're not recording or on a call, or when you quit. Install this version by hand once; later versions arrive on their own.
 - macOS (Apple Silicon, macOS 26 or later): signed and notarized by Apple. If you used an earlier version, allow the Microphone, System Audio Recording and Screen Recording permissions again when Scribe asks; this happens once.
 - Windows: unsigned. On the SmartScreen prompt, choose More info → Run anyway.
