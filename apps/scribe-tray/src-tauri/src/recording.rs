@@ -21,6 +21,7 @@ use crate::privacy;
 use crate::start_failure::StartError;
 use crate::tray;
 use crate::tray_listener::TrayRecordingListener;
+use crate::updates;
 use crate::webview;
 
 const STATE_EVENT: &str = "recorder://state";
@@ -165,6 +166,7 @@ pub fn is_recording<R: Runtime>(app: &AppHandle<R>) -> bool {
 pub fn publish_state<R: Runtime>(app: &AppHandle<R>) {
     let state = app.state::<RecordingController>().state();
     tray::show_recorder_state(app, state);
+    updates::refresh_restart_item(app);
     let payload = StatePayload {
         state: state_name(state),
     };

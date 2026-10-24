@@ -1,5 +1,6 @@
 mod controller;
 mod install;
+mod menu_item;
 mod release_feed;
 
 use std::thread;
@@ -15,7 +16,6 @@ use tauri_plugin_updater::Update;
 use crate::call_watch::CallPresence;
 use crate::popover;
 use crate::recording::{self, RecordingController};
-use crate::tray;
 
 use controller::{StagedPackage, UpdateController};
 
@@ -44,6 +44,10 @@ pub fn restart_to_update<R: Runtime>(app: &AppHandle<R>) {
     if is_free_to_restart(app) {
         install::install_and_relaunch(app, is_free_to_restart);
     }
+}
+
+pub fn refresh_restart_item<R: Runtime>(app: &AppHandle<R>) {
+    menu_item::enable(app, is_free_to_restart(app));
 }
 
 fn is_free_to_restart<R: Runtime>(app: &AppHandle<R>) -> bool {
@@ -122,7 +126,7 @@ fn download_and_stage<R: Runtime>(app: &AppHandle<R>, update: Update, version: &
                 bytes: bytes.into(),
             });
             tracing::info!(version = %version, "an update is ready");
-            tray::show_restart_to_update(app);
+            menu_item::show(app, is_free_to_restart(app));
         }
     }
 }
