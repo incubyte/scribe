@@ -5,6 +5,7 @@ interface SettingsPanelProps {
   readonly folder: string | null;
   readonly status: string | null;
   readonly isRecording: boolean;
+  readonly version: string | null;
   readonly onChangeFolder: () => void;
   readonly onBack: () => void;
   readonly children?: ReactNode;
@@ -17,6 +18,7 @@ export function SettingsPanel({
   folder,
   status,
   isRecording,
+  version,
   onChangeFolder,
   onBack,
   children,
@@ -60,6 +62,9 @@ export function SettingsPanel({
         {status}
       </p>
       {children}
+      {version === null ? null : (
+        <p className="settings__version">Version {version}</p>
+      )}
       <button className="actions__link" type="button" onClick={onBack}>
         Back
       </button>

@@ -60,6 +60,8 @@ const recordingForSixtyFiveSeconds: RecorderSnapshot = {
   lines: [{ speaker: "Them", start_ms: 0, text: "Good morning" }],
 };
 
+const SCRIBE_VERSION = "0.5.1";
+
 function backend(
   snapshot: RecorderSnapshot,
   recent: readonly SessionSummary[] = FIVE_SESSIONS,
@@ -70,6 +72,7 @@ function backend(
     model_download_status: modelDownload,
     recent_sessions: recent,
     claude_desktop_status: "not_connected",
+    "plugin:app|version": SCRIBE_VERSION,
     transcripts_folder: () => readFolder(),
     change_transcripts_folder: () => changeFolder(),
     screenshot_shortcuts: [
@@ -462,6 +465,15 @@ describe("the popover settings", () => {
       await screen.findByRole("button", { name: "Settings" }),
     );
   }
+
+  it("shows which version of Scribe is running", async () => {
+    backend(idle);
+    render(<Popover />);
+
+    await openSettings();
+
+    expect(await screen.findByText("Version 0.5.1")).toBeInTheDocument();
+  });
 
   it("shows the current transcripts folder", async () => {
     backend(idle);

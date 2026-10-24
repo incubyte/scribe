@@ -15,6 +15,7 @@ function renderPanel(
       folder={FOLDER}
       status={null}
       isRecording={false}
+      version="0.5.1"
       onChangeFolder={noop}
       onBack={noop}
       {...overrides}
@@ -34,6 +35,18 @@ describe("the settings panel", () => {
 
     expect(screen.getByText("Loading…")).toBeInTheDocument();
     expect(screen.queryByText(/Transcripts folder:/)).not.toBeInTheDocument();
+  });
+
+  it("shows the Scribe version", () => {
+    renderPanel();
+
+    expect(screen.getByText("Version 0.5.1")).toBeInTheDocument();
+  });
+
+  it("shows no version line until the version is known", () => {
+    renderPanel({ version: null });
+
+    expect(screen.queryByText(/Version/)).not.toBeInTheDocument();
   });
 
   it("announces the status message politely", () => {

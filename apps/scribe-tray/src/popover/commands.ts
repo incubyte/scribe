@@ -1,3 +1,4 @@
+import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { expecting, isString } from "../shared/guards";
 import {
@@ -43,6 +44,8 @@ export const fetchClaudeDesktopStatus = () =>
 export const copyMcpConfig = () => invoke("copy_mcp_config");
 
 export const openTranscriptsFolder = () => invoke("open_transcripts_folder");
+
+export const fetchAppVersion = () => getVersion();
 
 export const fetchTranscriptsFolder = () =>
   invoke<unknown>("transcripts_folder").then(expecting(isString, "transcripts folder"));

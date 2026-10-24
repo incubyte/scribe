@@ -371,7 +371,8 @@
 }
 
 .settings__status,
-.settings__reason {
+.settings__reason,
+.settings__version {
   margin: 0;
   color: var(--text-muted);
   font-size: var(--text-sm);
