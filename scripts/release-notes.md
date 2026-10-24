@@ -1,3 +1,3 @@
-- Settings now shows which version of Scribe is running. Scribe keeps itself up to date: it checks for a new version every hour and installs it when you are not recording or on a call, or when you quit.
+- Scribe now also checks for updates shortly after your computer wakes from sleep, as well as every hour. Settings shows which version is running.
 - macOS (Apple Silicon, macOS 26 or later): signed and notarized by Apple. If you used an earlier version, allow the Microphone, System Audio Recording and Screen Recording permissions again when Scribe asks; this happens once.
 - Windows: unsigned. On the SmartScreen prompt, choose More info → Run anyway.
