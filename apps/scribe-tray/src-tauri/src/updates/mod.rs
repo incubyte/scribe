@@ -17,8 +17,8 @@ use crate::popover;
 use crate::recording::RecordingController;
 use crate::tray;
 
-pub use install::AfterInstall;
 use controller::{StagedPackage, UpdateController};
+pub use install::AfterInstall;
 
 const THREAD_NAME: &str = "update-check";
 const TICK_INTERVAL: Duration = Duration::from_secs(30);

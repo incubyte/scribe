@@ -2,6 +2,8 @@ use std::time::{Duration, Instant};
 
 use scribe_core::update::{CHECK_INTERVAL, ReleaseVersion, UpdateLifecycle};
 
+const ONE_MILLISECOND_SHORT_OF_CHECK_INTERVAL: Duration = Duration::from_millis(3_599_999);
+
 #[derive(Clone, Debug, PartialEq)]
 struct TestPackage(&'static str);
 
@@ -109,7 +111,7 @@ fn a_failed_install_is_retried_only_after_the_check_interval() {
 
     lifecycle.record_failed_install(failed_at);
 
-    assert!(!lifecycle.is_install_due(failed_at + CHECK_INTERVAL - Duration::from_millis(1)));
+    assert!(!lifecycle.is_install_due(failed_at + ONE_MILLISECOND_SHORT_OF_CHECK_INTERVAL));
     assert!(lifecycle.is_install_due(failed_at + CHECK_INTERVAL));
 }
 

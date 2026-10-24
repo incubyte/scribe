@@ -93,9 +93,13 @@ fn build_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<Menu<R>> {
             &quit,
         ],
     )?;
+    manage_menu(app, toggle, &menu);
+    Ok(menu)
+}
+
+fn manage_menu<R: Runtime>(app: &AppHandle<R>, toggle: MenuItem<R>, menu: &Menu<R>) {
     app.manage(RecordingMenuItem(toggle));
     app.manage(TrayMenu(menu.clone()));
-    Ok(menu)
 }
 
 fn connect_claude_desktop_item<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<MenuItem<R>> {
