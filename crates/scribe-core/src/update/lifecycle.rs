@@ -1,4 +1,7 @@
 use std::fmt;
+use std::time::Instant;
+
+use super::CHECK_INTERVAL;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ReleaseVersion(String);
@@ -24,7 +27,11 @@ impl fmt::Display for ReleaseVersion {
 enum Phase<P> {
     UpToDate,
     Downloading(ReleaseVersion),
-    Ready { version: ReleaseVersion, package: P },
+    Ready {
+        version: ReleaseVersion,
+        package: P,
+        failed_install_at: Option<Instant>,
+    },
 }
 
 pub struct UpdateLifecycle<P> {
@@ -62,6 +69,7 @@ impl<P> UpdateLifecycle<P> {
             self.phase = Phase::Ready {
                 version: version.clone(),
                 package,
+                failed_install_at: None,
             };
         }
     }
@@ -75,6 +83,26 @@ impl<P> UpdateLifecycle<P> {
     #[must_use]
     pub fn is_ready(&self) -> bool {
         matches!(self.phase, Phase::Ready { .. })
+    }
+
+    pub fn record_failed_install(&mut self, now: Instant) {
+        if let Phase::Ready {
+            failed_install_at, ..
+        } = &mut self.phase
+        {
+            *failed_install_at = Some(now);
+        }
+    }
+
+    #[must_use]
+    pub fn is_install_due(&self, now: Instant) -> bool {
+        match &self.phase {
+            Phase::Ready {
+                failed_install_at, ..
+            } => failed_install_at
+                .is_none_or(|failed| now.saturating_duration_since(failed) >= CHECK_INTERVAL),
+            _ => false,
+        }
     }
 
     #[must_use]

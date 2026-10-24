@@ -37,6 +37,11 @@ impl CallWatch {
         self.in_call && !self.reported
     }
 
+    #[must_use]
+    pub fn is_in_call(&self) -> bool {
+        self.in_call
+    }
+
     fn hold(&mut self) {
         self.released_at = None;
         if !self.in_call {

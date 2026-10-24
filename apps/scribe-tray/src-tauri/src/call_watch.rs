@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -13,7 +14,21 @@ use crate::recording::RecordingController;
 const POLL_INTERVAL: Duration = Duration::from_secs(2);
 const THREAD_NAME: &str = "call-watch";
 
+#[derive(Default)]
+pub struct CallPresence(AtomicBool);
+
+impl CallPresence {
+    pub fn is_in_call(&self) -> bool {
+        self.0.load(Ordering::Relaxed)
+    }
+
+    fn publish(&self, in_call: bool) {
+        self.0.store(in_call, Ordering::Relaxed);
+    }
+}
+
 pub fn install<R: Runtime>(app: &AppHandle<R>) {
+    app.manage(CallPresence::default());
     let handle = app.clone();
     let spawned = thread::Builder::new()
         .name(THREAD_NAME.to_owned())
@@ -33,6 +48,7 @@ fn watch_forever<R: Runtime>(app: &AppHandle<R>, probe: &dyn CallProbe, watch: &
         match probe.call_app_holds_microphone() {
             Ok(holds_microphone) => {
                 watch.observe(holds_microphone, Instant::now());
+                app.state::<CallPresence>().publish(watch.is_in_call());
                 open_if_call_started(app, watch);
             }
             Err(error) => tracing::debug!(%error, "could not read which apps hold the microphone"),

@@ -102,3 +102,34 @@ fn an_app_already_holding_the_microphone_at_the_first_observation_makes_a_call_s
 
     assert!(watch.is_start_due());
 }
+
+#[test]
+fn a_call_still_counts_during_the_grace_after_the_call_app_lets_go() {
+    let started = Instant::now();
+    let mut watch = CallWatch::new(GRACE);
+    watch.observe(true, started);
+    watch.observe(false, started);
+
+    watch.observe(false, started + ONE_MILLISECOND_SHORT_OF_GRACE);
+
+    assert!(watch.is_in_call());
+}
+
+#[test]
+fn a_call_no_longer_counts_once_the_grace_has_passed() {
+    let started = Instant::now();
+    let mut watch = CallWatch::new(GRACE);
+    watch.observe(true, started);
+    watch.observe(false, started);
+
+    watch.observe(false, started + GRACE);
+
+    assert!(!watch.is_in_call());
+}
+
+#[test]
+fn no_call_counts_before_a_call_app_takes_the_microphone() {
+    let watch = CallWatch::new(GRACE);
+
+    assert!(!watch.is_in_call());
+}

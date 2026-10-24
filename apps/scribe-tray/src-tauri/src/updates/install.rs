@@ -1,10 +1,11 @@
+use std::time::Instant;
+
 use tauri::{AppHandle, Manager, Runtime};
 
 use super::controller::{StagedPackage, UpdateController};
 
 pub enum AfterInstall {
     Exit,
-    #[expect(dead_code, reason = "constructed by the idle install slice")]
     Relaunch,
 }
 
@@ -19,7 +20,10 @@ pub fn install_staged<R: Runtime>(app: &AppHandle<R>, after: AfterInstall) {
     tracing::info!(version, "installing the update");
     match apply(package, &after) {
         Ok(()) => finish(app, &after),
-        Err(error) => tracing::error!(%error, version, "could not install the update"),
+        Err(error) => {
+            controller.record_failed_install(Instant::now());
+            tracing::error!(%error, version, "could not install the update");
+        }
     }
 }
 

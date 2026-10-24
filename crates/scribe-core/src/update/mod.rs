@@ -1,8 +1,10 @@
+mod install_moment;
 mod lifecycle;
 mod schedule;
 
 use std::time::Duration;
 
+pub use install_moment::{InstallConditions, InstallMoment, WaitReason, install_moment};
 pub use lifecycle::{ReleaseVersion, UpdateLifecycle};
 pub use schedule::CheckSchedule;
 

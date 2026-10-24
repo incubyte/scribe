@@ -27,6 +27,10 @@ pub fn toggle<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
+pub fn is_open<R: Runtime>(app: &AppHandle<R>) -> bool {
+    popover_window(app).is_ok_and(|window| window.is_visible().unwrap_or(false))
+}
+
 pub fn open_for_call<R: Runtime>(app: &AppHandle<R>) {
     let window = match popover_window(app) {
         Ok(window) => window,

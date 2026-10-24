@@ -5,9 +5,16 @@ mod release_feed;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use scribe_core::update::{CHECK_INTERVAL, CheckSchedule, ReleaseVersion};
+use scribe_core::recording::RecorderState;
+use scribe_core::update::{
+    CHECK_INTERVAL, CheckSchedule, InstallConditions, InstallMoment, ReleaseVersion, install_moment,
+};
 use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_updater::Update;
+
+use crate::call_watch::CallPresence;
+use crate::popover;
+use crate::recording::RecordingController;
 
 pub use install::AfterInstall;
 use controller::{StagedPackage, UpdateController};
@@ -45,6 +52,28 @@ fn tick<R: Runtime>(app: &AppHandle<R>, schedule: &mut CheckSchedule, now: Insta
     if schedule.is_check_due(now) {
         schedule.mark_checked(now);
         check_and_stage(app);
+    }
+    install_if_idle(app, now);
+}
+
+fn install_if_idle<R: Runtime>(app: &AppHandle<R>, now: Instant) {
+    if install_moment(&current_conditions(app, now)) == InstallMoment::Now {
+        install::install_staged(app, AfterInstall::Relaunch);
+    }
+}
+
+fn current_conditions<R: Runtime>(app: &AppHandle<R>, now: Instant) -> InstallConditions {
+    InstallConditions {
+        install_due: app
+            .try_state::<UpdateController>()
+            .is_some_and(|controller| controller.is_install_due(now)),
+        recorder: app
+            .try_state::<RecordingController>()
+            .map_or(RecorderState::Locked, |recorder| recorder.state()),
+        in_call: app
+            .try_state::<CallPresence>()
+            .is_none_or(|presence| presence.is_in_call()),
+        popover_open: popover::is_open(app),
     }
 }
 

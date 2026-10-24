@@ -1,4 +1,5 @@
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
+use std::time::Instant;
 
 use scribe_core::update::{ReleaseVersion, UpdateLifecycle};
 use tauri_plugin_updater::Update;
@@ -34,6 +35,14 @@ impl UpdateController {
 
     pub fn package_to_install(&self) -> Option<StagedPackage> {
         self.lifecycle().package_to_install()
+    }
+
+    pub fn is_install_due(&self, now: Instant) -> bool {
+        self.lifecycle().is_install_due(now)
+    }
+
+    pub fn record_failed_install(&self, now: Instant) {
+        self.lifecycle().record_failed_install(now);
     }
 
     fn lifecycle(&self) -> MutexGuard<'_, UpdateLifecycle<StagedPackage>> {

@@ -1,4 +1,6 @@
-use scribe_core::update::{ReleaseVersion, UpdateLifecycle};
+use std::time::{Duration, Instant};
+
+use scribe_core::update::{CHECK_INTERVAL, ReleaseVersion, UpdateLifecycle};
 
 #[derive(Clone, Debug, PartialEq)]
 struct TestPackage(&'static str);
@@ -96,4 +98,33 @@ fn a_finished_download_nobody_asked_for_is_ignored() {
 fn a_version_displays_as_its_text() {
     assert_eq!(version("0.5.0").to_string(), "0.5.0");
     assert_eq!(version("0.5.0").as_str(), "0.5.0");
+}
+
+#[test]
+fn a_failed_install_is_retried_only_after_the_check_interval() {
+    let failed_at = Instant::now();
+    let mut lifecycle = UpdateLifecycle::new();
+    lifecycle.begin_download(&version("0.5.0"));
+    lifecycle.finish_download(TestPackage("0.5.0 bytes"));
+
+    lifecycle.record_failed_install(failed_at);
+
+    assert!(!lifecycle.is_install_due(failed_at + CHECK_INTERVAL - Duration::from_millis(1)));
+    assert!(lifecycle.is_install_due(failed_at + CHECK_INTERVAL));
+}
+
+#[test]
+fn an_update_with_no_failed_install_is_due_at_once() {
+    let mut lifecycle = UpdateLifecycle::new();
+    lifecycle.begin_download(&version("0.5.0"));
+    lifecycle.finish_download(TestPackage("0.5.0 bytes"));
+
+    assert!(lifecycle.is_install_due(Instant::now()));
+}
+
+#[test]
+fn nothing_is_due_to_install_before_an_update_is_ready() {
+    let lifecycle = UpdateLifecycle::<TestPackage>::new();
+
+    assert!(!lifecycle.is_install_due(Instant::now()));
 }
