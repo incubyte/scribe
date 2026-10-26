@@ -61,7 +61,7 @@ fn session(text: &str) -> SessionId {
 fn a_recording_during_a_meeting_is_linked_to_it() {
     let agenda = agenda_of(vec![review()]);
 
-    let chosen = chosen_meeting(Some(&agenda), &anchor_at("2026-10-26T10:58:00+05:30"));
+    let chosen = chosen_meeting(Some(&agenda), &anchor_at("2026-10-26T10:58:00+05:30"), &[]);
 
     assert_eq!(chosen, Some(review()));
 }
@@ -70,7 +70,7 @@ fn a_recording_during_a_meeting_is_linked_to_it() {
 fn a_recording_with_no_meeting_around_it_is_linked_to_nothing() {
     let agenda = agenda_of(vec![review()]);
 
-    let chosen = chosen_meeting(Some(&agenda), &anchor_at("2026-10-26T15:00:00+05:30"));
+    let chosen = chosen_meeting(Some(&agenda), &anchor_at("2026-10-26T15:00:00+05:30"), &[]);
 
     assert_eq!(chosen, None);
 }
@@ -84,14 +84,33 @@ fn a_recording_that_fits_two_meetings_equally_is_linked_to_neither() {
     );
     let agenda = agenda_of(vec![review(), other]);
 
-    let chosen = chosen_meeting(Some(&agenda), &anchor_at("2026-10-26T11:05:00+05:30"));
+    let chosen = chosen_meeting(Some(&agenda), &anchor_at("2026-10-26T11:05:00+05:30"), &[]);
 
     assert_eq!(chosen, None);
 }
 
 #[test]
+fn a_recording_that_fits_two_meetings_is_linked_to_the_one_the_teams_window_names() {
+    let other = meeting(
+        "other",
+        "2026-10-26T11:00:00+05:30",
+        "2026-10-26T11:30:00+05:30",
+    );
+    let agenda = agenda_of(vec![review(), other]);
+    let titles = vec!["Review | Microsoft Teams".to_owned()];
+
+    let chosen = chosen_meeting(
+        Some(&agenda),
+        &anchor_at("2026-10-26T11:05:00+05:30"),
+        &titles,
+    );
+
+    assert_eq!(chosen, Some(review()));
+}
+
+#[test]
 fn a_recording_with_no_agenda_to_look_at_is_linked_to_nothing() {
-    let chosen = chosen_meeting(None, &anchor_at("2026-10-26T11:05:00+05:30"));
+    let chosen = chosen_meeting(None, &anchor_at("2026-10-26T11:05:00+05:30"), &[]);
 
     assert_eq!(chosen, None);
 }

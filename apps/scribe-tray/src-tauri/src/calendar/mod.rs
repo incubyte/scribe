@@ -8,6 +8,7 @@ pub mod connection_payload;
 pub mod day_bounds;
 pub mod selection;
 mod session_link;
+mod titles;
 pub mod vault;
 
 use std::error::Error;
@@ -21,7 +22,7 @@ use connection::OutlookConnection;
 use selection::MeetingSelection;
 use vault::KeyringVault;
 
-pub use session_link::{link_finished_session, note_recording_started};
+pub use session_link::{link_finished_session, note_call_started, note_recording_started};
 
 pub fn install<R: Runtime>(app: &AppHandle<R>) {
     app.manage(OutlookConnection::new());

@@ -110,15 +110,15 @@ fn skip_unreadable<T>(outcome: Result<T, WasapiError>, message: &str) -> Option<
         .ok()
 }
 
-struct ProcessTable(HashMap<u32, (u32, String)>);
+pub(crate) struct ProcessTable(HashMap<u32, (u32, String)>);
 
 impl ProcessTable {
-    fn snapshot() -> Result<ProcessTable, CaptureError> {
+    pub(crate) fn snapshot() -> Result<ProcessTable, CaptureError> {
         let snapshot = SnapshotHandle::take()?;
         Ok(ProcessTable(snapshot.processes()))
     }
 
-    fn belongs_to_teams(&self, pid: u32) -> bool {
+    pub(crate) fn belongs_to_teams(&self, pid: u32) -> bool {
         let mut current = pid;
         for _ in 0..=MAX_ANCESTRY {
             let Some((parent, exe_name)) = self.0.get(&current) else {

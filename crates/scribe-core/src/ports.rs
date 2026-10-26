@@ -47,6 +47,10 @@ pub trait CallProbe: Send {
     fn call_app_holds_microphone(&self) -> Result<bool, CaptureError>;
 }
 
+pub trait MeetingWindowTitles: Send + Sync {
+    fn teams_window_titles(&self) -> Vec<String>;
+}
+
 pub trait ScreenshotStore: Send + Sync {
     fn save(
         &self,

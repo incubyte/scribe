@@ -10,8 +10,12 @@ mod loopback;
 mod recovery;
 #[cfg(windows)]
 mod stream;
+#[cfg(windows)]
+mod teams_windows;
 
 #[cfg(windows)]
 pub use call_probe::WasapiCallProbe;
 #[cfg(windows)]
 pub use loopback::LoopbackSource;
+#[cfg(windows)]
+pub use teams_windows::WasapiTeamsTitles;

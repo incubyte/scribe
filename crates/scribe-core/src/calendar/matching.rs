@@ -5,6 +5,7 @@ use chrono::{DateTime, FixedOffset};
 use super::CANDIDATE_LEAD;
 use super::agenda::TodaysAgenda;
 use super::meeting::{Meeting, Response};
+use super::titles::meeting_named_in_titles;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MatchAnchor(DateTime<FixedOffset>);
@@ -20,6 +21,7 @@ impl MatchAnchor {
 pub struct MatchInputs<'a> {
     pub agenda: &'a TodaysAgenda,
     pub anchor: MatchAnchor,
+    pub titles: &'a [String],
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -51,11 +53,16 @@ pub fn meeting_candidates<'a>(agenda: &'a TodaysAgenda, anchor: &MatchAnchor) ->
 
 #[must_use]
 pub fn match_meeting(inputs: &MatchInputs) -> MatchOutcome {
-    let mut ranked: Vec<Meeting> = meeting_candidates(inputs.agenda, &inputs.anchor)
-        .into_iter()
-        .cloned()
-        .collect();
-    ranked.sort_by_key(|meeting| rank(meeting, &inputs.anchor));
+    let candidates = meeting_candidates(inputs.agenda, &inputs.anchor);
+    match meeting_named_in_titles(&candidates, inputs.titles) {
+        Some(named) => MatchOutcome::Matched(named.clone()),
+        None => rank_candidates(candidates, &inputs.anchor),
+    }
+}
+
+fn rank_candidates(candidates: Vec<&Meeting>, anchor: &MatchAnchor) -> MatchOutcome {
+    let mut ranked: Vec<Meeting> = candidates.into_iter().cloned().collect();
+    ranked.sort_by_key(|meeting| rank(meeting, anchor));
     match ranked.as_slice() {
         [] => MatchOutcome::Unmatched,
         [only] => MatchOutcome::Matched(only.clone()),

@@ -1,7 +1,6 @@
 use cidre::core_audio as ca;
+use scribe_core::call::TEAMS_BUNDLE_ID_PREFIX;
 use scribe_core::ports::{CallProbe, CaptureError};
-
-const TEAMS_BUNDLE_ID_PREFIX: &str = "com.microsoft.teams";
 
 #[derive(Default)]
 pub struct CoreAudioCallProbe;

@@ -11,7 +11,11 @@ scribe-core.workspace = true
 [target.'cfg(windows)'.dependencies]
 tracing.workspace = true
 wasapi = "0.26"
-windows = { version = "0.62", features = ["Win32_Foundation", "Win32_System_Diagnostics_ToolHelp"] }
+windows = { version = "0.62", features = [
+    "Win32_Foundation",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_UI_WindowsAndMessaging",
+] }
 
 [dev-dependencies]
 scribe-core = { workspace = true, features = ["testing"] }

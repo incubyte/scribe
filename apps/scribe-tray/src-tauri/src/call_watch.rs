@@ -8,6 +8,7 @@ use scribe_core::call::{CALL_END_GRACE, CallWatch};
 use scribe_core::ports::CallProbe;
 use tauri::{AppHandle, Manager, Runtime};
 
+use crate::calendar;
 use crate::call_probes;
 use crate::popover;
 use crate::recording;
@@ -20,6 +21,7 @@ const THREAD_NAME: &str = "call-watch";
 pub struct CallPresence {
     in_call: AtomicBool,
     call_started_at: Mutex<Option<DateTime<FixedOffset>>>,
+    call_titles: Mutex<Vec<String>>,
 }
 
 impl CallPresence {
@@ -34,6 +36,20 @@ impl CallPresence {
             .unwrap_or_else(PoisonError::into_inner)
     }
 
+    pub fn call_titles(&self) -> Vec<String> {
+        self.call_titles
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+    }
+
+    pub fn remember_call_titles(&self, titles: Vec<String>) {
+        *self
+            .call_titles
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = titles;
+    }
+
     fn publish(&self, in_call: bool) -> bool {
         let was_in_call = self.in_call.swap(in_call, Ordering::Relaxed);
         let changed = was_in_call != in_call;
@@ -43,6 +59,7 @@ impl CallPresence {
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner) =
                 in_call.then(|| Local::now().fixed_offset());
+            self.remember_call_titles(Vec::new());
         }
         changed
     }
@@ -78,9 +95,13 @@ fn watch_forever<R: Runtime>(app: &AppHandle<R>, probe: &dyn CallProbe, watch: &
 }
 
 fn publish_presence<R: Runtime>(app: &AppHandle<R>, watch: &CallWatch) {
-    let presence_changed = app.state::<CallPresence>().publish(watch.is_in_call());
+    let in_call = watch.is_in_call();
+    let presence_changed = app.state::<CallPresence>().publish(in_call);
     if presence_changed {
         updates::refresh_restart_item(app);
+    }
+    if presence_changed && in_call {
+        calendar::note_call_started(app);
     }
 }
 

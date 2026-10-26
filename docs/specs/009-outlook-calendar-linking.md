@@ -235,11 +235,11 @@ When a call starts and Scribe can read window titles, it reads the titles of the
 
 **Acceptance criteria**
 
-- [ ] **5.4.1** With two overlapping candidates, a Teams window titled "Anthara Standup | Microsoft Teams" links the transcript to Anthara Standup.
-- [ ] **5.4.2** Subjects are compared case-insensitively, ignoring surrounding whitespace and Teams' own suffixes. A title that contains two candidates' subjects doesn't decide the match.
-- [ ] **5.4.3** On macOS without Screen Recording permission, titles read as blank, matching falls back to the ranking, and no permission prompt or notification appears.
-- [ ] **5.4.4** Only windows owned by the Teams process count: the same bundle id and exe rules the call probe already uses. Browser tabs and other apps' titles are never read for matching.
-- [ ] **5.4.5** Window titles are read at most once per call start, and on later Teams-title checks only while a call is in progress. They are never stored or logged.
+- [x] **5.4.1** With two overlapping candidates, a Teams window titled "Anthara Standup | Microsoft Teams" links the transcript to Anthara Standup.
+- [x] **5.4.2** Subjects are compared case-insensitively, ignoring surrounding whitespace and Teams' own suffixes. A title that contains two candidates' subjects doesn't decide the match.
+- [x] **5.4.3** On macOS without Screen Recording permission, titles read as blank, matching falls back to the ranking, and no permission prompt or notification appears.
+- [x] **5.4.4** Only windows owned by the Teams process count: the same bundle id and exe rules the call probe already uses. Browser tabs and other apps' titles are never read for matching.
+- [x] **5.4.5** Window titles are read at most once per call start, and on later Teams-title checks only while a call is in progress. They are never stored or logged.
 
 ### 5.5 Confirm or correct the meeting when a call starts
 

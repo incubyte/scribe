@@ -9,13 +9,18 @@ use tauri::{AppHandle, Manager, Runtime};
 use super::agenda_cache::AgendaCache;
 use super::connection;
 use super::selection::{MeetingSelection, chosen_meeting};
+use super::titles;
 use crate::call_watch::CallPresence;
 
 pub fn note_recording_started<R: Runtime>(app: &AppHandle<R>, session: &SessionId) {
     let Some(selection) = app.try_state::<MeetingSelection>() else {
         return;
     };
-    let chosen = chosen_meeting(connected_agenda(app).as_ref(), &anchor_now(app));
+    let chosen = chosen_meeting(
+        connected_agenda(app).as_ref(),
+        &anchor_now(app),
+        &call_titles(app),
+    );
     selection.begin(session.clone(), chosen);
 }
 
@@ -44,4 +49,22 @@ fn anchor_now<R: Runtime>(app: &AppHandle<R>) -> MatchAnchor {
         .try_state::<CallPresence>()
         .and_then(|presence| presence.call_started_at());
     MatchAnchor::new(call_started_at.unwrap_or_else(|| Local::now().fixed_offset()))
+}
+
+fn call_titles<R: Runtime>(app: &AppHandle<R>) -> Vec<String> {
+    app.try_state::<CallPresence>()
+        .map(|presence| presence.call_titles())
+        .unwrap_or_default()
+}
+
+pub fn note_call_started<R: Runtime>(app: &AppHandle<R>) {
+    if !matches!(
+        connection::current_connection(app),
+        Connection::Connected(_)
+    ) {
+        return;
+    }
+    if let Some(presence) = app.try_state::<CallPresence>() {
+        presence.remember_call_titles(titles::teams_titles().teams_window_titles());
+    }
 }

@@ -21,6 +21,8 @@ exclude_globs = [
     "apps/scribe-tray/src-tauri/src/calendar/commands.rs",
     "apps/scribe-tray/src-tauri/src/calendar/agenda_refresh.rs",
     "apps/scribe-tray/src-tauri/src/calendar/session_link.rs",
+    "apps/scribe-tray/src-tauri/src/calendar/titles.rs",
     "crates/audio-macos/src/call_probe.rs",
     "crates/audio-windows/src/call_probe.rs",
+    "crates/audio-windows/src/teams_windows.rs",
 ]

@@ -38,11 +38,16 @@ impl MeetingSelection {
 }
 
 #[must_use]
-pub fn chosen_meeting(agenda: Option<&TodaysAgenda>, anchor: &MatchAnchor) -> Option<Meeting> {
+pub fn chosen_meeting(
+    agenda: Option<&TodaysAgenda>,
+    anchor: &MatchAnchor,
+    titles: &[String],
+) -> Option<Meeting> {
     let outcome = agenda.map_or(MatchOutcome::Unmatched, |agenda| {
         match_meeting(&MatchInputs {
             agenda,
             anchor: *anchor,
+            titles,
         })
     });
     tracing::info!(

@@ -51,6 +51,16 @@ fn matched_at(meetings: Vec<Meeting>, anchor: &str) -> MatchOutcome {
     match_meeting(&MatchInputs {
         agenda: &agenda,
         anchor: MatchAnchor::new(moment(anchor)),
+        titles: &[],
+    })
+}
+
+fn matched_with_titles(meetings: Vec<Meeting>, anchor: &str, titles: &[String]) -> MatchOutcome {
+    let agenda = agenda_of(meetings);
+    match_meeting(&MatchInputs {
+        agenda: &agenda,
+        anchor: MatchAnchor::new(moment(anchor)),
+        titles,
     })
 }
 
@@ -167,4 +177,31 @@ fn the_match_states_are_named_for_logging() {
     assert_eq!(MatchOutcome::Unmatched.kind(), "unmatched");
     assert_eq!(MatchOutcome::Matched(review()).kind(), "matched");
     assert_eq!(MatchOutcome::Ambiguous(vec![review()]).kind(), "ambiguous");
+}
+
+#[test]
+fn a_teams_window_title_outranks_every_ranking_rule() {
+    let tentative = Meeting {
+        response: Response::Tentative,
+        is_teams: false,
+        ..meeting("tentative", START_OF_REVIEW, END_OF_REVIEW)
+    };
+    let titles = vec!["Tentative | Microsoft Teams".to_owned()];
+
+    let outcome = matched_with_titles(
+        vec![review(), tentative.clone()],
+        "2026-10-26T11:05:00+05:30",
+        &titles,
+    );
+
+    assert_eq!(outcome, MatchOutcome::Matched(tentative));
+}
+
+#[test]
+fn titles_that_name_no_candidate_leave_the_ranking_in_charge() {
+    let titles = vec!["Unrelated chat | Microsoft Teams".to_owned()];
+
+    let outcome = matched_with_titles(vec![review()], "2026-10-26T11:05:00+05:30", &titles);
+
+    assert_eq!(outcome, MatchOutcome::Matched(review()));
 }
