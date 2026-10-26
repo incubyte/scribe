@@ -2,6 +2,7 @@ import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
 import { expecting, isString } from "../shared/guards";
 import {
+  isAgendaView,
   isClaudeDesktopStatus,
   isFolderChange,
   isModelDownload,
@@ -79,3 +80,8 @@ export const connectOutlook = () =>
 
 export const disconnectOutlook = () =>
   invoke<unknown>("disconnect_outlook").then(expecting(isOutlookConnection, "Outlook connection"));
+
+export const fetchTodaysAgenda = () =>
+  invoke<unknown>("todays_agenda").then(expecting(isAgendaView, "today's agenda"));
+
+export const refreshAgenda = () => invoke("refresh_agenda");

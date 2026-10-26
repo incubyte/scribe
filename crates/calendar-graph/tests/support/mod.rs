@@ -31,17 +31,41 @@ impl FormRequest {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GetRequest {
+    pub url: String,
+    pub bearer: String,
+}
+
 pub struct FakeTransport {
     replies: Mutex<VecDeque<Result<HttpReply, TransportError>>>,
     requests: Mutex<Vec<FormRequest>>,
+    json_replies: Mutex<VecDeque<Result<HttpReply, TransportError>>>,
+    json_requests: Mutex<Vec<GetRequest>>,
 }
 
 impl FakeTransport {
     pub fn replying(replies: Vec<Result<HttpReply, TransportError>>) -> Arc<FakeTransport> {
+        FakeTransport::scripted(replies, Vec::new())
+    }
+
+    pub fn scripted(
+        replies: Vec<Result<HttpReply, TransportError>>,
+        json_replies: Vec<Result<HttpReply, TransportError>>,
+    ) -> Arc<FakeTransport> {
         Arc::new(FakeTransport {
             replies: Mutex::new(replies.into()),
             requests: Mutex::new(Vec::new()),
+            json_replies: Mutex::new(json_replies.into()),
+            json_requests: Mutex::new(Vec::new()),
         })
+    }
+
+    pub fn json_requests(&self) -> Vec<GetRequest> {
+        self.json_requests
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
     }
 
     pub fn silent() -> Arc<FakeTransport> {
@@ -75,10 +99,19 @@ impl HttpTransport for FakeTransport {
             .expect("the test scripted no reply for this request")
     }
 
-    fn get_json(&self, _url: &str, _bearer: &Secret) -> Result<HttpReply, TransportError> {
-        Err(TransportError(
-            "the fake transport serves no JSON".to_owned(),
-        ))
+    fn get_json(&self, url: &str, bearer: &Secret) -> Result<HttpReply, TransportError> {
+        self.json_requests
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .push(GetRequest {
+                url: url.to_owned(),
+                bearer: bearer.expose().to_owned(),
+            });
+        self.json_replies
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .pop_front()
+            .expect("the test scripted no JSON reply for this request")
     }
 }
 

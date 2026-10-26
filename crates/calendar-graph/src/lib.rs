@@ -1,5 +1,7 @@
 mod account;
 mod authority;
+mod calendar_view;
+mod graph_events;
 mod id_token;
 mod loopback;
 mod pkce;
@@ -9,6 +11,8 @@ mod transport;
 
 pub use account::OutlookAccount;
 pub use authority::{AUTHORIZE_URL, CLIENT_ID, SCOPES, TOKEN_URL};
+pub use calendar_view::calendar_view_url;
+pub use graph_events::{GraphPage, events_from_page};
 pub use id_token::identity_from;
 pub use loopback::{LoopbackListener, RedirectParams};
 pub use pkce::{SignInRequest, challenge_for};

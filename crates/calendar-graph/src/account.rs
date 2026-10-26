@@ -1,17 +1,25 @@
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::{Duration, Instant};
 
-use scribe_core::calendar::{AccountIdentity, CalendarError, SIGN_IN_TIMEOUT, Secret, VaultError};
-use scribe_core::ports::CredentialVault;
+use chrono::FixedOffset;
+use scribe_core::calendar::{
+    AccountIdentity, CalendarError, CalendarEvent, DayBounds, SIGN_IN_TIMEOUT, Secret, VaultError,
+};
+use scribe_core::ports::{CalendarSource, CredentialVault};
 use url::Url;
 
+use crate::authority::GRAPH_ORIGIN;
+use crate::calendar_view::calendar_view_url;
+use crate::graph_events::{GraphPage, events_from_page};
 use crate::loopback::{LoopbackListener, RedirectParams};
 use crate::pkce::SignInRequest;
 use crate::sign_in_error::SignInError;
 use crate::token_client::{CodeProof, TokenGrant, redeem_code, refresh};
-use crate::transport::HttpTransport;
+use crate::transport::{HttpReply, HttpTransport};
 
 const EARLY_REFRESH: Duration = Duration::from_secs(60);
+const MAX_PAGES: usize = 5;
+const UNAUTHORISED: u16 = 401;
 
 struct CachedAccess {
     token: Secret,
@@ -102,6 +110,49 @@ impl OutlookAccount {
 
     fn access(&self) -> MutexGuard<'_, Option<CachedAccess>> {
         self.access.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+impl CalendarSource for OutlookAccount {
+    fn events_between(&self, day: &DayBounds) -> Result<Vec<CalendarEvent>, CalendarError> {
+        let mut events = Vec::new();
+        let mut next = Some(calendar_view_url(day).to_string());
+        for _ in 0..MAX_PAGES {
+            let Some(url) = next else { break };
+            let page = self.page_at(&url, day.start.timezone())?;
+            events.extend(page.events);
+            next = page.next_link;
+        }
+        Ok(events)
+    }
+}
+
+impl OutlookAccount {
+    fn page_at(&self, url: &str, offset: FixedOffset) -> Result<GraphPage, CalendarError> {
+        if !url.starts_with(GRAPH_ORIGIN) {
+            return Err(CalendarError::Malformed);
+        }
+        let reply = self.get_authorised(url)?;
+        if !reply.is_success() {
+            return Err(CalendarError::Unreachable);
+        }
+        events_from_page(&reply.body, offset)
+    }
+
+    fn get_authorised(&self, url: &str) -> Result<HttpReply, CalendarError> {
+        let reply = self.get_with_current_token(url)?;
+        if reply.status != UNAUTHORISED {
+            return Ok(reply);
+        }
+        *self.access() = None;
+        self.get_with_current_token(url)
+    }
+
+    fn get_with_current_token(&self, url: &str) -> Result<HttpReply, CalendarError> {
+        let token = self.access_token()?;
+        self.transport
+            .get_json(url, &token)
+            .map_err(|_| CalendarError::Unreachable)
     }
 }
 

@@ -1,6 +1,11 @@
 import type {
+  AgendaBlock,
+  AgendaChip,
+  AgendaStatus,
+  AgendaView,
   ClaudeDesktopStatus,
   FolderChange,
+  HiddenMeeting,
   ModelDownload,
   OutlookConnection,
   OutlookState,
@@ -18,6 +23,7 @@ import {
   type Guard,
   hasFields,
   isListOf,
+  isBoolean,
   isNullable,
   isNumber,
   isOneOf,
@@ -150,5 +156,47 @@ export function isOutlookConnection(value: unknown): value is OutlookConnection 
     display_name: isNullable(isString),
     email: isNullable(isString),
     error: isNullable(isString),
+  });
+}
+
+const AGENDA_STATUSES: readonly AgendaStatus[] = ["ready", "loading", "failed"];
+
+const isHiddenMeeting = (value: unknown): value is HiddenMeeting =>
+  hasFields(value, {
+    event_id: isString,
+    subject: isString,
+    starts_at: isString,
+    ends_at: isString,
+  });
+
+const isAgendaBlock = (value: unknown): value is AgendaBlock =>
+  hasFields(value, {
+    event_id: isString,
+    subject: isString,
+    starts_at: isString,
+    ends_at: isString,
+    is_teams: isBoolean,
+    is_recurring: isBoolean,
+    top_minutes: isNumber,
+    height_minutes: isNumber,
+    column: isNumber,
+    columns: isNumber,
+  });
+
+const isAgendaChip = (value: unknown): value is AgendaChip =>
+  hasFields(value, {
+    top_minutes: isNumber,
+    height_minutes: isNumber,
+    hidden: isListOf(isHiddenMeeting),
+  });
+
+export function isAgendaView(value: unknown): value is AgendaView {
+  return hasFields(value, {
+    status: isOneOf(AGENDA_STATUSES),
+    stale: isBoolean,
+    day_start: isNullable(isString),
+    fetched_at: isNullable(isString),
+    blocks: isListOf(isAgendaBlock),
+    overflow: isListOf(isAgendaChip),
   });
 }

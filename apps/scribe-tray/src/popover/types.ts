@@ -66,3 +66,40 @@ export interface OutlookConnection {
   readonly email: string | null;
   readonly error: string | null;
 }
+
+export type AgendaStatus = "ready" | "loading" | "failed";
+
+export interface AgendaBlock {
+  readonly event_id: string;
+  readonly subject: string;
+  readonly starts_at: string;
+  readonly ends_at: string;
+  readonly is_teams: boolean;
+  readonly is_recurring: boolean;
+  readonly top_minutes: number;
+  readonly height_minutes: number;
+  readonly column: number;
+  readonly columns: number;
+}
+
+export interface HiddenMeeting {
+  readonly event_id: string;
+  readonly subject: string;
+  readonly starts_at: string;
+  readonly ends_at: string;
+}
+
+export interface AgendaChip {
+  readonly top_minutes: number;
+  readonly height_minutes: number;
+  readonly hidden: readonly HiddenMeeting[];
+}
+
+export interface AgendaView {
+  readonly status: AgendaStatus;
+  readonly stale: boolean;
+  readonly day_start: string | null;
+  readonly fetched_at: string | null;
+  readonly blocks: readonly AgendaBlock[];
+  readonly overflow: readonly AgendaChip[];
+}

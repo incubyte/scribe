@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { expecting } from "../shared/guards";
 import {
+  isAgendaView,
   isFolderChange,
   isModelDownload,
   isPartialPayload,
@@ -101,5 +102,34 @@ describe("messages from the app are checked before the popover trusts them", () 
     expect(isRebindOutcome({ outcome: "teleported" })).toBe(false);
     expect(isRebindOutcome({})).toBe(false);
     expect(isRebindOutcome("accepted")).toBe(false);
+  });
+
+  it("accepts an agenda view and rejects one with an unknown status or a malformed block", () => {
+    const view = {
+      status: "ready",
+      stale: false,
+      day_start: "2026-10-26T00:00:00+00:00",
+      fetched_at: null,
+      blocks: [],
+      overflow: [],
+    };
+    const block = {
+      event_id: "a",
+      subject: "Standup",
+      starts_at: "2026-10-26T09:00:00+00:00",
+      ends_at: "2026-10-26T09:15:00+00:00",
+      is_teams: true,
+      is_recurring: false,
+      top_minutes: 540,
+      height_minutes: 15,
+      column: 0,
+      columns: 1,
+    };
+
+    expect(isAgendaView(view)).toBe(true);
+    expect(isAgendaView({ ...view, blocks: [block] })).toBe(true);
+    expect(isAgendaView({ ...view, status: "stuck" })).toBe(false);
+    expect(isAgendaView({ ...view, blocks: [{ ...block, columns: "2" }] })).toBe(false);
+    expect(isAgendaView({ ...view, overflow: [{ top_minutes: 1, height_minutes: 1 }] })).toBe(false);
   });
 });

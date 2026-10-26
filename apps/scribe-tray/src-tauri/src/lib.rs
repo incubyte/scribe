@@ -73,6 +73,8 @@ fn with_commands<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         calendar::commands::outlook_connection,
         calendar::commands::connect_outlook,
         calendar::commands::disconnect_outlook,
+        calendar::commands::todays_agenda,
+        calendar::commands::refresh_agenda,
     ])
 }
 

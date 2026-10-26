@@ -9,8 +9,9 @@ import {
 } from "./commands";
 import { LiveTranscript } from "./LiveTranscript";
 import { ModelDownloadPanel } from "./ModelDownloadPanel";
+import { useOutlookConnection } from "./outlook/useOutlookConnection";
 import { PopoverActions } from "./PopoverActions";
-import { RecentSessions } from "./RecentSessions";
+import { SessionsOrAgenda } from "./SessionsOrAgenda";
 import { SettingsView } from "./SettingsView";
 import { StatusBar } from "./StatusBar";
 import { useClaudeDesktopStatus } from "./useClaudeDesktopStatus";
@@ -34,6 +35,7 @@ export function Popover() {
   const { feed, recent } = useRecordingFeed();
   const { download, retry } = useModelDownload();
   const claudeDesktop = useClaudeDesktopStatus();
+  const outlook = useOutlookConnection();
   const { view, openSettings, leaveSettings, settingsButton } =
     usePopoverView();
   useEscapeToHide();
@@ -64,12 +66,11 @@ export function Popover() {
       {feed.phase === "recording" ? (
         <LiveTranscript lines={feed.lines} partials={feed.partials} />
       ) : null}
-      {recent === null ? null : (
-        <RecentSessions
-          sessions={recent}
-          onOpen={(id) => void openSession(id)}
-        />
-      )}
+      <SessionsOrAgenda
+        isOutlookConnected={outlook.connection?.state === "connected"}
+        recent={recent}
+        onOpen={(id) => void openSession(id)}
+      />
       <PopoverActions
         claudeStatus={claudeDesktop.status}
         onConnectClaudeDesktop={claudeDesktop.connect}

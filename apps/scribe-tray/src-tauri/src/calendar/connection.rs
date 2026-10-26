@@ -8,6 +8,7 @@ use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_opener::OpenerExt;
 use url::Url;
 
+use super::agenda_refresh;
 use super::connection_payload::ConnectionPayload;
 use crate::webview;
 
@@ -60,6 +61,10 @@ impl OutlookConnection {
         ConnectionPayload::new(&view.connection, view.failure)
     }
 
+    fn connection(&self) -> Connection {
+        self.view().connection.clone()
+    }
+
     fn view(&self) -> MutexGuard<'_, ConnectionView> {
         self.view.lock().unwrap_or_else(PoisonError::into_inner)
     }
@@ -67,6 +72,14 @@ impl OutlookConnection {
 
 pub fn current<R: Runtime>(app: &AppHandle<R>) -> ConnectionPayload {
     app.state::<OutlookConnection>().payload()
+}
+
+pub fn current_connection<R: Runtime>(app: &AppHandle<R>) -> Connection {
+    app.state::<OutlookConnection>().connection()
+}
+
+pub fn require_reconnect<R: Runtime>(app: &AppHandle<R>) {
+    publish(app, Connection::ReconnectNeeded, None);
 }
 
 pub fn connect_in_background<R: Runtime>(app: &AppHandle<R>) {
@@ -160,6 +173,7 @@ fn publish<R: Runtime>(
     connection: Connection,
     failure: Option<&'static str>,
 ) -> ConnectionPayload {
+    agenda_refresh::follow_connection(app, &connection);
     let payload = app.state::<OutlookConnection>().change(connection, failure);
     webview::emit(app, CONNECTION_EVENT, payload.clone());
     payload

@@ -35,4 +35,10 @@ export default tseslint.config(
       "@typescript-eslint/no-non-null-assertion": "error",
     },
   },
+  {
+    files: ["src/popover/agenda/AgendaBlockItem.tsx"],
+    rules: {
+      "jsx-a11y/no-noninteractive-tabindex": ["error", { roles: ["region"], tags: ["li"] }],
+    },
+  },
 );

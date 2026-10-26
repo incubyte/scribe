@@ -69,17 +69,49 @@ const SIGNED_OUT_OF_OUTLOOK = {
   error: null,
 };
 
+const CONNECTED_TO_OUTLOOK = {
+  state: "connected",
+  display_name: "Sapan Parikh",
+  email: "sapan@incubyte.co",
+  error: null,
+};
+
+const AGENDA_WITH_A_STANDUP = {
+  status: "ready",
+  stale: false,
+  day_start: "2026-10-17T00:00:00+00:00",
+  fetched_at: "2026-10-17T09:05:00+00:00",
+  blocks: [
+    {
+      event_id: "standup",
+      subject: "Standup",
+      starts_at: "2026-10-17T09:30:00+00:00",
+      ends_at: "2026-10-17T09:45:00+00:00",
+      is_teams: true,
+      is_recurring: false,
+      top_minutes: 570,
+      height_minutes: 15,
+      column: 0,
+      columns: 1,
+    },
+  ],
+  overflow: [],
+};
+
 function backend(
   snapshot: RecorderSnapshot,
   recent: readonly SessionSummary[] = FIVE_SESSIONS,
   modelDownload: ModelDownload = READY,
+  outlook: unknown = SIGNED_OUT_OF_OUTLOOK,
 ) {
   const responses: Readonly<Record<string, unknown>> = {
     recorder_snapshot: snapshot,
     model_download_status: modelDownload,
     recent_sessions: recent,
     claude_desktop_status: "not_connected",
-    outlook_connection: SIGNED_OUT_OF_OUTLOOK,
+    outlook_connection: outlook,
+    todays_agenda: AGENDA_WITH_A_STANDUP,
+    refresh_agenda: null,
     connect_outlook: { ...SIGNED_OUT_OF_OUTLOOK, state: "connecting" },
     disconnect_outlook: SIGNED_OUT_OF_OUTLOOK,
     "plugin:app|version": SCRIBE_VERSION,
@@ -234,6 +266,26 @@ describe("the popover while nothing is recording", () => {
     expect(
       screen.getByRole("button", { name: /Call 2026-10-17 12:00/ }),
     ).toHaveFocus();
+  });
+});
+
+describe("the popover's home view follows the Outlook connection", () => {
+  it("shows today's agenda in place of recent sessions while connected", async () => {
+    backend(idle, FIVE_SESSIONS, READY, CONNECTED_TO_OUTLOOK);
+    render(<Popover />);
+
+    expect(await screen.findByRole("heading", { name: /^Today · / })).toBeInTheDocument();
+    expect(await screen.findByRole("listitem", { name: /^Standup/ })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Recent sessions" })).not.toBeInTheDocument();
+  });
+
+  it("shows recent sessions and asks for no agenda while signed out", async () => {
+    const handler = backend(idle);
+    render(<Popover />);
+
+    expect(await screen.findByRole("heading", { name: "Recent sessions" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /^Today · / })).not.toBeInTheDocument();
+    expect(handler).not.toHaveBeenCalledWith("todays_agenda", {});
   });
 });
 

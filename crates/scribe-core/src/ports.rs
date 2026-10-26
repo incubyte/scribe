@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use chrono::{DateTime, FixedOffset};
 
-use crate::calendar::{Secret, VaultError};
+use crate::calendar::{CalendarError, CalendarEvent, DayBounds, Secret, VaultError};
 use crate::capture::{
     Frame, MonitorShot, ScreenshotName, ScreenshotReference, ServedImage, SessionMoment,
 };
@@ -65,6 +65,10 @@ pub trait CredentialVault: Send + Sync {
     fn load(&self) -> Result<Option<Secret>, VaultError>;
     fn save(&self, secret: &Secret) -> Result<(), VaultError>;
     fn forget(&self) -> Result<(), VaultError>;
+}
+
+pub trait CalendarSource: Send + Sync {
+    fn events_between(&self, day: &DayBounds) -> Result<Vec<CalendarEvent>, CalendarError>;
 }
 
 pub trait RecordingListener: Send + Sync {

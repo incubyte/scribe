@@ -189,17 +189,17 @@ While connected, the popover replaces Recent sessions with **Today**, a scrollab
 
 **Acceptance criteria**
 
-- [ ] **5.2.1** While `Connected`, the popover shows "Today · <weekday> <day>" with today's agenda in place of Recent sessions. While signed out it shows Recent sessions, unchanged ([4.1](#4-invariants)).
-- [ ] **5.2.2** The agenda contains every occurrence from local midnight to midnight, recurring ones included. It leaves out all-day events, cancelled events, events the user declined, and events shown as `free`.
-- [ ] **5.2.3** Block top and height follow start and duration on the hour scale, in the computer's time zone. A meeting shorter than 15 minutes is drawn at the 15-minute minimum height.
-- [ ] **5.2.4** Overlapping meetings share the row width in equal columns. With more than two overlapping, the third and later collapse into a "+N" chip, which lists them when clicked.
-- [ ] **5.2.5** Each block shows the subject (truncated with an ellipsis, with the full subject in its accessible name), a "Teams" tag for Teams meetings, and a recurring icon for series occurrences.
-- [ ] **5.2.6** On open, the grid scrolls so the current time sits in its top third, a "now" line marks the current minute, and blocks that have ended are dimmed.
-- [ ] **5.2.7** The agenda refreshes on sign-in, every 5 minutes, after the computer wakes and each time the popover opens. Changes in Outlook appear within 5 minutes.
-- [ ] **5.2.8** With no qualifying meetings, Today shows "No meetings today".
-- [ ] **5.2.9** When a refresh fails, the last fetched agenda stays visible with "Updated <time>". If nothing has been fetched yet, Today shows "Couldn't load your calendar" with a Retry button.
-- [ ] **5.2.10** Graph requests use `$select` for only the fields in [§3.2 Meeting](#32-kinds-of-data) and never request the event body.
-- [ ] **5.2.11** The agenda is a list for assistive tech: each block is announced as "<subject>, <start>–<end>", plus "Teams meeting" and "recurring" where they apply. Keyboard focus moves through blocks in time order, and colour is never the only cue for "past".
+- [x] **5.2.1** While `Connected`, the popover shows "Today · <weekday> <day>" with today's agenda in place of Recent sessions. While signed out it shows Recent sessions, unchanged ([4.1](#4-invariants)).
+- [x] **5.2.2** The agenda contains every occurrence from local midnight to midnight, recurring ones included. It leaves out all-day events, cancelled events, events the user declined, and events shown as `free`.
+- [x] **5.2.3** Block top and height follow start and duration on the hour scale, in the computer's time zone. A meeting shorter than 15 minutes is drawn at the 15-minute minimum height.
+- [x] **5.2.4** Overlapping meetings share the row width in equal columns. With more than two overlapping, the third and later collapse into a "+N" chip, which lists them when clicked.
+- [x] **5.2.5** Each block shows the subject (truncated with an ellipsis, with the full subject in its accessible name), a "Teams" tag for Teams meetings, and a recurring icon for series occurrences.
+- [x] **5.2.6** On open, the grid scrolls so the current time sits in its top third, a "now" line marks the current minute, and blocks that have ended are dimmed.
+- [x] **5.2.7** The agenda refreshes on sign-in, every 5 minutes, after the computer wakes and each time the popover opens. Changes in Outlook appear within 5 minutes.
+- [x] **5.2.8** With no qualifying meetings, Today shows "No meetings today".
+- [x] **5.2.9** When a refresh fails, the last fetched agenda stays visible with "Updated <time>". If nothing has been fetched yet, Today shows "Couldn't load your calendar" with a Retry button.
+- [x] **5.2.10** Graph requests use `$select` for only the fields in [§3.2 Meeting](#32-kinds-of-data) and never request the event body.
+- [x] **5.2.11** The agenda is a list for assistive tech: each block is announced as "<subject>, <start>–<end>", plus "Teams meeting" and "recurring" where they apply. Keyboard focus moves through blocks in time order, and colour is never the only cue for "past".
 
 ### 5.3 Save the meeting's name and invitees with each transcript
 

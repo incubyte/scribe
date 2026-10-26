@@ -26,6 +26,8 @@ function backend(
     screenshot_shortcuts: () => shortcuts,
     transcripts_folder: () => "/Users/me/Documents/Scribe",
     outlook_connection: () => ({ state: "disconnected", display_name: null, email: null, error: null }),
+    todays_agenda: () => ({ status: "loading", stale: false, day_start: null, fetched_at: null, blocks: [], overflow: [] }),
+    refresh_agenda: () => null,
     rebind_screenshot_shortcut: () => {
       const outcome = rebind();
       shortcuts = outcome.outcome === "accepted" ? shortcutsWithRegion(outcome.label) : shortcuts;
