@@ -459,6 +459,21 @@ sequenceDiagram
 
 **9.4 Recent sessions vanish while connected — accepted.** The transcripts folder, the MCP server and Claude still reach every transcript [5].
 
+**9.5 Offline after a restart shows "Connecting to Outlook…" — deferred.** When the token is stored but Microsoft can't be reached, `restored_connection` (`calendar/connection.rs`) keeps the state at `Connecting` until a retry succeeds. Settings offers no action, and the popover shows Recent sessions rather than "Couldn't load your calendar". The fix is a separate "stored, unreachable" state. Sources: [3].
+
+**9.6 Very short meetings can clip their switch or Record button — deferred.** A 15-minute block is shorter than the 24 px targets, and `.agenda__block` hides overflow. Forcing a taller block made back-to-back meetings overlap (AC 5.2.3), so the block keeps its true height. The fix is to lay controls for short blocks outside the block. Sources: [3].
+
+**9.7 Code-structure clean-ups from review — deferred.** None changes behaviour:
+- `recording.rs` and `call_watch.rs` import `calendar` and the reverse, where an event or port would decouple them.
+- `calendar/auto_record.rs` mixes arming, persistence, threads and notifications.
+- The match, agenda and connection states cross into the webview views as strings rather than enums.
+- The new popover buttons hand-roll their styles instead of a shared compact `.button` variant, and the grid offsets are literals instead of one custom property.
+- `agenda_refresh::refresh` returns a bare `bool`.
+- `answer_strength` and `HttpReply::is_success` use bare numbers.
+- The calendar-graph test support keeps a module-wide `dead_code` allow, because each test binary uses part of it.
+
+Sources: [3].
+
 ## 10. Established behaviour — documented, not changed
 
 **10.1 Two Teams calls less than 30 seconds apart count as one call.** `CALL_END_GRACE` keeps the latch through mutes and device switches, so a quick hop between meetings doesn't end the call. [Slice 5.7](#57-switch-to-the-next-meeting-without-leaving-the-call) handles that case with a prompt rather than shortening the grace. Confirmed intended: spec 006 and Sapan Parikh, 2026-10-25 [5, 7].
