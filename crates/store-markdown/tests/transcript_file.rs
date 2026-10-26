@@ -3,6 +3,7 @@ use std::path::Path;
 use std::time::Duration;
 
 use chrono::{DateTime, FixedOffset};
+use scribe_core::calendar::{EventId, Meeting, MeetingLink, Person, Response};
 use scribe_core::ports::TranscriptStore;
 use scribe_core::recording::{Segment, SessionHeader, SessionId, SessionStatus, Speaker};
 use store_markdown::{MarkdownTranscriptStore, TranscriptsFolder, parse_header, render_header};
@@ -250,4 +251,84 @@ fn a_header_reads_back_exactly_as_it_was_written() {
     header.status = SessionStatus::Complete;
 
     assert_eq!(parse_header(&render_header(&header)).unwrap(), header);
+}
+
+fn person(name: &str) -> Person {
+    Person {
+        name: name.to_owned(),
+        email: format!("{}@example.com", name.to_lowercase()),
+    }
+}
+
+fn review_link(subject: &str, attendees: Vec<Person>) -> MeetingLink {
+    MeetingLink::from_meeting(&Meeting {
+        event_id: EventId::new("AAMkAD"),
+        subject: subject.to_owned(),
+        starts_at: DateTime::parse_from_rfc3339("2026-10-17T14:30:00+05:30").unwrap(),
+        ends_at: DateTime::parse_from_rfc3339("2026-10-17T15:15:00+05:30").unwrap(),
+        organizer: person("Sneha"),
+        attendees,
+        is_teams: true,
+        is_recurring: false,
+        response: Response::Accepted,
+    })
+}
+
+#[test]
+fn a_linked_header_carries_a_meeting_block_with_the_event_organizer_and_attendees() {
+    let header = call_header().with_meeting(review_link("DXC Review", vec![person("Sapan")]));
+
+    let text = render_header(&header);
+
+    assert!(text.contains(
+        "title: \"DXC Review\"\n\
+         started_at: 2026-10-17T14:30:05+05:30\n"
+    ));
+    assert!(text.ends_with(
+        "meeting:\n\
+         \x20 event_id: \"AAMkAD\"\n\
+         \x20 subject: \"DXC Review\"\n\
+         \x20 starts_at: 2026-10-17T14:30:00+05:30\n\
+         \x20 ends_at: 2026-10-17T15:15:00+05:30\n\
+         \x20 organizer: { name: \"Sneha\", email: \"sneha@example.com\" }\n\
+         \x20 attendees:\n\
+         \x20   - { name: \"Sapan\", email: \"sapan@example.com\" }\n\
+         \x20 attendee_count: 1\n\
+         ---\n"
+    ));
+}
+
+#[test]
+fn a_linked_header_reads_back_exactly_as_it_was_written() {
+    let header = call_header().with_meeting(review_link(
+        "Review: \"Q4\" plans \\ budget",
+        vec![person("Sapan"), person("Asha")],
+    ));
+
+    assert_eq!(parse_header(&render_header(&header)).unwrap(), header);
+}
+
+#[test]
+fn a_meeting_with_no_attendees_reads_back_with_none() {
+    let header = call_header().with_meeting(review_link("Solo", Vec::new()));
+
+    assert_eq!(parse_header(&render_header(&header)).unwrap(), header);
+}
+
+#[test]
+fn linking_a_meeting_to_a_saved_call_retitles_it_and_keeps_its_lines() {
+    let parent = tempfile::tempdir().unwrap();
+    let store = store_in(parent.path());
+    let id = store.create(&call_header()).unwrap();
+    store.append(&id, &my_line(4, "Hello")).unwrap();
+    store.finalise(&id, ended_at()).unwrap();
+    let link = review_link("DXC Review", vec![person("Sapan")]);
+
+    store.link_meeting(&id, link.clone()).unwrap();
+
+    let document = store.read(&id).unwrap();
+    assert_eq!(document.header.title, "DXC Review");
+    assert_eq!(document.header.meeting, Some(link));
+    assert_eq!(document.header.status, SessionStatus::Complete);
+    assert_eq!(document.segments.len(), 1);
 }

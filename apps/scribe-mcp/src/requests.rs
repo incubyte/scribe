@@ -1,7 +1,9 @@
 use chrono::NaiveDate;
 use rmcp::schemars;
 use schemars::JsonSchema;
-use scribe_core::library::{Limit, ListQuery, SearchHit, SegmentMatch, SessionSummaryView};
+use scribe_core::library::{
+    Limit, ListQuery, MeetingSummaryView, PersonView, SearchHit, SegmentMatch, SessionSummaryView,
+};
 use scribe_core::recording::SessionSummary;
 use serde::{Deserialize, Serialize};
 use store_markdown::TranscriptsFolder;
@@ -54,6 +56,22 @@ pub struct TranscriptSummaryDto {
     pub started_at: String,
     pub duration_seconds: Option<u64>,
     pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub meeting: Option<MeetingDto>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct PersonDto {
+    pub name: String,
+    pub email: String,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub struct MeetingDto {
+    pub subject: String,
+    pub organizer: PersonDto,
+    pub attendees: Vec<PersonDto>,
+    pub attendee_count: usize,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -123,6 +141,27 @@ impl From<SessionSummaryView> for TranscriptSummaryDto {
             started_at: view.started_at,
             duration_seconds: view.duration_seconds,
             status: view.status.to_owned(),
+            meeting: view.meeting.map(MeetingDto::from),
+        }
+    }
+}
+
+impl From<MeetingSummaryView> for MeetingDto {
+    fn from(view: MeetingSummaryView) -> MeetingDto {
+        MeetingDto {
+            subject: view.subject,
+            organizer: view.organizer.into(),
+            attendees: view.attendees.into_iter().map(PersonDto::from).collect(),
+            attendee_count: view.attendee_count,
+        }
+    }
+}
+
+impl From<PersonView> for PersonDto {
+    fn from(view: PersonView) -> PersonDto {
+        PersonDto {
+            name: view.name,
+            email: view.email,
         }
     }
 }

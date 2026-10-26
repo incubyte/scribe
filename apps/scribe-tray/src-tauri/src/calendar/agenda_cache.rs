@@ -1,6 +1,8 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
+use scribe_core::calendar::TodaysAgenda;
+
 use super::agenda_snapshot::{AgendaSnapshot, FetchedAgenda};
 use super::agenda_view::AgendaView;
 
@@ -19,6 +21,12 @@ impl AgendaCache {
     #[must_use]
     pub fn view(&self) -> AgendaView {
         AgendaView::of(&self.snapshot())
+    }
+
+    #[must_use]
+    pub fn agenda(&self) -> Option<TodaysAgenda> {
+        let fetched = self.snapshot().fetched.clone()?;
+        Some(fetched.agenda)
     }
 
     pub fn record_fetch(&self, fetched: FetchedAgenda) -> AgendaView {

@@ -1,7 +1,10 @@
 use chrono::{DateTime, FixedOffset, SecondsFormat};
+use scribe_core::calendar::MeetingLink;
 use scribe_core::recording::{Segment, SessionHeader, SessionId, SessionStatus, offset_as_clock};
 use serde::Deserialize;
 use std::fmt::Write as _;
+
+use crate::meeting_block::{parse_meeting, render_meeting};
 
 const DELIMITER_LINE: &str = "---\n";
 const HEADER_END: &str = "\n---\n";
@@ -20,6 +23,9 @@ pub fn render_header(header: &SessionHeader) -> String {
     let _ = writeln!(text, "status: {}", header.status.as_str());
     let _ = writeln!(text, "engine: {}", header.engine);
     let _ = writeln!(text, "language: {}", header.language);
+    if let Some(link) = &header.meeting {
+        render_meeting(&mut text, link);
+    }
     text.push_str(DELIMITER_LINE);
     text
 }
@@ -38,7 +44,7 @@ pub fn render_segment(segment: &Segment) -> String {
 pub fn parse_header(raw: &str) -> Result<SessionHeader, MalformedHeader> {
     let (front_matter, _) = split_front_matter(raw)?;
     let fields: HeaderFields = serde_saphyr::from_str(front_matter).map_err(|_| MalformedHeader)?;
-    fields.into_header()
+    fields.into_header(parse_meeting(front_matter))
 }
 
 pub(crate) fn split_front_matter(raw: &str) -> Result<(&str, &str), MalformedHeader> {
@@ -59,7 +65,7 @@ struct HeaderFields {
 }
 
 impl HeaderFields {
-    fn into_header(self) -> Result<SessionHeader, MalformedHeader> {
+    fn into_header(self, meeting: Option<MeetingLink>) -> Result<SessionHeader, MalformedHeader> {
         Ok(SessionHeader {
             id: SessionId::parse(&self.id).map_err(|_| MalformedHeader)?,
             title: self.title,
@@ -71,15 +77,16 @@ impl HeaderFields {
                 .map_err(|_| MalformedHeader)?,
             engine: self.engine,
             language: self.language,
+            meeting,
         })
     }
 }
 
-fn parse_timestamp(raw: &str) -> Result<DateTime<FixedOffset>, MalformedHeader> {
+pub(crate) fn parse_timestamp(raw: &str) -> Result<DateTime<FixedOffset>, MalformedHeader> {
     DateTime::parse_from_rfc3339(raw).map_err(|_| MalformedHeader)
 }
 
-fn timestamp(moment: DateTime<FixedOffset>) -> String {
+pub(crate) fn timestamp(moment: DateTime<FixedOffset>) -> String {
     moment.to_rfc3339_opts(SecondsFormat::Secs, false)
 }
 
@@ -89,7 +96,7 @@ fn optional_timestamp(moment: Option<DateTime<FixedOffset>>) -> String {
         .unwrap_or_default()
 }
 
-fn quoted(text: &str) -> String {
+pub(crate) fn quoted(text: &str) -> String {
     let escaped: String = text.chars().map(escape_char).collect();
     format!("\"{escaped}\"")
 }

@@ -7,6 +7,7 @@ use chrono::{DateTime, FixedOffset};
 use rmcp::model::CallToolRequestParams;
 use rmcp::service::RunningService;
 use rmcp::{RoleClient, ServiceExt};
+use scribe_core::calendar::{EventId, Meeting, MeetingLink, Person, Response};
 use scribe_core::library::TranscriptLibrary;
 use scribe_core::ports::TranscriptStore;
 use scribe_core::recording::{Segment, SessionHeader, SessionId, Speaker};
@@ -243,6 +244,77 @@ async fn an_ai_app_sees_saved_calls_newest_first() {
             "2026-10-15-090000"
         ]
     );
+}
+
+fn link_review(store: &MarkdownTranscriptStore, id: &SessionId) {
+    let person = |name: &str| Person {
+        name: name.to_owned(),
+        email: format!("{name}@example.com"),
+    };
+    let link = MeetingLink::from_meeting(&Meeting {
+        event_id: EventId::new("AAMkAD"),
+        subject: "DXC Review".to_owned(),
+        starts_at: moment("2026-10-17T09:00:00+00:00"),
+        ends_at: moment("2026-10-17T09:45:00+00:00"),
+        organizer: person("sneha"),
+        attendees: vec![person("sapan"), person("asha")],
+        is_teams: true,
+        is_recurring: false,
+        response: Response::Accepted,
+    });
+    store.link_meeting(id, link).unwrap();
+}
+
+#[tokio::test]
+async fn a_listed_call_linked_to_a_meeting_carries_its_subject_organizer_and_attendees() {
+    let folder = tempfile::tempdir().unwrap();
+    let store = store_in(folder.path());
+    let id = save_call(&store, "2026-10-17T09:00:00+00:00");
+    link_review(&store, &id);
+    let client = connect_to(folder.path()).await;
+
+    let result = call(&client, "list_transcripts", json!({})).await;
+
+    let listed = &result["structuredContent"]["transcripts"][0];
+    assert_eq!(listed["title"], "DXC Review");
+    assert_eq!(
+        listed["meeting"],
+        json!({
+            "subject": "DXC Review",
+            "organizer": { "name": "sneha", "email": "sneha@example.com" },
+            "attendees": [
+                { "name": "sapan", "email": "sapan@example.com" },
+                { "name": "asha", "email": "asha@example.com" }
+            ],
+            "attendee_count": 2
+        })
+    );
+}
+
+#[tokio::test]
+async fn a_listed_call_without_a_meeting_has_no_meeting_field() {
+    let folder = tempfile::tempdir().unwrap();
+    save_call(&store_in(folder.path()), "2026-10-17T09:00:00+00:00");
+    let client = connect_to(folder.path()).await;
+
+    let result = call(&client, "list_transcripts", json!({})).await;
+
+    let listed = &result["structuredContent"]["transcripts"][0];
+    assert!(listed.get("meeting").is_none());
+}
+
+#[tokio::test]
+async fn reading_a_call_linked_to_a_meeting_includes_the_meeting_block() {
+    let folder = tempfile::tempdir().unwrap();
+    let store = store_in(folder.path());
+    let id = save_call(&store, "2026-10-17T09:00:00+00:00");
+    link_review(&store, &id);
+    let client = connect_to(folder.path()).await;
+
+    let result = call(&client, "get_transcript", json!({ "id": id.as_str() })).await;
+
+    assert!(text_of(&result).contains("meeting:\n  event_id: \"AAMkAD\""));
+    assert!(text_of(&result).contains("subject: \"DXC Review\""));
 }
 
 #[tokio::test]

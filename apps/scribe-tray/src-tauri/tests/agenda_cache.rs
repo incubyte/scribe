@@ -117,3 +117,19 @@ fn a_nudge_is_taken_once() {
     assert!(cache.take_nudge());
     assert!(!cache.take_nudge());
 }
+
+#[test]
+fn the_cached_agenda_is_available_for_matching_even_after_a_failed_refresh() {
+    let cache = AgendaCache::new();
+    cache.record_fetch(fetched_with(&["standup"]));
+    cache.record_failure();
+
+    let agenda = cache.agenda().unwrap();
+
+    assert_eq!(agenda.meetings().len(), 1);
+}
+
+#[test]
+fn there_is_no_agenda_to_match_against_before_the_first_fetch() {
+    assert_eq!(AgendaCache::new().agenda(), None);
+}

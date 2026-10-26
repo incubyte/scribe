@@ -144,3 +144,64 @@ fn listing_every_call_returns_more_than_a_page_of_calls() {
 
     assert_eq!(store.list_all().unwrap().len(), 30);
 }
+
+const HEADER_WITHOUT_MEETING: &str = "---\n\
+    id: 2026-10-15-090000\n\
+    title: \"Call 2026-10-15 09:00\"\n\
+    started_at: 2026-10-15T09:00:00+00:00\n\
+    ended_at: 2026-10-15T10:05:00+00:00\n\
+    status: complete\n\
+    engine: speechanalyzer\n\
+    language: en-US\n";
+
+fn write_transcript(store: &MarkdownTranscriptStore, id: &SessionId, front_matter: &str) {
+    let path = store.path_for(id);
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(
+        path,
+        format!("{front_matter}---\n[00:00:03] **Me:** Hello\n"),
+    )
+    .unwrap();
+}
+
+#[test]
+fn a_transcript_written_before_meetings_existed_is_read_without_a_meeting() {
+    let folder = tempfile::tempdir().unwrap();
+    let store = store_in(folder.path());
+    let id = SessionId::parse("2026-10-15-090000").unwrap();
+    write_transcript(&store, &id, HEADER_WITHOUT_MEETING);
+
+    let document = store.read(&id).unwrap();
+
+    assert_eq!(document.header.meeting, None);
+    assert_eq!(document.header.title, "Call 2026-10-15 09:00");
+    assert_eq!(document.segments.len(), 1);
+}
+
+#[test]
+fn a_meeting_block_that_is_not_what_it_should_be_leaves_the_transcript_readable() {
+    let folder = tempfile::tempdir().unwrap();
+    let store = store_in(folder.path());
+    let id = SessionId::parse("2026-10-15-090000").unwrap();
+    let malformed = format!("{HEADER_WITHOUT_MEETING}meeting:\n  subject: 42\n  attendees: oops\n");
+    write_transcript(&store, &id, &malformed);
+
+    let document = store.read(&id).unwrap();
+
+    assert_eq!(document.header.meeting, None);
+    assert_eq!(document.header.status, SessionStatus::Complete);
+    assert_eq!(document.segments.len(), 1);
+}
+
+#[test]
+fn a_meeting_block_with_a_bad_time_leaves_the_transcript_readable() {
+    let folder = tempfile::tempdir().unwrap();
+    let store = store_in(folder.path());
+    let id = SessionId::parse("2026-10-15-090000").unwrap();
+    let malformed = format!(
+        "{HEADER_WITHOUT_MEETING}meeting:\n  event_id: \"a\"\n  subject: \"s\"\n  starts_at: not-a-time\n  ends_at: 2026-10-15T10:00:00+00:00\n  organizer: {{ name: \"o\", email: \"o@x\" }}\n  attendees: []\n  attendee_count: 0\n"
+    );
+    write_transcript(&store, &id, &malformed);
+
+    assert_eq!(store.read(&id).unwrap().header.meeting, None);
+}

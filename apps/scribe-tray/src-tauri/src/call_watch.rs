@@ -1,7 +1,9 @@
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Mutex, PoisonError};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use chrono::{DateTime, FixedOffset, Local};
 use scribe_core::call::{CALL_END_GRACE, CallWatch};
 use scribe_core::ports::CallProbe;
 use tauri::{AppHandle, Manager, Runtime};
@@ -15,16 +17,34 @@ const POLL_INTERVAL: Duration = Duration::from_secs(2);
 const THREAD_NAME: &str = "call-watch";
 
 #[derive(Default)]
-pub struct CallPresence(AtomicBool);
+pub struct CallPresence {
+    in_call: AtomicBool,
+    call_started_at: Mutex<Option<DateTime<FixedOffset>>>,
+}
 
 impl CallPresence {
     pub fn is_in_call(&self) -> bool {
-        self.0.load(Ordering::Relaxed)
+        self.in_call.load(Ordering::Relaxed)
+    }
+
+    pub fn call_started_at(&self) -> Option<DateTime<FixedOffset>> {
+        *self
+            .call_started_at
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
     }
 
     fn publish(&self, in_call: bool) -> bool {
-        let was_in_call = self.0.swap(in_call, Ordering::Relaxed);
-        was_in_call != in_call
+        let was_in_call = self.in_call.swap(in_call, Ordering::Relaxed);
+        let changed = was_in_call != in_call;
+        if changed {
+            *self
+                .call_started_at
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner) =
+                in_call.then(|| Local::now().fixed_offset());
+        }
+        changed
     }
 }
 

@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{PoisonError, RwLock};
 
 use chrono::{DateTime, FixedOffset};
+use scribe_core::calendar::MeetingLink;
 use scribe_core::ports::{StoreError, TranscriptStore};
 use scribe_core::recording::{
     Segment, SessionDocument, SessionHeader, SessionId, SessionStatus, SessionSummary,
@@ -43,6 +44,10 @@ impl MarkdownTranscriptStore {
     #[must_use]
     pub fn path_for(&self, id: &SessionId) -> PathBuf {
         month_layout::existing_path(self.folder().path(), id)
+    }
+
+    pub fn link_meeting(&self, id: &SessionId, link: MeetingLink) -> Result<(), StoreError> {
+        rewrite_header(&self.path_for(id), |header| header.with_meeting(link))
     }
 
     fn try_create(

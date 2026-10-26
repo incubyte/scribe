@@ -8,7 +8,7 @@ use std::sync::Arc;
 pub use error::LibraryError;
 pub use query::{Limit, ListQuery};
 pub use search::{SearchHit, SearchQuery, SegmentMatch};
-pub use summary_view::SessionSummaryView;
+pub use summary_view::{MeetingSummaryView, PersonView, SessionSummaryView};
 
 use search::find_matches;
 

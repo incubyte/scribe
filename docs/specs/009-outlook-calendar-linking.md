@@ -217,15 +217,15 @@ A candidate "ranks clearly first" when it beats the next one on rule 1 or rule 2
 
 **Acceptance criteria**
 
-- [ ] **5.3.1** A call that starts at 10:58 for an 11:00–11:30 Teams meeting produces a transcript titled "DXC Review" with a `meeting` block for that event.
-- [ ] **5.3.2** A call that started at 11:05 in the 11:00–11:30 meeting and is still recording at 11:40 stays linked to the 11:00 meeting, even though an 11:30 meeting has begun ([4.5](#4-invariants)).
-- [ ] **5.3.3** A recording started with no meeting candidates gets no `meeting` block and keeps today's date-based title.
-- [ ] **5.3.4** When the match is `Ambiguous`, the transcript keeps the date-based title and gets no `meeting` block, unless the user picks a meeting.
-- [ ] **5.3.5** The `meeting` block has `event_id`, `subject`, `starts_at`, `ends_at`, `organizer`, `attendees` and `attendee_count`, and is written as valid YAML. `attendees` lists at most 50 people and `attendee_count` gives the full number.
-- [ ] **5.3.6** Transcripts written before this spec, and new transcripts without a `meeting` block, parse unchanged in the tray and in `scribe-mcp` ([4.6](#4-invariants)).
-- [ ] **5.3.7** The `scribe-mcp` transcript listing and transcript read include `meeting` (subject, organizer, attendees) when it is present.
-- [ ] **5.3.8** If the agenda is stale or empty because Graph is unreachable, recording proceeds and the transcript is saved without a `meeting` block ([4.4](#4-invariants)).
-- [ ] **5.3.9** Logs record only that a match happened and its state (`Matched`, `Ambiguous` or `Unmatched`), never the subject, names or emails ([4.3](#4-invariants)).
+- [x] **5.3.1** A call that starts at 10:58 for an 11:00–11:30 Teams meeting produces a transcript titled "DXC Review" with a `meeting` block for that event.
+- [x] **5.3.2** A call that started at 11:05 in the 11:00–11:30 meeting and is still recording at 11:40 stays linked to the 11:00 meeting, even though an 11:30 meeting has begun ([4.5](#4-invariants)).
+- [x] **5.3.3** A recording started with no meeting candidates gets no `meeting` block and keeps today's date-based title.
+- [x] **5.3.4** When the match is `Ambiguous`, the transcript keeps the date-based title and gets no `meeting` block, unless the user picks a meeting.
+- [x] **5.3.5** The `meeting` block has `event_id`, `subject`, `starts_at`, `ends_at`, `organizer`, `attendees` and `attendee_count`, and is written as valid YAML. `attendees` lists at most 50 people and `attendee_count` gives the full number.
+- [x] **5.3.6** Transcripts written before this spec, and new transcripts without a `meeting` block, parse unchanged in the tray and in `scribe-mcp` ([4.6](#4-invariants)).
+- [x] **5.3.7** The `scribe-mcp` transcript listing and transcript read include `meeting` (subject, organizer, attendees) when it is present.
+- [x] **5.3.8** If the agenda is stale or empty because Graph is unreachable, recording proceeds and the transcript is saved without a `meeting` block ([4.4](#4-invariants)).
+- [x] **5.3.9** Logs record only that a match happened and its state (`Matched`, `Ambiguous` or `Unmatched`), never the subject, names or emails ([4.3](#4-invariants)).
 
 ### 5.4 Recognise the meeting from the Teams window title
 

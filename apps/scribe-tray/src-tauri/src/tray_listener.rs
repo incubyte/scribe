@@ -8,6 +8,7 @@ use scribe_core::recording::{RecordingEvent, Segment, SessionId, Speaker};
 use serde::Serialize;
 use tauri::{AppHandle, Manager, Runtime};
 
+use crate::calendar;
 use crate::live_feed::{LiveFeed, LiveLine};
 use crate::notifications;
 use crate::recording::{self, RecordingController};
@@ -115,6 +116,7 @@ impl<R: Runtime> TrayUpdater<R> {
         self.app
             .state::<LiveFeed>()
             .started(Local::now().fixed_offset());
+        calendar::note_recording_started(&self.app, id);
         recording::publish_state(&self.app);
         self.emit(STARTED_EVENT, SessionPayload { id: id.to_string() });
     }
@@ -136,6 +138,7 @@ impl<R: Runtime> TrayUpdater<R> {
         self.recording_since = None;
         self.app.state::<LiveFeed>().stopped();
         self.app.state::<RecordingController>().stop_session(id);
+        calendar::link_finished_session(&self.app, id);
         recording::publish_state(&self.app);
         self.emit(STOPPED_EVENT, SessionPayload { id: id.to_string() });
     }

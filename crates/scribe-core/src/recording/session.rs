@@ -4,6 +4,7 @@ use std::str::FromStr;
 use chrono::{DateTime, FixedOffset};
 
 use super::segment::Segment;
+use crate::calendar::MeetingLink;
 
 const STAMP_FORMAT: &str = "%Y-%m-%d-%H%M%S";
 const TITLE_FORMAT: &str = "Call %Y-%m-%d %H:%M";
@@ -131,6 +132,7 @@ pub struct SessionHeader {
     pub status: SessionStatus,
     pub engine: String,
     pub language: String,
+    pub meeting: Option<MeetingLink>,
 }
 
 impl SessionHeader {
@@ -148,12 +150,22 @@ impl SessionHeader {
             status: SessionStatus::Recording,
             engine: engine.to_owned(),
             language: language.to_owned(),
+            meeting: None,
         }
     }
 
     #[must_use]
     pub fn with_id(self, id: SessionId) -> SessionHeader {
         SessionHeader { id, ..self }
+    }
+
+    #[must_use]
+    pub fn with_meeting(self, link: MeetingLink) -> SessionHeader {
+        SessionHeader {
+            title: link.subject.clone(),
+            meeting: Some(link),
+            ..self
+        }
     }
 
     #[must_use]
@@ -181,6 +193,7 @@ pub struct SessionSummary {
     pub started_at: DateTime<FixedOffset>,
     pub duration_seconds: Option<u64>,
     pub status: SessionStatus,
+    pub meeting: Option<MeetingLink>,
 }
 
 impl SessionHeader {
@@ -192,6 +205,7 @@ impl SessionHeader {
             started_at: self.started_at,
             duration_seconds: self.duration_seconds(),
             status: self.status,
+            meeting: self.meeting.clone(),
         }
     }
 

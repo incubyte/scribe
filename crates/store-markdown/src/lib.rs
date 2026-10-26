@@ -1,5 +1,6 @@
 mod format;
 mod image_codec;
+mod meeting_block;
 mod month_layout;
 mod private_file;
 mod reader;

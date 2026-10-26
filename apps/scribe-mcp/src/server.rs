@@ -30,7 +30,7 @@ impl ScribeServer {
 #[tool_router]
 impl ScribeServer {
     #[tool(
-        description = "List the call transcripts Scribe has recorded and saved on this computer, newest first. Returns id, title, start time, duration and status for each call. Calls still being recorded are not included."
+        description = "List the call transcripts Scribe has recorded and saved on this computer, newest first. Returns id, title, start time, duration and status for each call, plus the calendar meeting (subject, organizer, attendees) when the call was linked to one. Calls still being recorded are not included."
     )]
     async fn list_transcripts(
         &self,

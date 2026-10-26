@@ -1,4 +1,5 @@
 use chrono::DateTime;
+use scribe_core::calendar::{EventId, Meeting, MeetingLink, Person, Response};
 use scribe_core::recording::{SessionHeader, SessionId, SessionStatus, default_title};
 
 #[test]
@@ -72,8 +73,32 @@ fn a_new_session_header_describes_a_recording_in_progress() {
             status: SessionStatus::Recording,
             engine: "speechanalyzer".to_owned(),
             language: "en-US".to_owned(),
+            meeting: None,
         }
     );
+}
+
+#[test]
+fn linking_a_meeting_retitles_the_session_with_the_meeting_subject() {
+    let started_at = DateTime::parse_from_rfc3339("2026-10-26T10:58:00+05:30").unwrap();
+    let link = MeetingLink::from_meeting(&Meeting {
+        event_id: EventId::new("review"),
+        subject: "DXC Review".to_owned(),
+        starts_at: started_at,
+        ends_at: started_at,
+        organizer: Person::default(),
+        attendees: Vec::new(),
+        is_teams: true,
+        is_recurring: false,
+        response: Response::Accepted,
+    });
+
+    let header =
+        SessionHeader::recording(started_at, "speechanalyzer", "en-US").with_meeting(link.clone());
+
+    assert_eq!(header.title, "DXC Review");
+    assert_eq!(header.meeting, Some(link.clone()));
+    assert_eq!(header.summary().meeting, Some(link));
 }
 
 #[test]
