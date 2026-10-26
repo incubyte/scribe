@@ -190,7 +190,7 @@ pub fn start_for_meeting<R: Runtime>(
     start: AutoStart,
 ) -> Result<SessionId, StartError> {
     let selection = app.state::<MeetingSelection>();
-    selection.prepare(meeting.clone(), start);
+    selection.prepare(calendar::call_match_for_meeting(app, meeting), start);
     let started = app.state::<RecordingController>().start();
     if let Err(error) = &started {
         selection.abandon_prepared();

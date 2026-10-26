@@ -12,7 +12,9 @@ mod titles;
 use std::time::Duration;
 
 pub use agenda::{TodaysAgenda, todays_agenda};
-pub use armed::{ArmedAction, ArmedEntry, ArmedMeetings, ArmedState, ArmedWatch, WatchInputs};
+pub use armed::{
+    ArmedAction, ArmedEntry, ArmedMeetings, ArmedState, ArmedWatch, MissedReason, WatchInputs,
+};
 pub use connection::{AccountIdentity, Connection, Secret};
 pub use error::{CalendarError, VaultError};
 pub use layout::{

@@ -30,7 +30,7 @@ pub fn on_poll<R: Runtime>(app: &AppHandle<R>, in_call: bool) {
     if state.is_open() {
         return;
     }
-    if let Some(view) = offer_next(app, &state, &linked) {
+    if let Some(view) = prompt_for_next(app, &state, &linked) {
         publish(app, Some(view));
         popover::open_for_call(app);
     }
@@ -43,7 +43,7 @@ fn linked_meeting_in_call<R: Runtime>(app: &AppHandle<R>, in_call: bool) -> Opti
     app.try_state::<MeetingSelection>()?.active_meeting()
 }
 
-fn offer_next<R: Runtime>(
+fn prompt_for_next<R: Runtime>(
     app: &AppHandle<R>,
     state: &SwitchState,
     linked: &Meeting,
@@ -79,8 +79,11 @@ pub fn switch<R: Runtime>(app: &AppHandle<R>) {
         return;
     };
     publish(app, None);
+    let start = app
+        .try_state::<ArmedStore>()
+        .map_or(AutoStart::No, |armed| armed.start_for(&next.event_id));
     app.state::<RecordingController>().stop();
-    if recording::start_for_meeting(app, &next, AutoStart::No).is_err() {
+    if recording::start_for_meeting(app, &next, start).is_err() {
         tracing::warn!("could not start recording the next meeting after switching");
     }
 }

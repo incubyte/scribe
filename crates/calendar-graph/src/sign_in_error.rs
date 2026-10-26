@@ -21,6 +21,8 @@ pub enum SignInError {
     Malformed,
     #[error("the redirect listener failed")]
     Listener,
+    #[error("the account was disconnected during the sign-in")]
+    Disconnected,
     #[error("the credential store failed: {0}")]
     Vault(#[from] VaultError),
 }
@@ -51,6 +53,7 @@ impl SignInError {
             SignInError::Unreachable => "unreachable",
             SignInError::Malformed => "malformed",
             SignInError::Listener => "listener",
+            SignInError::Disconnected => "disconnected",
             SignInError::Vault(_) => "vault",
         }
     }
@@ -66,6 +69,7 @@ impl SignInError {
             SignInError::Unreachable => "Microsoft couldn't be reached",
             SignInError::Malformed => "Microsoft's answer couldn't be read",
             SignInError::Listener => "Scribe couldn't wait for the browser's answer",
+            SignInError::Disconnected => "Outlook was disconnected during the sign-in",
             SignInError::Vault(_) => "the credential store couldn't keep the sign-in",
         }
     }

@@ -32,7 +32,8 @@ use vault::KeyringVault;
 pub use auto_record::{note_going_to_sleep, note_meeting_finished, stop_if_auto_started};
 pub use notify::notify_meeting_not_started;
 pub use session_link::{
-    link_finished_session, note_call_ended, note_call_started, note_recording_started,
+    call_match_for_meeting, link_finished_session, note_call_ended, note_call_started,
+    note_recording_started,
 };
 
 pub fn install<R: Runtime>(app: &AppHandle<R>) {

@@ -39,10 +39,24 @@ impl CachedAccess {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+struct DisconnectCount(u64);
+
+#[derive(Default)]
+struct AccountAccess {
+    cached: Option<CachedAccess>,
+    disconnects: DisconnectCount,
+}
+
+enum GrantFate {
+    Kept,
+    DroppedAfterDisconnect,
+}
+
 pub struct OutlookAccount {
     transport: Arc<dyn HttpTransport>,
     vault: Arc<dyn CredentialVault>,
-    access: Mutex<Option<CachedAccess>>,
+    access: Mutex<AccountAccess>,
 }
 
 impl OutlookAccount {
@@ -53,11 +67,12 @@ impl OutlookAccount {
         OutlookAccount {
             transport,
             vault,
-            access: Mutex::new(None),
+            access: Mutex::new(AccountAccess::default()),
         }
     }
 
     pub fn connect(&self, open_browser: &dyn Fn(&Url)) -> Result<AccountIdentity, SignInError> {
+        let since = self.disconnects();
         let request = SignInRequest::generate();
         let listener = LoopbackListener::bind().map_err(|_| SignInError::Listener)?;
         let redirect_uri = listener.redirect_uri();
@@ -68,22 +83,27 @@ impl OutlookAccount {
             redirect_uri: &redirect_uri,
         };
         let grant = redeem_code(self.transport.as_ref(), &code, &proof)?;
-        self.remember(&mut self.access(), &grant)?;
-        Ok(grant.identity)
+        match self.keep_unless_disconnected_since(since, &grant)? {
+            GrantFate::Kept => Ok(grant.identity),
+            GrantFate::DroppedAfterDisconnect => Err(SignInError::Disconnected),
+        }
     }
 
     pub fn restore(&self) -> Result<Option<AccountIdentity>, CalendarError> {
+        let since = self.disconnects();
         let Some(stored) = self.vault.load()? else {
             return Ok(None);
         };
         let grant = refresh(self.transport.as_ref(), &stored)?;
-        self.remember(&mut self.access(), &grant)?;
-        Ok(Some(grant.identity))
+        match self.keep_unless_disconnected_since(since, &grant)? {
+            GrantFate::Kept => Ok(Some(grant.identity)),
+            GrantFate::DroppedAfterDisconnect => Ok(None),
+        }
     }
 
-    pub fn access_token(&self) -> Result<Secret, CalendarError> {
+    pub fn fresh_access_token(&self) -> Result<Secret, CalendarError> {
         let mut access = self.access();
-        if let Some(cached) = access.as_ref().filter(|cached| cached.is_fresh()) {
+        if let Some(cached) = access.cached.as_ref().filter(|cached| cached.is_fresh()) {
             return Ok(cached.token.clone());
         }
         let stored = self.vault.load()?.ok_or(CalendarError::NotConnected)?;
@@ -93,22 +113,37 @@ impl OutlookAccount {
     }
 
     pub fn disconnect(&self) -> Result<(), VaultError> {
+        let mut access = self.access();
         self.vault.forget()?;
-        *self.access() = None;
+        access.cached = None;
+        access.disconnects.0 += 1;
         Ok(())
     }
 
-    fn remember(
+    fn disconnects(&self) -> DisconnectCount {
+        self.access().disconnects
+    }
+
+    fn keep_unless_disconnected_since(
         &self,
-        access: &mut Option<CachedAccess>,
+        since: DisconnectCount,
         grant: &TokenGrant,
-    ) -> Result<(), VaultError> {
+    ) -> Result<GrantFate, VaultError> {
+        let mut access = self.access();
+        if access.disconnects != since {
+            return Ok(GrantFate::DroppedAfterDisconnect);
+        }
+        self.remember(&mut access, grant)?;
+        Ok(GrantFate::Kept)
+    }
+
+    fn remember(&self, access: &mut AccountAccess, grant: &TokenGrant) -> Result<(), VaultError> {
         self.vault.save(&grant.refresh)?;
-        *access = Some(CachedAccess::granted(grant));
+        access.cached = Some(CachedAccess::granted(grant));
         Ok(())
     }
 
-    fn access(&self) -> MutexGuard<'_, Option<CachedAccess>> {
+    fn access(&self) -> MutexGuard<'_, AccountAccess> {
         self.access.lock().unwrap_or_else(PoisonError::into_inner)
     }
 }
@@ -144,12 +179,12 @@ impl OutlookAccount {
         if reply.status != UNAUTHORISED {
             return Ok(reply);
         }
-        *self.access() = None;
+        self.access().cached = None;
         self.get_with_current_token(url)
     }
 
     fn get_with_current_token(&self, url: &str) -> Result<HttpReply, CalendarError> {
-        let token = self.access_token()?;
+        let token = self.fresh_access_token()?;
         self.transport
             .get_json(url, &token)
             .map_err(|_| CalendarError::Unreachable)

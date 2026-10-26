@@ -32,7 +32,7 @@ impl SwitchPrompts {
         SwitchPrompts::default()
     }
 
-    pub fn due(&mut self, inputs: &SwitchInputs) -> Option<SwitchPrompt> {
+    pub fn offer_next(&mut self, inputs: &SwitchInputs) -> Option<SwitchPrompt> {
         let next = inputs
             .agenda
             .meetings()

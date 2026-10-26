@@ -277,8 +277,11 @@ stateDiagram-v2
   [*] --> Armed: switch on
   Armed --> [*]: switch off
   Armed --> Recording: call starts in window and matches this meeting
-  Armed --> Missed: start + 5 min, no call
-  Missed --> Recording: user presses Record on the block
+  Armed --> Missed: start + 5 min, no call since the start
+  Missed --> Recording: call starts in window and matches this meeting, or user presses Record
+  Armed --> StartFailed: recording can't start
+  Missed --> StartFailed: recording can't start
+  StartFailed --> Recording: user presses Record on the block
   Recording --> Recorded: call ends (after grace) or user stops
   Recorded --> [*]
 ```
@@ -468,3 +471,4 @@ sequenceDiagram
 
 - 2026-10-25 — Sapan Parikh — Initial spec from a feasibility review and a live session [5].
 - 2026-10-26 — Sapan Parikh — Scope changed from `Calendars.ReadBasic` to `Calendars.Read` so attendees and organizer are certain to come back; still read-only and user-consentable [8]. Former open question 8.2 closed.
+- 2026-10-26 — Sapan Parikh — Missed now has two causes. A meeting missed because no call came by start + 5 minutes still starts recording by itself if its call begins later while the meeting is on (late join). A meeting whose recording couldn't start is final and is never retried by itself. Missed is never reported while a Teams call is in progress, nor for a meeting that a call overlapped after its start.

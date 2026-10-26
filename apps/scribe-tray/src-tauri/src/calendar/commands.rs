@@ -58,15 +58,16 @@ pub fn choose_meeting<R: Runtime>(
     let chosen = event_id.map(EventId::new);
     app.state::<MeetingSelection>()
         .choose(chosen.as_ref())
-        .map_err(|_| "that meeting is not one of the candidates".to_owned())?;
+        .map_err(|error| error.reason().to_owned())?;
     session_link::publish_call_meeting(&app);
     Ok(session_link::current_call_meeting(&app))
 }
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
-pub fn arm_meeting<R: Runtime>(app: AppHandle<R>, event_id: String) {
-    auto_record::arm(&app, EventId::new(event_id));
+pub fn arm_meeting<R: Runtime>(app: AppHandle<R>, event_id: String) -> Result<(), String> {
+    auto_record::arm(&app, EventId::new(event_id))
+        .map_err(|_| "that meeting is not on today's agenda".to_owned())
 }
 
 #[tauri::command]

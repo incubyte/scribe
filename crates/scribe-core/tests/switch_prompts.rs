@@ -71,7 +71,7 @@ fn retro_armed() -> ArmedMeetings {
 
 fn offered(prompts: &mut SwitchPrompts, inputs: &SwitchInputs) -> Option<(String, String)> {
     prompts
-        .due(inputs)
+        .offer_next(inputs)
         .map(|prompt| (prompt.from.subject, prompt.to.subject))
 }
 

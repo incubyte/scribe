@@ -5,6 +5,7 @@ use scribe_core::calendar::{
 };
 use scribe_tray::calendar::agenda_view::Arming;
 use scribe_tray::calendar::armed::{ArmedStore, entries_from, settings_value};
+use scribe_tray::calendar::selection::AutoStart;
 use serde_json::json;
 
 fn today() -> NaiveDate {
@@ -50,7 +51,7 @@ fn poll_without_a_call(store: &ArmedStore, now: &str) -> Vec<ArmedAction> {
     };
     let agenda = todays_agenda(vec![event], &day);
     let armed = store.armed();
-    store.next_actions(&WatchInputs {
+    store.take_due_actions(&WatchInputs {
         agenda: &agenda,
         armed: &armed,
         matched: None,
@@ -189,4 +190,29 @@ fn a_recording_that_ended_normally_is_not_armed_again_after_wake() {
     let actions = poll_without_a_call(&store, "2026-10-26T11:20:00+05:30");
 
     assert!(actions.is_empty());
+}
+
+#[test]
+fn switching_to_an_armed_meeting_records_it_as_started_by_itself() {
+    let store = ArmedStore::new(ArmedMeetings::default());
+    store.arm(review_id(), today());
+
+    assert_eq!(store.start_for(&review_id()), AutoStart::Yes);
+}
+
+#[test]
+fn switching_to_a_meeting_that_is_not_armed_records_it_as_started_by_hand() {
+    let store = ArmedStore::new(ArmedMeetings::default());
+
+    assert_eq!(store.start_for(&review_id()), AutoStart::No);
+}
+
+#[test]
+fn a_start_failure_shows_the_meeting_as_missed() {
+    let store = ArmedStore::new(ArmedMeetings::default());
+    store.arm(review_id(), today());
+
+    store.note_start_failed(&review_id());
+
+    assert_eq!(store.arming_of(&review_id()), Arming::Missed);
 }

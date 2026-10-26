@@ -3,7 +3,7 @@ use std::sync::Arc;
 use chrono::Local;
 use scribe_core::calendar::{
     ArmedMeetings, Connection, MatchAnchor, MatchInputs, MatchOutcome, Meeting, MeetingLink,
-    TodaysAgenda, match_meeting,
+    TodaysAgenda, match_meeting, meeting_candidates,
 };
 use scribe_core::recording::SessionId;
 use store_markdown::MarkdownTranscriptStore;
@@ -115,6 +115,7 @@ pub fn note_call_started<R: Runtime>(app: &AppHandle<R>) {
     let Some(selection) = app.try_state::<MeetingSelection>() else {
         return;
     };
+    capture_call_titles(app);
     selection.note_call_started(match_for_call(app));
     publish_call_meeting(app);
 }
@@ -137,15 +138,31 @@ pub fn publish_call_meeting<R: Runtime>(app: &AppHandle<R>) {
     webview::emit(app, MATCH_EVENT, current_call_meeting(app));
 }
 
-fn match_for_call<R: Runtime>(app: &AppHandle<R>) -> CallMatch {
-    if !matches!(
+#[must_use]
+pub fn call_match_for_meeting<R: Runtime>(app: &AppHandle<R>, meeting: &Meeting) -> CallMatch {
+    let anchor = anchor_now(app);
+    let around = connected_agenda(app)
+        .map(|agenda| {
+            meeting_candidates(&agenda, &anchor)
+                .into_iter()
+                .cloned()
+                .collect()
+        })
+        .unwrap_or_default();
+    CallMatch::decided(meeting.clone(), around)
+}
+
+fn capture_call_titles<R: Runtime>(app: &AppHandle<R>) {
+    if matches!(
         connection::current_connection(app),
         Connection::Connected(_)
     ) {
-        return CallMatch::settled(None);
+        app.state::<CallPresence>()
+            .remember_call_titles(titles::teams_titles().teams_window_titles());
     }
-    app.state::<CallPresence>()
-        .remember_call_titles(titles::teams_titles().teams_window_titles());
+}
+
+fn match_for_call<R: Runtime>(app: &AppHandle<R>) -> CallMatch {
     let clues = call_clues(app);
     call_match(
         connected_agenda(app)

@@ -15,11 +15,11 @@ use macos::teams_titles as platform_teams_titles;
 
 #[cfg(windows)]
 mod windows {
-    use audio_windows::WasapiTeamsTitles;
+    use audio_windows::TeamsWindowTitles;
     use scribe_core::ports::MeetingWindowTitles;
 
     pub fn teams_titles() -> Box<dyn MeetingWindowTitles> {
-        Box::new(WasapiTeamsTitles)
+        Box::new(TeamsWindowTitles)
     }
 }
 

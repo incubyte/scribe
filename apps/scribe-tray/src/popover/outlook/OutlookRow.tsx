@@ -31,20 +31,17 @@ function failureText({ error }: OutlookConnection): string | null {
   return error === null ? null : `Outlook didn't connect: ${error}`;
 }
 
+function statusText(connection: OutlookConnection): string | null {
+  return connection.state === "connecting" ? "Connecting to Outlook…" : failureText(connection);
+}
+
 function accountText({ display_name, email }: OutlookConnection): string {
   return `Connected as ${display_name ?? ""} · ${email ?? ""}`;
 }
 
 const CONTENT_BY_STATE: Readonly<Record<OutlookState, (props: StateContentProps) => ReactNode>> = {
-  disconnected: ({ connection, onConnect }) => (
-    <>
-      <ConnectButton label="Connect Outlook" onConnect={onConnect} />
-      <p role="status" aria-label="Outlook status" className="settings__status">
-        {failureText(connection)}
-      </p>
-    </>
-  ),
-  connecting: () => <p className="settings__status">Connecting to Outlook…</p>,
+  disconnected: ({ onConnect }) => <ConnectButton label="Connect Outlook" onConnect={onConnect} />,
+  connecting: () => null,
   connected: ({ connection, onDisconnect, accountId }) => (
     <>
       <p id={accountId} className="outlook__account">
@@ -87,6 +84,9 @@ export function OutlookRow({ connection, onConnect, onDisconnect }: OutlookRowPr
           accountId={accountId}
         />
       )}
+      <p role="status" aria-label="Outlook status" className="settings__status">
+        {connection === null ? null : statusText(connection)}
+      </p>
     </section>
   );
 }

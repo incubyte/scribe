@@ -17,6 +17,12 @@ use crate::updates;
 const POLL_INTERVAL: Duration = Duration::from_secs(2);
 const THREAD_NAME: &str = "call-watch";
 
+enum PresenceChange {
+    Unchanged,
+    CallStarted,
+    CallEnded,
+}
+
 #[derive(Default)]
 pub struct CallPresence {
     in_call: AtomicBool,
@@ -50,18 +56,30 @@ impl CallPresence {
             .unwrap_or_else(PoisonError::into_inner) = titles;
     }
 
-    fn publish(&self, in_call: bool) -> bool {
+    fn update_in_call(&self, in_call: bool) -> PresenceChange {
         let was_in_call = self.in_call.swap(in_call, Ordering::Relaxed);
-        let changed = was_in_call != in_call;
-        if changed {
-            *self
-                .call_started_at
-                .lock()
-                .unwrap_or_else(PoisonError::into_inner) =
-                in_call.then(|| Local::now().fixed_offset());
-            self.remember_call_titles(Vec::new());
+        match (was_in_call, in_call) {
+            (false, true) => PresenceChange::CallStarted,
+            (true, false) => PresenceChange::CallEnded,
+            _ => PresenceChange::Unchanged,
         }
-        changed
+    }
+
+    fn begin_call_details(&self) {
+        self.replace_call_start(Some(Local::now().fixed_offset()));
+        self.remember_call_titles(Vec::new());
+    }
+
+    fn clear_call_details(&self) {
+        self.replace_call_start(None);
+        self.remember_call_titles(Vec::new());
+    }
+
+    fn replace_call_start(&self, started_at: Option<DateTime<FixedOffset>>) {
+        *self
+            .call_started_at
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner) = started_at;
     }
 }
 
@@ -96,18 +114,27 @@ fn watch_forever<R: Runtime>(app: &AppHandle<R>, probe: &dyn CallProbe, watch: &
 }
 
 fn publish_presence<R: Runtime>(app: &AppHandle<R>, watch: &CallWatch) {
-    let in_call = watch.is_in_call();
-    let presence_changed = app.state::<CallPresence>().publish(in_call);
-    if presence_changed {
-        updates::refresh_restart_item(app);
+    match app
+        .state::<CallPresence>()
+        .update_in_call(watch.is_in_call())
+    {
+        PresenceChange::Unchanged => {}
+        PresenceChange::CallStarted => call_started(app),
+        PresenceChange::CallEnded => call_ended(app),
     }
-    if presence_changed && in_call {
-        calendar::note_call_started(app);
-    }
-    if presence_changed && !in_call {
-        calendar::stop_if_auto_started(app);
-        calendar::note_call_ended(app);
-    }
+}
+
+fn call_started<R: Runtime>(app: &AppHandle<R>) {
+    app.state::<CallPresence>().begin_call_details();
+    updates::refresh_restart_item(app);
+    calendar::note_call_started(app);
+}
+
+fn call_ended<R: Runtime>(app: &AppHandle<R>) {
+    app.state::<CallPresence>().clear_call_details();
+    updates::refresh_restart_item(app);
+    calendar::stop_if_auto_started(app);
+    calendar::note_call_ended(app);
 }
 
 fn open_if_call_started<R: Runtime>(app: &AppHandle<R>, watch: &mut CallWatch) {

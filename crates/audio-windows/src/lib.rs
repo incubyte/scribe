@@ -18,4 +18,4 @@ pub use call_probe::WasapiCallProbe;
 #[cfg(windows)]
 pub use loopback::LoopbackSource;
 #[cfg(windows)]
-pub use teams_windows::WasapiTeamsTitles;
+pub use teams_windows::TeamsWindowTitles;

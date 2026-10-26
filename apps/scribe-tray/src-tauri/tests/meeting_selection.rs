@@ -5,8 +5,8 @@ use scribe_core::calendar::{
 };
 use scribe_core::recording::SessionId;
 use scribe_tray::calendar::selection::{
-    AutoStart, CallMatch, ChooseError, FinishedChoice, MeetingSelection, adopt, call_match,
-    chosen_meeting,
+    AutoStart, CallMatch, ChooseError, FinishedChoice, MeetingSelection, call_match,
+    chosen_meeting, pending_or_settled,
 };
 
 fn moment(text: &str) -> DateTime<FixedOffset> {
@@ -69,6 +69,10 @@ fn inputs<'a>(agenda: &'a TodaysAgenda, at: &str, titles: &'a [String]) -> Match
         titles,
         armed: NOTHING_ARMED,
     }
+}
+
+fn decided(meeting: Meeting) -> CallMatch {
+    CallMatch::decided(meeting, Vec::new())
 }
 
 fn linked(meeting: Meeting) -> FinishedChoice {
@@ -136,7 +140,7 @@ fn a_recording_with_no_agenda_to_look_at_is_linked_to_nothing() {
 fn the_meeting_chosen_for_a_recording_is_handed_over_once_for_that_recording() {
     let selection = MeetingSelection::new();
     let recording = session("2026-10-26-110500");
-    selection.begin(recording.clone(), Some(review()));
+    selection.begin_from_call(recording.clone(), || Some(review()));
 
     assert_eq!(selection.take_for(&recording), Some(linked(review())));
     assert_eq!(selection.take_for(&recording), None);
@@ -145,7 +149,7 @@ fn the_meeting_chosen_for_a_recording_is_handed_over_once_for_that_recording() {
 #[test]
 fn another_recording_does_not_receive_the_meeting_chosen_for_this_one() {
     let selection = MeetingSelection::new();
-    selection.begin(session("2026-10-26-110500"), Some(review()));
+    selection.begin_from_call(session("2026-10-26-110500"), || Some(review()));
 
     assert_eq!(selection.take_for(&session("2026-10-26-120000")), None);
 }
@@ -153,8 +157,8 @@ fn another_recording_does_not_receive_the_meeting_chosen_for_this_one() {
 #[test]
 fn a_new_recording_replaces_the_previous_choice() {
     let selection = MeetingSelection::new();
-    selection.begin(session("2026-10-26-110500"), Some(review()));
-    selection.begin(session("2026-10-26-120000"), None);
+    selection.begin_from_call(session("2026-10-26-110500"), || Some(review()));
+    selection.begin_from_call(session("2026-10-26-120000"), || None);
 
     assert_eq!(selection.take_for(&session("2026-10-26-110500")), None);
 }
@@ -252,7 +256,7 @@ fn a_recording_adopts_the_choice_made_for_the_call() {
     let mut pending = two_overlapping();
     pending.choose(Some(&id("other"))).unwrap();
 
-    let adopted = adopt(Some(pending), || Some(review()));
+    let adopted = pending_or_settled(Some(pending), || Some(review()));
 
     assert_eq!(adopted.selected(), Some(&other()));
 }
@@ -262,14 +266,14 @@ fn a_recording_adopts_not_a_calendar_meeting_without_asking_the_calendar_again()
     let mut pending = two_overlapping();
     pending.choose(None).unwrap();
 
-    let adopted = adopt(Some(pending), || Some(review()));
+    let adopted = pending_or_settled(Some(pending), || Some(review()));
 
     assert_eq!(adopted.selected(), None);
 }
 
 #[test]
 fn a_recording_without_a_call_falls_back_to_matching_the_calendar() {
-    let adopted = adopt(None, || Some(review()));
+    let adopted = pending_or_settled(None, || Some(review()));
 
     assert_eq!(adopted.selected(), Some(&review()));
 }
@@ -330,7 +334,7 @@ fn choosing_when_there_is_no_call_is_refused() {
 
     assert_eq!(
         selection.choose(Some(&id("review"))),
-        Err(ChooseError::NotACandidate)
+        Err(ChooseError::NoCall)
     );
 }
 
@@ -359,7 +363,7 @@ fn a_recording_started_for_an_armed_meeting_is_linked_to_it_and_marked_automatic
     let selection = MeetingSelection::new();
     let recording = session("2026-10-26-110500");
     selection.note_call_started(two_overlapping());
-    selection.prepare(other(), AutoStart::Yes);
+    selection.prepare(decided(other()), AutoStart::Yes);
 
     selection.begin_from_call(recording.clone(), || None);
 
@@ -376,7 +380,7 @@ fn a_recording_started_for_an_armed_meeting_is_linked_to_it_and_marked_automatic
 #[test]
 fn a_recording_started_for_a_meeting_shows_that_meeting_in_the_live_view() {
     let selection = MeetingSelection::new();
-    selection.prepare(review(), AutoStart::No);
+    selection.prepare(decided(review()), AutoStart::No);
 
     selection.begin_from_call(session("2026-10-26-110500"), || None);
 
@@ -400,7 +404,7 @@ fn a_recording_started_by_hand_is_never_treated_as_automatic() {
 fn a_start_that_failed_does_not_decide_the_next_recording() {
     let selection = MeetingSelection::new();
     let recording = session("2026-10-26-110500");
-    selection.prepare(other(), AutoStart::Yes);
+    selection.prepare(decided(other()), AutoStart::Yes);
     selection.abandon_prepared();
 
     selection.begin_from_call(recording.clone(), || Some(review()));
@@ -413,11 +417,99 @@ fn a_start_that_failed_does_not_decide_the_next_recording() {
 fn the_meeting_being_recorded_is_known_until_the_recording_is_handed_over() {
     let selection = MeetingSelection::new();
     let recording = session("2026-10-26-110500");
-    selection.begin(recording.clone(), Some(review()));
+    selection.prepare(decided(review()), AutoStart::No);
+    selection.begin_from_call(recording.clone(), || None);
 
     assert_eq!(selection.active_meeting(), Some(review()));
 
     selection.take_for(&recording);
 
     assert_eq!(selection.active_meeting(), None);
+}
+
+#[test]
+fn a_recording_started_for_a_meeting_still_offers_the_meetings_overlapping_it() {
+    let selection = MeetingSelection::new();
+    selection.prepare(
+        CallMatch::decided(other(), vec![review(), other()]),
+        AutoStart::Yes,
+    );
+
+    selection.begin_from_call(session("2026-10-26-110500"), || None);
+
+    let shown = selection.current().unwrap();
+    assert_eq!(shown.selected(), Some(&other()));
+    assert_eq!(shown.candidates(), [other(), review()]);
+}
+
+#[test]
+fn a_correction_made_while_recording_becomes_the_calls_choice_after_stop() {
+    let selection = MeetingSelection::new();
+    let recording = session("2026-10-26-110500");
+    selection.note_call_started(two_overlapping());
+    selection.begin_from_call(recording.clone(), || None);
+    selection.choose(Some(&id("other"))).unwrap();
+
+    selection.take_for(&recording);
+
+    assert_eq!(selection.current().unwrap().selected(), Some(&other()));
+}
+
+#[test]
+fn a_second_recording_in_the_same_call_keeps_the_correction_made_in_the_first() {
+    let selection = MeetingSelection::new();
+    let first = session("2026-10-26-110500");
+    let second = session("2026-10-26-111500");
+    selection.note_call_started(two_overlapping());
+    selection.begin_from_call(first.clone(), || None);
+    selection.choose(Some(&id("other"))).unwrap();
+    selection.take_for(&first);
+
+    selection.begin_from_call(second.clone(), || Some(review()));
+
+    assert_eq!(selection.take_for(&second), Some(linked(other())));
+}
+
+#[test]
+fn choosing_not_a_calendar_meeting_for_the_call_holds_back_armed_meetings() {
+    let selection = MeetingSelection::new();
+    selection.note_call_started(two_overlapping());
+
+    selection.choose(None).unwrap();
+
+    assert!(selection.is_call_declared_not_a_meeting());
+}
+
+#[test]
+fn choosing_not_a_calendar_meeting_on_a_recording_holds_back_armed_meetings_for_the_rest_of_the_call()
+ {
+    let selection = MeetingSelection::new();
+    let recording = session("2026-10-26-110500");
+    selection.note_call_started(two_overlapping());
+    selection.begin_from_call(recording.clone(), || None);
+    selection.choose(None).unwrap();
+
+    selection.take_for(&recording);
+
+    assert!(selection.is_call_declared_not_a_meeting());
+}
+
+#[test]
+fn a_call_the_calendar_could_not_match_does_not_hold_back_armed_meetings() {
+    let selection = MeetingSelection::new();
+
+    selection.note_call_started(CallMatch::settled(None));
+
+    assert!(!selection.is_call_declared_not_a_meeting());
+}
+
+#[test]
+fn a_new_call_forgets_that_the_last_one_was_not_a_calendar_meeting() {
+    let selection = MeetingSelection::new();
+    selection.note_call_started(two_overlapping());
+    selection.choose(None).unwrap();
+
+    selection.note_call_ended();
+
+    assert!(!selection.is_call_declared_not_a_meeting());
 }

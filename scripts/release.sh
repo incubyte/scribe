@@ -18,6 +18,8 @@ versioned_update_archive="$root/target/release/Scribe_${version}_aarch64.app.tar
 installer="$root/target/$windows_target/release/bundle/nsis/Scribe_${version}_x64-setup.exe"
 manifest="$root/target/release/latest.json"
 download_base="https://github.com/incubyte/scribe/releases/download/$tag"
+outlook_authority="$root/crates/calendar-graph/src/authority.rs"
+placeholder_client_id="00000000-0000-0000-0000-000000000000"
 export PATH="/opt/homebrew/opt/llvm/bin:/opt/homebrew/opt/lld/bin:$PATH"
 
 require_clean_main() {
@@ -27,6 +29,13 @@ require_clean_main() {
   fi
   if [ "$(git -C "$root" rev-parse --abbrev-ref HEAD)" != "main" ]; then
     echo "Release from main." >&2
+    exit 1
+  fi
+}
+
+require_outlook_client_id() {
+  if grep -q "$placeholder_client_id" "$outlook_authority"; then
+    echo "Set the Entra app's client id in $outlook_authority; it still has the placeholder $placeholder_client_id." >&2
     exit 1
   fi
 }
@@ -158,6 +167,7 @@ publish_assets() {
 }
 
 require_clean_main
+require_outlook_client_id
 require_notary_credentials
 require_update_signing_key
 build_macos

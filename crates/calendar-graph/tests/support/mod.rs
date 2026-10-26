@@ -3,6 +3,7 @@
 use std::collections::VecDeque;
 use std::io::{Read, Write};
 use std::net::TcpStream;
+use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::thread;
 
@@ -13,8 +14,8 @@ use scribe_core::calendar::{Secret, VaultError};
 use scribe_core::ports::CredentialVault;
 use url::Url;
 
-pub const DISPLAY_NAME: &str = "Sapan Parikh";
-pub const EMAIL: &str = "sapan@incubyte.co";
+pub const DISPLAY_NAME: &str = "Riya Shah";
+pub const EMAIL: &str = "riya@example.com";
 
 #[derive(Debug, Clone)]
 pub struct FormRequest {
@@ -112,6 +113,74 @@ impl HttpTransport for FakeTransport {
             .unwrap_or_else(PoisonError::into_inner)
             .pop_front()
             .expect("the test scripted no JSON reply for this request")
+    }
+}
+
+pub struct HeldTransport {
+    reply: Mutex<Option<Result<HttpReply, TransportError>>>,
+    arrived: Mutex<Sender<()>>,
+    released: Mutex<Receiver<()>>,
+}
+
+pub struct TransportGate {
+    arrived: Receiver<()>,
+    release: Sender<()>,
+}
+
+impl TransportGate {
+    pub fn wait_for_request(&self) {
+        self.arrived.recv().expect("the held request never arrived");
+    }
+
+    pub fn release(&self) {
+        self.release
+            .send(())
+            .expect("the held request is no longer waiting");
+    }
+}
+
+impl HeldTransport {
+    pub fn holding(
+        reply: Result<HttpReply, TransportError>,
+    ) -> (Arc<HeldTransport>, TransportGate) {
+        let (arrived_tx, arrived_rx) = mpsc::channel();
+        let (release_tx, release_rx) = mpsc::channel();
+        let transport = Arc::new(HeldTransport {
+            reply: Mutex::new(Some(reply)),
+            arrived: Mutex::new(arrived_tx),
+            released: Mutex::new(release_rx),
+        });
+        let gate = TransportGate {
+            arrived: arrived_rx,
+            release: release_tx,
+        };
+        (transport, gate)
+    }
+}
+
+impl HttpTransport for HeldTransport {
+    fn post_form(&self, _url: &str, _form: &[(&str, &str)]) -> Result<HttpReply, TransportError> {
+        let _ = self
+            .arrived
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .send(());
+        let _ = self
+            .released
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .recv();
+        self.reply
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take()
+            .expect("the held transport answers one request")
+    }
+
+    fn get_json(&self, _url: &str, _bearer: &Secret) -> Result<HttpReply, TransportError> {
+        Err(TransportError(
+            "the held transport serves only tokens".to_owned(),
+        ))
     }
 }
 

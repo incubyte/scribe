@@ -101,6 +101,29 @@ describe("the Outlook calendar row in Settings", () => {
     ).toBeInTheDocument();
   });
 
+  it("keeps one status region mounted so a failed sign-in is read out", () => {
+    const { rerender } = renderRow(CONNECTING);
+    const region = screen.getByRole("status", { name: "Outlook status" });
+
+    rerender(<OutlookRow connection={DECLINED} onConnect={noop} onDisconnect={noop} />);
+
+    expect(screen.getByRole("status", { name: "Outlook status" })).toBe(region);
+    expect(region).toHaveTextContent(
+      "Outlook didn't connect: the sign-in was cancelled or consent was declined",
+    );
+  });
+
+  it.each([
+    ["signed out", SIGNED_OUT],
+    ["connected", CONNECTED],
+    ["while connecting", CONNECTING],
+    ["when a reconnect is needed", RECONNECT_NEEDED],
+  ])("has a status region %s", (_, connection) => {
+    renderRow(connection);
+
+    expect(screen.getByRole("status", { name: "Outlook status" })).toBeInTheDocument();
+  });
+
   it("says it is connecting while the sign-in is under way", () => {
     renderRow(CONNECTING);
 

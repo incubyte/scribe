@@ -44,15 +44,12 @@ export function todayHeading(now: number): string {
 }
 
 export function blockName(block: AgendaBlock, ended: boolean): string {
-  const parts = [`${block.subject}, ${rangeLabel(block)}`];
-  if (block.is_teams) {
-    parts.push("Teams meeting");
-  }
-  if (block.is_recurring) {
-    parts.push("recurring");
-  }
-  if (ended) {
-    parts.push("ended");
-  }
-  return parts.join(", ");
+  const cues: ReadonlyArray<readonly [boolean, string]> = [
+    [block.is_teams, "Teams meeting"],
+    [block.is_recurring, "recurring"],
+    [ended, "ended"],
+    [!ended && block.armed_state === "missed", "No call detected"],
+  ];
+  const shown = cues.filter(([applies]) => applies).map(([, cue]) => cue);
+  return [`${block.subject}, ${rangeLabel(block)}`, ...shown].join(", ");
 }

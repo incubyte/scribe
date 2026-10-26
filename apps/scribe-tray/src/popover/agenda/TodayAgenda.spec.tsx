@@ -194,7 +194,7 @@ describe("today's agenda in the popover", () => {
       ],
     };
     await renderAgenda(readyWith([STANDUP], [chip]));
-    const button = await screen.findByRole("button", { name: "1 more meeting" });
+    const button = await screen.findByRole("button", { name: "+1, 1 more meeting" });
     expect(screen.queryByText("Third wheel, 9:15 AM–9:45 AM")).not.toBeVisible();
 
     await userEvent.click(button);
@@ -285,6 +285,31 @@ describe("today's agenda in the popover", () => {
     await userEvent.click(screen.getByRole("button", { name: "Record Design review" }));
 
     expect(handler).toHaveBeenCalledWith("record_meeting", { eventId: "review" });
+  });
+
+  it("names a missed meeting as having no call detected", async () => {
+    await renderAgenda(readyWith([{ ...REVIEW, armed: true, armed_state: "missed" }]));
+
+    expect(
+      await screen.findByRole("listitem", { name: /^Design review.*, No call detected$/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("asks for a fresh agenda when a meeting can no longer be armed", async () => {
+    const handler = vi.fn((command: string) => {
+      if (command === "arm_meeting") {
+        throw new Error("that meeting is not on today's agenda");
+      }
+      return command === "todays_agenda" ? readyWith([REVIEW]) : undefined;
+    });
+    mockIPC(handler, { shouldMockEvents: true });
+    render(<TodayAgenda />);
+    const toggle = await screen.findByRole("switch", { name: /Design review/ });
+    handler.mockClear();
+
+    await userEvent.click(toggle);
+
+    await waitFor(() => expect(handler).toHaveBeenCalledWith("refresh_agenda", {}));
   });
 
   it("offers nothing to record for a missed meeting that has ended", async () => {

@@ -5,12 +5,12 @@ use support::id_token_for;
 
 #[test]
 fn the_account_name_and_email_are_read_from_the_id_token() {
-    let token = id_token_for("Sapan Parikh", "sapan@incubyte.co");
+    let token = id_token_for("Riya Shah", "riya@example.com");
 
     let identity = identity_from(&token).unwrap();
 
-    assert_eq!(identity.display_name, "Sapan Parikh");
-    assert_eq!(identity.email, "sapan@incubyte.co");
+    assert_eq!(identity.display_name, "Riya Shah");
+    assert_eq!(identity.email, "riya@example.com");
 }
 
 #[test]

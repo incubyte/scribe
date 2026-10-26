@@ -69,7 +69,13 @@ pub enum ArmedState {
     Armed,
     Recording,
     Recorded,
-    Missed,
+    Missed(MissedReason),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MissedReason {
+    NoCallInTime,
+    StartFailed,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -88,9 +94,19 @@ pub struct WatchInputs<'a> {
     pub now: DateTime<FixedOffset>,
 }
 
+impl ArmedState {
+    fn can_start(self) -> bool {
+        matches!(
+            self,
+            ArmedState::Armed | ArmedState::Missed(MissedReason::NoCallInTime)
+        )
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct ArmedWatch {
     states: HashMap<EventId, ArmedState>,
+    last_call_seen: Option<DateTime<FixedOffset>>,
 }
 
 impl ArmedWatch {
@@ -104,14 +120,17 @@ impl ArmedWatch {
         self.states.get(id).copied().unwrap_or(ArmedState::Armed)
     }
 
-    pub fn next_actions(&mut self, inputs: &WatchInputs) -> Vec<ArmedAction> {
+    pub fn take_due_actions(&mut self, inputs: &WatchInputs) -> Vec<ArmedAction> {
+        if inputs.in_call {
+            self.last_call_seen = Some(inputs.now);
+        }
         let due: Vec<(ArmedAction, ArmedState)> = inputs
             .agenda
             .meetings()
             .iter()
             .filter(|meeting| inputs.armed.is_armed(&meeting.event_id))
-            .filter(|meeting| self.state_of(&meeting.event_id) == ArmedState::Armed)
-            .filter_map(|meeting| due_action(meeting, inputs))
+            .filter(|meeting| inputs.now < meeting.ends_at)
+            .filter_map(|meeting| self.due_action(meeting, inputs))
             .collect();
         due.into_iter()
             .map(|(action, next)| self.settle(action, next))
@@ -129,11 +148,39 @@ impl ArmedWatch {
     }
 
     pub fn note_start_failed(&mut self, id: &EventId) {
-        self.states.insert(id.clone(), ArmedState::Missed);
+        self.states
+            .insert(id.clone(), ArmedState::Missed(MissedReason::StartFailed));
     }
 
     pub fn forget(&mut self, id: &EventId) {
         self.states.remove(id);
+    }
+
+    fn due_action(
+        &self,
+        meeting: &Meeting,
+        inputs: &WatchInputs,
+    ) -> Option<(ArmedAction, ArmedState)> {
+        let state = self.state_of(&meeting.event_id);
+        if state.can_start() && is_start_due(meeting, inputs) {
+            return Some((
+                ArmedAction::StartRecording(meeting.clone()),
+                ArmedState::Recording,
+            ));
+        }
+        (state == ArmedState::Armed && self.is_missed(meeting, inputs)).then(|| {
+            (
+                ArmedAction::ReportMissed(meeting.clone()),
+                ArmedState::Missed(MissedReason::NoCallInTime),
+            )
+        })
+    }
+
+    fn is_missed(&self, meeting: &Meeting, inputs: &WatchInputs) -> bool {
+        let call_seen_since_start = self
+            .last_call_seen
+            .is_some_and(|seen| seen >= meeting.starts_at);
+        !call_seen_since_start && inputs.now >= meeting.starts_at + as_chrono(MISSED_AFTER)
     }
 
     fn settle(&mut self, action: ArmedAction, next: ArmedState) -> ArmedAction {
@@ -143,34 +190,11 @@ impl ArmedWatch {
     }
 }
 
-fn due_action(meeting: &Meeting, inputs: &WatchInputs) -> Option<(ArmedAction, ArmedState)> {
-    if inputs.now >= meeting.ends_at {
-        return None;
-    }
-    if is_start_due(meeting, inputs) {
-        return Some((
-            ArmedAction::StartRecording(meeting.clone()),
-            ArmedState::Recording,
-        ));
-    }
-    is_missed(meeting, inputs).then(|| {
-        (
-            ArmedAction::ReportMissed(meeting.clone()),
-            ArmedState::Missed,
-        )
-    })
-}
-
 fn is_start_due(meeting: &Meeting, inputs: &WatchInputs) -> bool {
     inputs.in_call
         && !inputs.recording
         && is_matched(meeting, inputs)
         && inputs.now >= meeting.starts_at - as_chrono(CANDIDATE_LEAD)
-}
-
-fn is_missed(meeting: &Meeting, inputs: &WatchInputs) -> bool {
-    let in_its_call = inputs.in_call && is_matched(meeting, inputs);
-    !in_its_call && inputs.now >= meeting.starts_at + as_chrono(MISSED_AFTER)
 }
 
 fn is_matched(meeting: &Meeting, inputs: &WatchInputs) -> bool {

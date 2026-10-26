@@ -7,6 +7,7 @@ use scribe_core::calendar::{
 use serde_json::{Value, json};
 
 use super::agenda_view::{AgendaView, Arming};
+use super::selection::AutoStart;
 
 pub const ARMED_MEETINGS_KEY: &str = "armed_meetings";
 const EVENT_ID_FIELD: &str = "event_id";
@@ -88,7 +89,7 @@ impl ArmedStore {
             return Arming::Off;
         }
         match locked(&self.watch).state_of(id) {
-            ArmedState::Missed => Arming::Missed,
+            ArmedState::Missed(_) => Arming::Missed,
             ArmedState::Armed | ArmedState::Recording | ArmedState::Recorded => Arming::Armed,
         }
     }
@@ -98,8 +99,17 @@ impl ArmedStore {
         view.marked(|id| self.arming_of(id))
     }
 
-    pub fn next_actions(&self, inputs: &WatchInputs) -> Vec<ArmedAction> {
-        locked(&self.watch).next_actions(inputs)
+    pub fn take_due_actions(&self, inputs: &WatchInputs) -> Vec<ArmedAction> {
+        locked(&self.watch).take_due_actions(inputs)
+    }
+
+    #[must_use]
+    pub fn start_for(&self, id: &EventId) -> AutoStart {
+        if locked(&self.armed).is_armed(id) {
+            AutoStart::Yes
+        } else {
+            AutoStart::No
+        }
     }
 
     pub fn note_recording(&self, id: &EventId) {

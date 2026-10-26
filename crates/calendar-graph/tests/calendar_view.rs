@@ -26,15 +26,14 @@ fn graph_event(id: &str, start: &str, end: &str) -> Value {
         "subject": format!("Subject {id}"),
         "start": { "dateTime": start, "timeZone": "UTC" },
         "end": { "dateTime": end, "timeZone": "UTC" },
-        "organizer": { "emailAddress": { "name": "Asha Rao", "address": "asha@incubyte.co" } },
+        "organizer": { "emailAddress": { "name": "Asha Rao", "address": "asha@example.com" } },
         "attendees": [
-            { "type": "required", "emailAddress": { "name": "Sapan Parikh", "address": "sapan@incubyte.co" } }
+            { "type": "required", "emailAddress": { "name": "Riya Shah", "address": "riya@example.com" } }
         ],
         "isAllDay": false,
         "isCancelled": false,
         "onlineMeetingProvider": "teamsForBusiness",
         "type": "occurrence",
-        "seriesMasterId": "series-1",
         "responseStatus": { "response": "accepted" },
         "showAs": "busy"
     })
@@ -88,7 +87,7 @@ fn the_request_selects_only_the_meeting_fields_and_never_the_body() {
 
     assert_eq!(
         query_value(&url, "$select"),
-        "id,subject,start,end,organizer,attendees,isAllDay,isCancelled,onlineMeetingProvider,type,seriesMasterId,responseStatus,showAs"
+        "id,subject,start,end,organizer,attendees,isAllDay,isCancelled,onlineMeetingProvider,type,responseStatus,showAs"
     );
 }
 
@@ -128,8 +127,8 @@ fn the_organizer_and_attendees_keep_their_names_and_emails() {
     let events = events_of(vec![page(&[standup()], None)]);
 
     let meeting = &events[0].meeting;
-    assert_eq!(meeting.organizer.email, "asha@incubyte.co");
-    assert_eq!(meeting.attendees[0].name, "Sapan Parikh");
+    assert_eq!(meeting.organizer.email, "asha@example.com");
+    assert_eq!(meeting.attendees[0].name, "Riya Shah");
 }
 
 #[test]

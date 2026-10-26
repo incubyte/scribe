@@ -1,10 +1,13 @@
 mod support;
 
+use std::sync::Arc;
+use std::thread;
+
 use calendar_graph::{OutlookAccount, SignInError, challenge_for};
 use scribe_core::calendar::{AccountIdentity, CalendarError, Secret, VaultError};
 use support::{
-    DISPLAY_NAME, EMAIL, FakeTransport, FakeVault, ScriptedBrowser, error_reply, query_value,
-    token_reply, unreachable,
+    DISPLAY_NAME, EMAIL, FakeTransport, FakeVault, HeldTransport, ScriptedBrowser, error_reply,
+    query_value, token_reply, unreachable,
 };
 
 const AN_HOUR: u64 = 3600;
@@ -240,7 +243,7 @@ fn a_disconnected_account_has_no_access_token() {
     account.disconnect().unwrap();
 
     assert!(matches!(
-        account.access_token(),
+        account.fresh_access_token(),
         Err(CalendarError::NotConnected)
     ));
 }
@@ -252,7 +255,7 @@ fn a_fresh_access_token_is_reused_without_asking_microsoft_again() {
     let browser = ScriptedBrowser::approving();
     account.connect(&|url| browser.open(url)).unwrap();
 
-    let token = account.access_token().unwrap();
+    let token = account.fresh_access_token().unwrap();
 
     assert_eq!(token.expose(), "access-1");
     assert_eq!(transport.form_requests().len(), 1);
@@ -269,8 +272,53 @@ fn an_access_token_about_to_expire_is_refreshed_first() {
     let browser = ScriptedBrowser::approving();
     account.connect(&|url| browser.open(url)).unwrap();
 
-    let token = account.access_token().unwrap();
+    let token = account.fresh_access_token().unwrap();
 
     assert_eq!(token.expose(), "access-2");
     assert_eq!(vault.stored().as_deref(), Some("refresh-2"));
+}
+
+#[test]
+fn disconnecting_while_a_restore_refreshes_leaves_the_vault_empty() {
+    let (transport, gate) = HeldTransport::holding(token_reply("access-2", "refresh-2", AN_HOUR));
+    let vault = FakeVault::holding("refresh-1");
+    let account = Arc::new(OutlookAccount::new(transport, vault.clone()));
+    let restoring = thread::spawn({
+        let account = Arc::clone(&account);
+        move || account.restore()
+    });
+    gate.wait_for_request();
+
+    account.disconnect().unwrap();
+    gate.release();
+    let restored = restoring.join().unwrap();
+
+    assert_eq!(vault.stored(), None);
+    assert_eq!(restored, Ok(None));
+    assert!(matches!(
+        account.fresh_access_token(),
+        Err(CalendarError::NotConnected)
+    ));
+}
+
+#[test]
+fn disconnecting_while_an_access_token_refreshes_leaves_the_vault_empty() {
+    let (transport, gate) = HeldTransport::holding(token_reply("access-2", "refresh-2", AN_HOUR));
+    let vault = FakeVault::holding("refresh-1");
+    let account = Arc::new(OutlookAccount::new(transport, vault.clone()));
+    let refreshing = thread::spawn({
+        let account = Arc::clone(&account);
+        move || account.fresh_access_token()
+    });
+    gate.wait_for_request();
+
+    let disconnecting = thread::spawn({
+        let account = Arc::clone(&account);
+        move || account.disconnect()
+    });
+    gate.release();
+    refreshing.join().unwrap().unwrap();
+    disconnecting.join().unwrap().unwrap();
+
+    assert_eq!(vault.stored(), None);
 }

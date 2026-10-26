@@ -18,7 +18,7 @@ export function OverflowChip({ chip }: OverflowChipProps) {
         className="agenda__chip-button"
         aria-expanded={isOpen}
         aria-controls={listId}
-        aria-label={`${count} more ${count === 1 ? "meeting" : "meetings"}`}
+        aria-label={`+${count}, ${count} more ${count === 1 ? "meeting" : "meetings"}`}
         onClick={() => setIsOpen((open) => !open)}
       >
         +{count}

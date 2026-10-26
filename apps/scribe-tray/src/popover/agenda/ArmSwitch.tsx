@@ -1,4 +1,4 @@
-import { armMeeting, disarmMeeting } from "../commands";
+import { armMeeting, disarmMeeting, refreshAgenda } from "../commands";
 import type { AgendaBlock } from "../types";
 
 interface ArmSwitchProps {
@@ -6,7 +6,8 @@ interface ArmSwitchProps {
 }
 
 export function ArmSwitch({ block }: ArmSwitchProps) {
-  const toggle = (armed: boolean) => (armed ? armMeeting : disarmMeeting)(block.event_id);
+  const toggle = (armed: boolean) =>
+    (armed ? armMeeting : disarmMeeting)(block.event_id).catch(refreshAgenda);
 
   return (
     <label className="agenda__switch">

@@ -532,10 +532,6 @@
   line-height: 14px;
 }
 
-.agenda__block--upcoming {
-  min-height: var(--space-5);
-}
-
 .agenda__block--ended {
   border-left-style: dashed;
   background: var(--surface-sunken);
@@ -557,7 +553,7 @@
   height: 16px;
   margin: 0;
   border: 1px solid var(--text-muted);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: radial-gradient(circle at 7px 50%, var(--text-muted) 5px, transparent 5.5px) var(--surface);
   cursor: pointer;
   appearance: none;
@@ -619,10 +615,11 @@
 }
 
 .agenda__chip-button {
-  min-height: 16px;
+  min-width: var(--space-5);
+  min-height: var(--space-5);
   padding: 0 var(--space-1);
-  border: 1px solid var(--hairline);
-  border-radius: 8px;
+  border: 1px solid var(--text-muted);
+  border-radius: var(--radius-control);
   background: var(--surface);
   color: var(--text);
   font: inherit;
@@ -686,8 +683,8 @@
 
 .meeting-line__summary:focus-visible,
 .meeting-line__choice:focus-within {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 1px;
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .meeting-line__choices {
@@ -720,8 +717,8 @@
 }
 
 .switch-prompt__heading:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 1px;
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-ring-offset);
 }
 
 .switch-prompt__text {

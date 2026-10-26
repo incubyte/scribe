@@ -12,9 +12,9 @@ use crate::call_probe::ProcessTable;
 const MAX_TITLE_UNITS: usize = 512;
 
 #[derive(Default)]
-pub struct WasapiTeamsTitles;
+pub struct TeamsWindowTitles;
 
-impl MeetingWindowTitles for WasapiTeamsTitles {
+impl MeetingWindowTitles for TeamsWindowTitles {
     fn teams_window_titles(&self) -> Vec<String> {
         let Ok(processes) = ProcessTable::snapshot() else {
             return Vec::new();

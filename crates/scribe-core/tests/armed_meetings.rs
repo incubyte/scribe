@@ -1,7 +1,8 @@
 use chrono::{DateTime, FixedOffset, NaiveDate};
 use scribe_core::calendar::{
     ArmedAction, ArmedEntry, ArmedMeetings, ArmedState, ArmedWatch, CalendarEvent, DayBounds,
-    EventId, Meeting, Person, Response, ShowAs, TodaysAgenda, WatchInputs, todays_agenda,
+    EventId, Meeting, MissedReason, Person, Response, ShowAs, TodaysAgenda, WatchInputs,
+    todays_agenda,
 };
 
 const START_OF_REVIEW: &str = "2026-10-26T11:00:00+05:30";
@@ -10,6 +11,7 @@ const BEFORE_THE_LEAD: &str = "2026-10-26T10:49:00+05:30";
 const TWO_MINUTES_EARLY: &str = "2026-10-26T10:58:00+05:30";
 const FOUR_MINUTES_IN: &str = "2026-10-26T11:04:00+05:30";
 const FIVE_MINUTES_IN: &str = "2026-10-26T11:05:00+05:30";
+const TEN_MINUTES_IN: &str = "2026-10-26T11:10:00+05:30";
 const TWENTY_MINUTES_IN: &str = "2026-10-26T11:20:00+05:30";
 const AFTER_THE_END: &str = "2026-10-26T11:30:00+05:30";
 
@@ -86,7 +88,7 @@ fn call_in_review() -> Poll {
 fn poll_at(watch: &mut ArmedWatch, poll: &Poll, now: &str) -> Vec<ArmedAction> {
     let agenda = agenda_with_review();
     let armed = review_armed();
-    watch.next_actions(&WatchInputs {
+    watch.take_due_actions(&WatchInputs {
         agenda: &agenda,
         armed: &armed,
         matched: poll.matched.as_ref(),
@@ -210,7 +212,10 @@ fn five_minutes_after_the_start_without_a_call_is_reported_missed_once() {
 
     assert_eq!(first, vec![ArmedAction::ReportMissed(review())]);
     assert!(second.is_empty());
-    assert_eq!(watch.state_of(&review_id()), ArmedState::Missed);
+    assert_eq!(
+        watch.state_of(&review_id()),
+        ArmedState::Missed(MissedReason::NoCallInTime)
+    );
 }
 
 #[test]
@@ -220,6 +225,81 @@ fn a_call_still_in_progress_at_the_first_poll_after_wake_starts_recording() {
     let actions = poll_at(&mut watch, &call_in_review(), TWENTY_MINUTES_IN);
 
     assert_eq!(actions, vec![ArmedAction::StartRecording(review())]);
+}
+
+fn call_in_another_meeting() -> Poll {
+    Poll {
+        in_call: true,
+        matched: None,
+        recording: true,
+    }
+}
+
+#[test]
+fn a_meeting_missed_for_want_of_a_call_starts_when_its_call_begins_late() {
+    let mut watch = ArmedWatch::new();
+    poll_at(&mut watch, &NO_CALL, FIVE_MINUTES_IN);
+
+    let actions = poll_at(&mut watch, &call_in_review(), TWENTY_MINUTES_IN);
+
+    assert_eq!(actions, vec![ArmedAction::StartRecording(review())]);
+    assert_eq!(watch.state_of(&review_id()), ArmedState::Recording);
+}
+
+#[test]
+fn a_late_start_that_fails_is_final() {
+    let mut watch = ArmedWatch::new();
+    poll_at(&mut watch, &NO_CALL, FIVE_MINUTES_IN);
+    poll_at(&mut watch, &call_in_review(), TEN_MINUTES_IN);
+
+    watch.note_start_failed(&review_id());
+    let actions = poll_at(&mut watch, &call_in_review(), TWENTY_MINUTES_IN);
+
+    assert!(actions.is_empty());
+    assert_eq!(
+        watch.state_of(&review_id()),
+        ArmedState::Missed(MissedReason::StartFailed)
+    );
+}
+
+#[test]
+fn a_late_call_after_the_meeting_has_ended_does_not_start_a_missed_meeting() {
+    let mut watch = ArmedWatch::new();
+    poll_at(&mut watch, &NO_CALL, FIVE_MINUTES_IN);
+
+    let actions = poll_at(&mut watch, &call_in_review(), AFTER_THE_END);
+
+    assert!(actions.is_empty());
+}
+
+#[test]
+fn an_armed_meeting_that_starts_during_another_call_is_not_reported_missed() {
+    let mut watch = ArmedWatch::new();
+
+    let actions = poll_at(&mut watch, &call_in_another_meeting(), FIVE_MINUTES_IN);
+
+    assert!(actions.is_empty());
+    assert_eq!(watch.state_of(&review_id()), ArmedState::Armed);
+}
+
+#[test]
+fn an_armed_meeting_overlapped_by_another_call_is_not_reported_missed_when_that_call_ends() {
+    let mut watch = ArmedWatch::new();
+    poll_at(&mut watch, &call_in_another_meeting(), FOUR_MINUTES_IN);
+
+    let actions = poll_at(&mut watch, &NO_CALL, TWENTY_MINUTES_IN);
+
+    assert!(actions.is_empty());
+}
+
+#[test]
+fn a_call_that_ended_before_the_meeting_started_does_not_excuse_missing_it() {
+    let mut watch = ArmedWatch::new();
+    poll_at(&mut watch, &call_in_another_meeting(), TWO_MINUTES_EARLY);
+
+    let actions = poll_at(&mut watch, &NO_CALL, FIVE_MINUTES_IN);
+
+    assert_eq!(actions, vec![ArmedAction::ReportMissed(review())]);
 }
 
 #[test]
@@ -274,7 +354,10 @@ fn a_failed_start_makes_the_meeting_missed_and_is_not_retried() {
     watch.note_start_failed(&review_id());
     let actions = poll_at(&mut watch, &call_in_review(), FIVE_MINUTES_IN);
 
-    assert_eq!(watch.state_of(&review_id()), ArmedState::Missed);
+    assert_eq!(
+        watch.state_of(&review_id()),
+        ArmedState::Missed(MissedReason::StartFailed)
+    );
     assert!(actions.is_empty());
 }
 
@@ -321,7 +404,7 @@ fn a_meeting_that_is_not_armed_is_never_started() {
     let nothing_armed = ArmedMeetings::default();
     let matched = review();
 
-    let actions = watch.next_actions(&WatchInputs {
+    let actions = watch.take_due_actions(&WatchInputs {
         agenda: &agenda,
         armed: &nothing_armed,
         matched: Some(&matched),

@@ -62,7 +62,7 @@ impl SwitchState {
         if switching.open.is_some() {
             return None;
         }
-        let prompt = switching.prompts.due(inputs)?;
+        let prompt = switching.prompts.offer_next(inputs)?;
         let view = SwitchPromptView::from(&prompt);
         switching.open = Some(prompt);
         Some(view)

@@ -2,7 +2,7 @@ use std::thread;
 
 use chrono::Local;
 use scribe_core::calendar::{
-    ArmedAction, ArmedEntry, ArmedMeetings, EventId, Meeting, WatchInputs,
+    ArmedAction, ArmedEntry, ArmedMeetings, EventId, Meeting, TodaysAgenda, WatchInputs,
 };
 use store_markdown::SETTINGS_FILE_NAME;
 use tauri::{AppHandle, Manager, Runtime};
@@ -18,6 +18,11 @@ use super::session_link;
 use crate::recording::{self, RecordingController};
 
 const RECORD_THREAD: &str = "record-meeting";
+const AUTO_START_THREAD: &str = "auto-start-meeting";
+const AUTO_STOP_THREAD: &str = "auto-stop-meeting";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NotOnTodaysAgenda;
 
 pub fn install<R: Runtime>(app: &AppHandle<R>) {
     let saved = saved_entries(app);
@@ -64,10 +69,12 @@ pub fn agenda_view<R: Runtime>(app: &AppHandle<R>) -> AgendaView {
         .mark(app.state::<AgendaCache>().view())
 }
 
-pub fn arm<R: Runtime>(app: &AppHandle<R>, id: EventId) {
+pub fn arm<R: Runtime>(app: &AppHandle<R>, id: EventId) -> Result<(), NotOnTodaysAgenda> {
+    todays_meeting(app, &id).ok_or(NotOnTodaysAgenda)?;
     app.state::<ArmedStore>().arm(id, Local::now().date_naive());
     save(app);
     publish_agenda(app);
+    Ok(())
 }
 
 pub fn disarm<R: Runtime>(app: &AppHandle<R>, id: &EventId) {
@@ -82,11 +89,15 @@ pub fn record<R: Runtime>(app: &AppHandle<R>, id: &EventId) {
         return;
     };
     let handle = app.clone();
-    let spawned = thread::Builder::new()
-        .name(RECORD_THREAD.to_owned())
-        .spawn(move || recording::start_for_meeting(&handle, &meeting, AutoStart::No));
+    run_on_thread(RECORD_THREAD, move || {
+        let _ = recording::start_for_meeting(&handle, &meeting, AutoStart::No);
+    });
+}
+
+fn run_on_thread(name: &str, job: impl FnOnce() + Send + 'static) {
+    let spawned = thread::Builder::new().name(name.to_owned()).spawn(job);
     if let Err(error) = spawned {
-        tracing::error!(%error, "could not start recording the meeting");
+        tracing::error!(%error, thread = name, "could not start the meeting recording thread");
     }
 }
 
@@ -107,7 +118,7 @@ pub fn on_poll<R: Runtime>(app: &AppHandle<R>, in_call: bool) {
         save(app);
     }
     for action in due_actions(app, &store, in_call) {
-        perform(app, &store, action);
+        perform(app, action);
     }
 }
 
@@ -122,9 +133,9 @@ fn due_actions<R: Runtime>(
         return Vec::new();
     };
     let matched = in_call
-        .then(|| session_link::call_meeting_now(app, &agenda))
+        .then(|| meeting_to_record_by_itself(app, &agenda))
         .flatten();
-    store.next_actions(&WatchInputs {
+    store.take_due_actions(&WatchInputs {
         agenda: &agenda,
         armed: &armed,
         matched: matched.as_ref(),
@@ -134,9 +145,27 @@ fn due_actions<R: Runtime>(
     })
 }
 
-fn perform<R: Runtime>(app: &AppHandle<R>, store: &ArmedStore, action: ArmedAction) {
+fn meeting_to_record_by_itself<R: Runtime>(
+    app: &AppHandle<R>,
+    agenda: &TodaysAgenda,
+) -> Option<Meeting> {
+    let declined = app
+        .try_state::<MeetingSelection>()
+        .is_some_and(|selection| selection.is_call_declared_not_a_meeting());
+    if declined {
+        return None;
+    }
+    session_link::call_meeting_now(app, agenda)
+}
+
+fn perform<R: Runtime>(app: &AppHandle<R>, action: ArmedAction) {
     match action {
-        ArmedAction::StartRecording(meeting) => start_by_itself(app, store, &meeting),
+        ArmedAction::StartRecording(meeting) => {
+            let handle = app.clone();
+            run_on_thread(AUTO_START_THREAD, move || {
+                start_by_itself(&handle, &meeting);
+            });
+        }
         ArmedAction::ReportMissed(meeting) => {
             notify::notify_meeting_missed(app, &meeting.subject);
             publish_agenda(app);
@@ -144,12 +173,13 @@ fn perform<R: Runtime>(app: &AppHandle<R>, store: &ArmedStore, action: ArmedActi
     }
 }
 
-fn start_by_itself<R: Runtime>(app: &AppHandle<R>, store: &ArmedStore, meeting: &Meeting) {
+fn start_by_itself<R: Runtime>(app: &AppHandle<R>, meeting: &Meeting) {
     tracing::info!("an armed meeting's call is in progress; recording it");
     if recording::start_for_meeting(app, meeting, AutoStart::Yes).is_ok() {
         notify::notify_meeting_recording(app, &meeting.subject);
     } else {
-        store.note_start_failed(&meeting.event_id);
+        app.state::<ArmedStore>()
+            .note_start_failed(&meeting.event_id);
         publish_agenda(app);
     }
 }
@@ -158,11 +188,16 @@ pub fn stop_if_auto_started<R: Runtime>(app: &AppHandle<R>) {
     let auto_started = app
         .try_state::<MeetingSelection>()
         .and_then(|selection| selection.auto_started_session());
-    if let Some(session) = auto_started {
+    let Some(session) = auto_started else {
+        return;
+    };
+    let handle = app.clone();
+    run_on_thread(AUTO_STOP_THREAD, move || {
         tracing::info!("the call ended; stopping the recording that started with it");
-        app.state::<RecordingController>()
+        handle
+            .state::<RecordingController>()
             .stop_if_recording(&session);
-    }
+    });
 }
 
 pub fn note_meeting_finished<R: Runtime>(app: &AppHandle<R>, finished: &FinishedChoice) {

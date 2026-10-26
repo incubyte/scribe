@@ -36,6 +36,23 @@ impl MeetingChoice {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChooseError {
     NotACandidate,
+    NoCall,
+}
+
+impl ChooseError {
+    #[must_use]
+    pub fn reason(self) -> &'static str {
+        match self {
+            ChooseError::NotACandidate => "that meeting is not one of the candidates",
+            ChooseError::NoCall => "there is no call or recording to choose a meeting for",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ChoiceSource {
+    Calendar,
+    User,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,6 +60,7 @@ pub struct CallMatch {
     state: &'static str,
     candidates: Vec<Meeting>,
     choice: MeetingChoice,
+    source: ChoiceSource,
 }
 
 impl CallMatch {
@@ -52,15 +70,17 @@ impl CallMatch {
             state: UNMATCHED,
             candidates: Vec::new(),
             choice: MeetingChoice::of(meeting),
+            source: ChoiceSource::Calendar,
         }
     }
 
     #[must_use]
-    pub fn decided(meeting: Meeting) -> CallMatch {
+    pub fn decided(meeting: Meeting, around: Vec<Meeting>) -> CallMatch {
         CallMatch {
             state: MATCHED,
-            candidates: vec![meeting.clone()],
+            candidates: first_then_others(&meeting, around),
             choice: MeetingChoice::Meeting(meeting),
+            source: ChoiceSource::Calendar,
         }
     }
 
@@ -92,7 +112,17 @@ impl CallMatch {
             None => MeetingChoice::NotAMeeting,
             Some(id) => MeetingChoice::Meeting(self.candidate(id)?.clone()),
         };
+        self.source = ChoiceSource::User;
         Ok(())
+    }
+
+    #[must_use]
+    pub fn is_declared_not_a_meeting(&self) -> bool {
+        self.source == ChoiceSource::User && self.choice == MeetingChoice::NotAMeeting
+    }
+
+    fn is_chosen_by_user(&self) -> bool {
+        self.source == ChoiceSource::User
     }
 
     fn candidate(&self, id: &EventId) -> Result<&Meeting, ChooseError> {
@@ -116,35 +146,35 @@ pub fn call_match(inputs: Option<MatchInputs>) -> CallMatch {
 fn settle(outcome: MatchOutcome, agenda: &TodaysAgenda, anchor: &MatchAnchor) -> CallMatch {
     let state = outcome.kind();
     match outcome {
-        MatchOutcome::Matched(meeting) => CallMatch {
-            state,
-            candidates: candidates_with_first(agenda, anchor, &meeting),
-            choice: MeetingChoice::Meeting(meeting),
-        },
+        MatchOutcome::Matched(meeting) => {
+            let around = meeting_candidates(agenda, anchor)
+                .into_iter()
+                .cloned()
+                .collect();
+            CallMatch::decided(meeting, around)
+        }
         MatchOutcome::Ambiguous(ranked) => CallMatch {
             state,
             choice: MeetingChoice::of(ranked.first().cloned()),
             candidates: ranked,
+            source: ChoiceSource::Calendar,
         },
         MatchOutcome::Unmatched => CallMatch::settled(None),
     }
 }
 
-fn candidates_with_first(
-    agenda: &TodaysAgenda,
-    anchor: &MatchAnchor,
-    first: &Meeting,
-) -> Vec<Meeting> {
-    let mut candidates: Vec<Meeting> = meeting_candidates(agenda, anchor)
+fn first_then_others(first: &Meeting, around: Vec<Meeting>) -> Vec<Meeting> {
+    let others = around
         .into_iter()
-        .cloned()
-        .collect();
-    candidates.sort_by_key(|candidate| candidate.event_id != first.event_id);
-    candidates
+        .filter(|meeting| meeting.event_id != first.event_id);
+    std::iter::once(first.clone()).chain(others).collect()
 }
 
 #[must_use]
-pub fn adopt(pending: Option<CallMatch>, fallback: impl FnOnce() -> Option<Meeting>) -> CallMatch {
+pub fn pending_or_settled(
+    pending: Option<CallMatch>,
+    fallback: impl FnOnce() -> Option<Meeting>,
+) -> CallMatch {
     pending.unwrap_or_else(|| CallMatch::settled(fallback()))
 }
 
@@ -161,6 +191,14 @@ struct Selection {
     recording: Option<ActiveRecording>,
 }
 
+impl Selection {
+    fn keep_correction_for_the_call(&mut self, finished: &CallMatch) {
+        if self.pending_call.is_some() && finished.is_chosen_by_user() {
+            self.pending_call = Some(finished.clone());
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct MeetingSelection {
     selection: Mutex<Selection>,
@@ -172,16 +210,8 @@ impl MeetingSelection {
         MeetingSelection::default()
     }
 
-    pub fn begin(&self, session: SessionId, meeting: Option<Meeting>) {
-        self.selection().recording = Some(ActiveRecording {
-            session,
-            found: CallMatch::settled(meeting),
-            start: AutoStart::No,
-        });
-    }
-
-    pub fn prepare(&self, meeting: Meeting, start: AutoStart) {
-        self.selection().prepared = Some((CallMatch::decided(meeting), start));
+    pub fn prepare(&self, found: CallMatch, start: AutoStart) {
+        self.selection().prepared = Some((found, start));
     }
 
     pub fn abandon_prepared(&self) {
@@ -193,7 +223,7 @@ impl MeetingSelection {
         let (found, start) = match selection.prepared.take() {
             Some(prepared) => prepared,
             None => (
-                adopt(selection.pending_call.clone(), fallback),
+                pending_or_settled(selection.pending_call.clone(), fallback),
                 AutoStart::No,
             ),
         };
@@ -214,6 +244,7 @@ impl MeetingSelection {
             return None;
         }
         let finished = selection.recording.take()?;
+        selection.keep_correction_for_the_call(&finished.found);
         Some(FinishedChoice {
             meeting: finished.found.selected()?.clone(),
             start: finished.start,
@@ -235,6 +266,14 @@ impl MeetingSelection {
             .recording
             .as_ref()
             .and_then(|recording| recording.found.selected().cloned())
+    }
+
+    #[must_use]
+    pub fn is_call_declared_not_a_meeting(&self) -> bool {
+        self.selection()
+            .pending_call
+            .as_ref()
+            .is_some_and(CallMatch::is_declared_not_a_meeting)
     }
 
     pub fn note_call_started(&self, found: CallMatch) {
@@ -260,7 +299,7 @@ impl MeetingSelection {
             Some(recording) => Some(&mut recording.found),
             None => selection.pending_call.as_mut(),
         };
-        target.ok_or(ChooseError::NotACandidate)?.choose(id)
+        target.ok_or(ChooseError::NoCall)?.choose(id)
     }
 
     fn selection(&self) -> MutexGuard<'_, Selection> {

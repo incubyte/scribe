@@ -5,7 +5,7 @@ use url::Url;
 use crate::authority::CALENDAR_VIEW_URL;
 
 pub const PAGE_SIZE: &str = "100";
-pub const SELECTED_FIELDS: &str = "id,subject,start,end,organizer,attendees,isAllDay,isCancelled,onlineMeetingProvider,type,seriesMasterId,responseStatus,showAs";
+pub const SELECTED_FIELDS: &str = "id,subject,start,end,organizer,attendees,isAllDay,isCancelled,onlineMeetingProvider,type,responseStatus,showAs";
 
 #[must_use]
 pub fn calendar_view_url(day: &DayBounds) -> Url {
