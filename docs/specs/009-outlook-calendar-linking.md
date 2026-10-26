@@ -482,6 +482,14 @@ Sources: [3].
 
 **9.9 Disconnect can wait for a token refresh — deferred.** `OutlookAccount::fresh_access_token` (`crates/calendar-graph/src/account.rs`) holds the access lock across the vault read and the HTTP refresh, so Disconnect can wait as long as the refresh takes. The transport bounds that at its 30 s request timeout (`REQUEST_TIMEOUT`, which includes the 10 s connect timeout). Holding the lock is what keeps a refresh from writing a token back after Disconnect. The fix is to refresh outside the lock and drop the grant when a disconnect happened meanwhile, as `connect` and `restore` already do. Sources: [3].
 
+**9.10 Closing-review leftovers — deferred.** Found by the last review pass. None is reachable without a hostile local process or an unusual timing:
+- `loopback.rs` `accept_before` checks the sign-in deadline only between polls, so a local client that connects without pause can stretch the wait past it.
+- `useBackendValue.ts` doesn't order two overlapping fetches against each other, only fetches against events.
+- `switch_state.rs` `SwitchInProgress` isn't `#[must_use]`.
+- The `tests/armed_store.rs` armed-choice tests rebuild the shell's composition by hand instead of driving `auto_record`.
+
+Sources: [3].
+
 ## 10. Established behaviour — documented, not changed
 
 **10.1 Two Teams calls less than 30 seconds apart count as one call.** `CALL_END_GRACE` keeps the latch through mutes and device switches, so a quick hop between meetings doesn't end the call. [Slice 5.7](#57-switch-to-the-next-meeting-without-leaving-the-call) handles that case with a prompt rather than shortening the grace. Confirmed intended: spec 006 and Sapan Parikh, 2026-10-25 [5, 7].
