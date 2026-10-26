@@ -1,3 +1,4 @@
+pub mod calendar;
 pub mod call;
 pub mod capture;
 pub mod library;

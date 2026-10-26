@@ -1,4 +1,5 @@
 pub mod blur_guard;
+pub mod calendar;
 mod call_probes;
 mod call_watch;
 pub mod claude_desktop;
@@ -69,6 +70,9 @@ fn with_commands<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         commands::change_transcripts_folder,
         commands::transcripts_folder,
         popover::hide_popover,
+        calendar::commands::outlook_connection,
+        calendar::commands::connect_outlook,
+        calendar::commands::disconnect_outlook,
     ])
 }
 
@@ -93,6 +97,7 @@ fn start_scribe<R: Runtime>(app: &AppHandle<R>) {
         "could not hide the popover when it loses focus",
     );
     call_watch::install(app);
+    calendar::install(app);
     log_startup_failure(
         privacy::show_statement_until_acknowledged(app),
         "could not show the privacy statement",

@@ -29,6 +29,9 @@ serde_json.workspace = true
 chrono = { version = "0.4", default-features = false, features = ["std", "clock"] }
 scribe-core = { workspace = true, features = ["serde"] }
 store-markdown.workspace = true
+calendar-graph.workspace = true
+keyring = { version = "3.6", features = ["apple-native", "windows-native"] }
+url = "2.5"
 audio-mic.workspace = true
 tracing.workspace = true
 thiserror.workspace = true

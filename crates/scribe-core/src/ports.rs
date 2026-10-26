@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use chrono::{DateTime, FixedOffset};
 
+use crate::calendar::{Secret, VaultError};
 use crate::capture::{
     Frame, MonitorShot, ScreenshotName, ScreenshotReference, ServedImage, SessionMoment,
 };
@@ -58,6 +59,12 @@ pub trait ScreenshotStore: Send + Sync {
         reference: &ScreenshotReference,
         max_long_edge: u32,
     ) -> Result<ServedImage, StoreError>;
+}
+
+pub trait CredentialVault: Send + Sync {
+    fn load(&self) -> Result<Option<Secret>, VaultError>;
+    fn save(&self, secret: &Secret) -> Result<(), VaultError>;
+    fn forget(&self) -> Result<(), VaultError>;
 }
 
 pub trait RecordingListener: Send + Sync {

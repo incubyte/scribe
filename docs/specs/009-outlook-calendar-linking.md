@@ -151,17 +151,17 @@ sequenceDiagram
 
 **Acceptance criteria**
 
-- [ ] **5.1.1** Signed out, Settings shows "Connect Outlook". After a successful sign-in it shows the account's display name and email, and a "Disconnect" button.
-- [ ] **5.1.2** Sign-in uses the authorization-code flow with PKCE (S256) and a random `state`. A redirect whose `state` doesn't match is rejected, and the connection stays `Disconnected`.
-- [ ] **5.1.3** The redirect listener binds to `127.0.0.1` only, accepts one request, and closes after that request or after 5 minutes, whichever comes first.
-- [ ] **5.1.4** The requested scopes are exactly `openid profile offline_access Calendars.ReadBasic`, and sign-in accepts work and school accounts only.
-- [ ] **5.1.5** The refresh token is stored in the macOS Keychain or Windows Credential Manager under the Scribe service name. It never appears in `settings.json`, the logs or the webview.
-- [ ] **5.1.6** After restarting Scribe, the connection is still `Connected` without a new sign-in.
-- [ ] **5.1.7** "Disconnect" deletes the stored token, returns Settings to "Connect Outlook", and the popover shows Recent sessions again.
-- [ ] **5.1.8** When Microsoft returns an error such as admin approval required, consent declined or a cancelled sign-in, Settings shows "Outlook didn't connect: <reason in plain words>" and stays `Disconnected`.
-- [ ] **5.1.9** If a token refresh is refused, the connection becomes `ReconnectNeeded`, and Settings shows "Reconnect Outlook". Recording is unaffected ([4.4](#4-invariants)).
-- [ ] **5.1.10** The Connect button, account text and Disconnect button are keyboard-operable, have accessible names, and meet 4.5:1 contrast in light and dark themes.
-- [ ] **5.1.11** The privacy statement and ARCHITECTURE §5 name the two new destinations, `login.microsoftonline.com` and `graph.microsoft.com`, and what is fetched from each.
+- [x] **5.1.1** Signed out, Settings shows "Connect Outlook". After a successful sign-in it shows the account's display name and email, and a "Disconnect" button.
+- [x] **5.1.2** Sign-in uses the authorization-code flow with PKCE (S256) and a random `state`. A redirect whose `state` doesn't match is rejected, and the connection stays `Disconnected`.
+- [x] **5.1.3** The redirect listener binds to `127.0.0.1` only, accepts one request, and closes after that request or after 5 minutes, whichever comes first.
+- [x] **5.1.4** The requested scopes are exactly `openid profile offline_access Calendars.ReadBasic`, and sign-in accepts work and school accounts only.
+- [x] **5.1.5** The refresh token is stored in the macOS Keychain or Windows Credential Manager under the Scribe service name. It never appears in `settings.json`, the logs or the webview.
+- [x] **5.1.6** After restarting Scribe, the connection is still `Connected` without a new sign-in.
+- [x] **5.1.7** "Disconnect" deletes the stored token, returns Settings to "Connect Outlook", and the popover shows Recent sessions again.
+- [x] **5.1.8** When Microsoft returns an error such as admin approval required, consent declined or a cancelled sign-in, Settings shows "Outlook didn't connect: <reason in plain words>" and stays `Disconnected`.
+- [x] **5.1.9** If a token refresh is refused, the connection becomes `ReconnectNeeded`, and Settings shows "Reconnect Outlook". Recording is unaffected ([4.4](#4-invariants)).
+- [x] **5.1.10** The Connect button, account text and Disconnect button are keyboard-operable, have accessible names, and meet 4.5:1 contrast in light and dark themes.
+- [x] **5.1.11** The privacy statement and ARCHITECTURE §5 name the two new destinations, `login.microsoftonline.com` and `graph.microsoft.com`, and what is fetched from each.
 
 ### 5.2 See today's meetings in the popover
 

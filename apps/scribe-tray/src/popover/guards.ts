@@ -2,6 +2,8 @@ import type {
   ClaudeDesktopStatus,
   FolderChange,
   ModelDownload,
+  OutlookConnection,
+  OutlookState,
   RebindOutcome,
   RecorderPhase,
   RecorderSnapshot,
@@ -138,4 +140,15 @@ export function isRebindOutcome(value: unknown): value is RebindOutcome {
     in_use_by_another_app: () => true,
   };
   return isString(value.outcome) && (checks[value.outcome]?.() ?? false);
+}
+
+const OUTLOOK_STATES: readonly OutlookState[] = ["disconnected", "connecting", "connected", "reconnect_needed"];
+
+export function isOutlookConnection(value: unknown): value is OutlookConnection {
+  return hasFields(value, {
+    state: isOneOf(OUTLOOK_STATES),
+    display_name: isNullable(isString),
+    email: isNullable(isString),
+    error: isNullable(isString),
+  });
 }

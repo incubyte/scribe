@@ -62,6 +62,13 @@ const recordingForSixtyFiveSeconds: RecorderSnapshot = {
 
 const SCRIBE_VERSION = "0.5.1";
 
+const SIGNED_OUT_OF_OUTLOOK = {
+  state: "disconnected",
+  display_name: null,
+  email: null,
+  error: null,
+};
+
 function backend(
   snapshot: RecorderSnapshot,
   recent: readonly SessionSummary[] = FIVE_SESSIONS,
@@ -72,6 +79,9 @@ function backend(
     model_download_status: modelDownload,
     recent_sessions: recent,
     claude_desktop_status: "not_connected",
+    outlook_connection: SIGNED_OUT_OF_OUTLOOK,
+    connect_outlook: { ...SIGNED_OUT_OF_OUTLOOK, state: "connecting" },
+    disconnect_outlook: SIGNED_OUT_OF_OUTLOOK,
     "plugin:app|version": SCRIBE_VERSION,
     transcripts_folder: () => readFolder(),
     change_transcripts_folder: () => changeFolder(),
@@ -473,6 +483,76 @@ describe("the popover settings", () => {
     await openSettings();
 
     expect(await screen.findByText("Version 0.5.1")).toBeInTheDocument();
+  });
+
+  it("offers to connect Outlook while signed out", async () => {
+    backend(idle);
+    render(<Popover />);
+
+    await openSettings();
+
+    expect(
+      await screen.findByRole("button", { name: "Connect Outlook" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the Outlook sign-in under way after Connect Outlook is pressed", async () => {
+    const handler = backend(idle);
+    render(<Popover />);
+    await openSettings();
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Connect Outlook" }),
+    );
+
+    expect(
+      await screen.findByText("Connecting to Outlook…"),
+    ).toBeInTheDocument();
+    expect(handler).toHaveBeenCalledWith("connect_outlook", {});
+  });
+
+  it("shows the account once Scribe reports the Outlook connection", async () => {
+    backend(idle);
+    render(<Popover />);
+    await openSettings();
+    await screen.findByRole("button", { name: "Connect Outlook" });
+
+    await act(() =>
+      emit("outlook://connection", {
+        state: "connected",
+        display_name: "Sapan Parikh",
+        email: "sapan@incubyte.co",
+        error: null,
+      }),
+    );
+
+    expect(
+      await screen.findByText("Connected as Sapan Parikh · sapan@incubyte.co"),
+    ).toBeInTheDocument();
+  });
+
+  it("returns to Connect Outlook after Disconnect is pressed", async () => {
+    const handler = backend(idle);
+    render(<Popover />);
+    await openSettings();
+    await screen.findByRole("button", { name: "Connect Outlook" });
+    await act(() =>
+      emit("outlook://connection", {
+        state: "connected",
+        display_name: "Sapan Parikh",
+        email: "sapan@incubyte.co",
+        error: null,
+      }),
+    );
+
+    await userEvent.click(
+      await screen.findByRole("button", { name: "Disconnect" }),
+    );
+
+    expect(
+      await screen.findByRole("button", { name: "Connect Outlook" }),
+    ).toBeInTheDocument();
+    expect(handler).toHaveBeenCalledWith("disconnect_outlook", {});
   });
 
   it("shows the current transcripts folder", async () => {

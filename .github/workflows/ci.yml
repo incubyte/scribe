@@ -19,7 +19,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  PORTABLE_CRATES: -p scribe-core -p store-markdown -p scribe-mcp -p stt-parakeet -p audio-resample
+  PORTABLE_CRATES: -p scribe-core -p store-markdown -p scribe-mcp -p stt-parakeet -p audio-resample -p calendar-graph
 
 jobs:
   portable:
@@ -39,10 +39,10 @@ jobs:
           mkdir -p "$HOME/.config" "$HOME/Documents"
           echo 'XDG_DOCUMENTS_DIR="$HOME/Documents"' > "$HOME/.config/user-dirs.dirs"
       - run: cargo test $PORTABLE_CRATES
-      - name: Only the Parakeet adapter and the updater may depend on an HTTP client
+      - name: Only the Parakeet adapter, the Outlook calendar adapter and the updater may depend on an HTTP client
         shell: bash
         run: |
-          dependents=$(cargo tree -e normal -i reqwest --depth 1 --prefix none 2>/dev/null | tail -n +2 | grep -v -E '^(stt-parakeet|tauri-plugin-updater) ' || true)
+          dependents=$(cargo tree -e normal -i reqwest --depth 1 --prefix none 2>/dev/null | tail -n +2 | grep -v -E '^(stt-parakeet|calendar-graph|tauri-plugin-updater) ' || true)
           if [ -n "$dependents" ]; then
             echo "An HTTP client is reachable from: $dependents"
             exit 1
@@ -55,10 +55,10 @@ jobs:
             echo "More than one ort version is linked: $versions"
             exit 1
           fi
-      - name: The MCP server stays free of audio, speech and screen capture dependencies
+      - name: The MCP server stays free of audio, speech, screen capture and calendar dependencies
         shell: bash
         run: |
-          forbidden=$(cargo tree -p scribe-mcp -e normal --prefix none | grep -E '^(cidre|cpal|wasapi|xcap|swift-rs|parakeet-rs|audio-|stt-|capture-) ' || true)
+          forbidden=$(cargo tree -p scribe-mcp -e normal --prefix none | grep -E '^(cidre|cpal|wasapi|xcap|swift-rs|parakeet-rs|keyring|audio-|stt-|capture-|calendar-) ' || true)
           if [ -n "$forbidden" ]; then
             echo "scribe-mcp depends on: $forbidden"
             exit 1

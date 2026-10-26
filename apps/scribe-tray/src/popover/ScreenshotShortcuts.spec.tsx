@@ -25,6 +25,7 @@ function backend(
   const responses: Readonly<Record<string, () => unknown>> = {
     screenshot_shortcuts: () => shortcuts,
     transcripts_folder: () => "/Users/me/Documents/Scribe",
+    outlook_connection: () => ({ state: "disconnected", display_name: null, email: null, error: null }),
     rebind_screenshot_shortcut: () => {
       const outcome = rebind();
       shortcuts = outcome.outcome === "accepted" ? shortcutsWithRegion(outcome.label) : shortcuts;
@@ -37,7 +38,7 @@ function backend(
     ...failures,
   };
   const handler = vi.fn((command: string) => responses[command]?.());
-  mockIPC(handler);
+  mockIPC(handler, { shouldMockEvents: true });
   return handler;
 }
 
@@ -56,8 +57,9 @@ async function startListeningOnRegion() {
   await screen.findByText(LISTENING);
 }
 
-afterEach(() => {
+afterEach(async () => {
   cleanup();
+  await new Promise((resolve) => setTimeout(resolve));
   clearMocks();
 });
 

@@ -8,6 +8,7 @@ members = [
     "crates/audio-windows",
     "crates/audio-resample",
     "crates/capture-macos",
+    "crates/calendar-graph",
     "crates/capture-windows",
     "crates/scribe-core",
     "crates/store-markdown",
@@ -37,6 +38,7 @@ audio-macos = { path = "crates/audio-macos" }
 audio-windows = { path = "crates/audio-windows" }
 capture-macos = { path = "crates/capture-macos" }
 capture-windows = { path = "crates/capture-windows" }
+calendar-graph = { path = "crates/calendar-graph" }
 stt-parakeet = { path = "crates/stt-parakeet" }
 stt-speechanalyzer = { path = "crates/stt-speechanalyzer" }
 

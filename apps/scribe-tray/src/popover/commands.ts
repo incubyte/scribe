@@ -5,6 +5,7 @@ import {
   isClaudeDesktopStatus,
   isFolderChange,
   isModelDownload,
+  isOutlookConnection,
   isRebindOutcome,
   isRecorderSnapshot,
   isSessionSummaries,
@@ -69,3 +70,12 @@ export const resetScreenshotShortcut = (kind: ShortcutKind) =>
   invoke<unknown>("reset_screenshot_shortcut", { kind }).then(
     expecting(isRebindOutcome, "shortcut reset"),
   );
+
+export const fetchOutlookConnection = () =>
+  invoke<unknown>("outlook_connection").then(expecting(isOutlookConnection, "Outlook connection"));
+
+export const connectOutlook = () =>
+  invoke<unknown>("connect_outlook").then(expecting(isOutlookConnection, "Outlook connection"));
+
+export const disconnectOutlook = () =>
+  invoke<unknown>("disconnect_outlook").then(expecting(isOutlookConnection, "Outlook connection"));

@@ -10,7 +10,7 @@ afterEach(() => {
 });
 
 describe("the privacy statement window", () => {
-  it("states the four local-only facts and offers a single button", () => {
+  it("states what stays on this computer and what Outlook fetches, and offers a single button", () => {
     render(<PrivacyStatement />);
 
     expect(
@@ -19,7 +19,12 @@ describe("the privacy statement window", () => {
     expect(screen.getByText("Speech is transcribed on-device.")).toBeInTheDocument();
     expect(screen.getByText("Audio is never saved.")).toBeInTheDocument();
     expect(
-      screen.getByText("Nothing — audio or text — is sent to any server."),
+      screen.getByText("Audio and transcripts are never sent to any server."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "If you connect Outlook, Scribe signs you in at login.microsoftonline.com and reads today's meetings (times, subjects and invitees) from graph.microsoft.com.",
+      ),
     ).toBeInTheDocument();
     expect(
       screen.getByText(

@@ -57,3 +57,12 @@ export type RebindOutcome =
   | { readonly outcome: "needs_modifier"; readonly message: string }
   | { readonly outcome: "duplicate_of"; readonly kind: ShortcutKind }
   | { readonly outcome: "in_use_by_another_app" };
+
+export type OutlookState = "disconnected" | "connecting" | "connected" | "reconnect_needed";
+
+export interface OutlookConnection {
+  readonly state: OutlookState;
+  readonly display_name: string | null;
+  readonly email: string | null;
+  readonly error: string | null;
+}

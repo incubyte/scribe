@@ -4,7 +4,8 @@ import { useEffect, useId, useRef } from "react";
 const STATEMENTS = [
   "Speech is transcribed on-device.",
   "Audio is never saved.",
-  "Nothing — audio or text — is sent to any server.",
+  "Audio and transcripts are never sent to any server.",
+  "If you connect Outlook, Scribe signs you in at login.microsoftonline.com and reads today's meetings (times, subjects and invitees) from graph.microsoft.com.",
   "Transcripts are saved as text files in your transcripts folder, Documents/Scribe unless you change it in Settings.",
 ] as const;
 
