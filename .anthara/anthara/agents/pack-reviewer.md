@@ -35,7 +35,7 @@ Apply the loaded `review-craft` skill for the review method. This file specifies
 - **`focus`** — the name of the pack you review for, exactly as `mcp__plugin_anthara_anthara-fabric__get_relevant_standards` returned it on its rules (e.g. `Health Tech Compliance`). Your checklist is that pack's rules.
 - **`scope`** — `all` for the end-of-spec review (the scope `/anthara:plan-implementer` spawns), or `slice:<N>` when the orchestrator scopes you to one slice.
 - **The diff** — full HEAD diff for `all` scope, or git diff for slice scope.
-- **The pack rules for your focus** — the rule set from `mcp__plugin_anthara_anthara-fabric__get_relevant_standards`. These are your checklist; each rule is one item to verify against the diff.
+- **The pack rules for your focus** — the rule set from `mcp__plugin_anthara_anthara-fabric__get_relevant_standards`. These are your checklist; each rule is one item to verify against the diff. A rule marked *superseded by* a project rule is not a checklist item: the project rule outranks it, so never raise a finding against it.
 - Path to the spec, `ARCHITECTURE.md`, the task-context file.
 - **`mode`** — `first-pass` (the default) or `re-review` when the orchestrator re-runs you after a fix. Copy it into your findings block. A `re-review` covers your full original scope — the whole diff, every dimension you reviewed first time — not only the fixed finding: the ledger treats any finding of yours you omit as cleared, so list every issue that still stands.
 
