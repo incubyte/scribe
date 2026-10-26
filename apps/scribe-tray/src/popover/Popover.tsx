@@ -8,6 +8,8 @@ import {
   stopRecording,
 } from "./commands";
 import { LiveTranscript } from "./LiveTranscript";
+import { MeetingLine } from "./meeting/MeetingLine";
+import { useCallMeeting } from "./meeting/useCallMeeting";
 import { ModelDownloadPanel } from "./ModelDownloadPanel";
 import { useOutlookConnection } from "./outlook/useOutlookConnection";
 import { PopoverActions } from "./PopoverActions";
@@ -36,6 +38,7 @@ export function Popover() {
   const { download, retry } = useModelDownload();
   const claudeDesktop = useClaudeDesktopStatus();
   const outlook = useOutlookConnection();
+  const callMeeting = useCallMeeting();
   const { view, openSettings, leaveSettings, settingsButton } =
     usePopoverView();
   useEscapeToHide();
@@ -62,6 +65,7 @@ export function Popover() {
         onStart={() => void startRecording()}
         onStop={() => void stopRecording()}
       />
+      <MeetingLine view={callMeeting.view} onChoose={callMeeting.choose} />
       <ModelDownloadPanel download={download} onRetry={retry} />
       {feed.phase === "recording" ? (
         <LiveTranscript lines={feed.lines} partials={feed.partials} />

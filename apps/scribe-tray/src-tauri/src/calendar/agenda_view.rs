@@ -130,6 +130,6 @@ impl From<&Meeting> for HiddenMeetingView {
     }
 }
 
-fn clock_text(moment: DateTime<FixedOffset>) -> String {
+pub(super) fn clock_text(moment: DateTime<FixedOffset>) -> String {
     moment.to_rfc3339_opts(SecondsFormat::Secs, false)
 }

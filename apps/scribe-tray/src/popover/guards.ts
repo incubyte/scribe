@@ -3,9 +3,12 @@ import type {
   AgendaChip,
   AgendaStatus,
   AgendaView,
+  CallMeetingState,
+  CallMeetingView,
   ClaudeDesktopStatus,
   FolderChange,
   HiddenMeeting,
+  MeetingCandidate,
   ModelDownload,
   OutlookConnection,
   OutlookState,
@@ -198,5 +201,18 @@ export function isAgendaView(value: unknown): value is AgendaView {
     fetched_at: isNullable(isString),
     blocks: isListOf(isAgendaBlock),
     overflow: isListOf(isAgendaChip),
+  });
+}
+
+const CALL_MEETING_STATES: readonly CallMeetingState[] = ["matched", "ambiguous", "unmatched"];
+
+const isMeetingCandidate: Guard<MeetingCandidate> = isHiddenMeeting;
+
+export function isCallMeetingView(value: unknown): value is CallMeetingView {
+  return hasFields(value, {
+    state: isOneOf(CALL_MEETING_STATES),
+    selected_event_id: isNullable(isString),
+    not_a_meeting: isBoolean,
+    candidates: isListOf(isMeetingCandidate),
   });
 }

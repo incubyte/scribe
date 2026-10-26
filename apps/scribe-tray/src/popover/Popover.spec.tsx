@@ -13,7 +13,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { axe } from "vitest-axe";
 import { Popover } from "./Popover";
 import { CHANGE_LABEL } from "./SettingsPanel";
-import type { ModelDownload, RecorderSnapshot, SessionSummary } from "./types";
+import type {
+  CallMeetingView,
+  ModelDownload,
+  RecorderSnapshot,
+  SessionSummary,
+} from "./types";
 
 const NOW = Date.parse("2026-10-17T09:10:00+00:00");
 
@@ -98,11 +103,39 @@ const AGENDA_WITH_A_STANDUP = {
   overflow: [],
 };
 
+const NO_CALL_MEETING: CallMeetingView = {
+  state: "unmatched",
+  selected_event_id: null,
+  not_a_meeting: false,
+  candidates: [],
+};
+
+const TWO_MEETINGS_FIT: CallMeetingView = {
+  state: "ambiguous",
+  selected_event_id: "review",
+  not_a_meeting: false,
+  candidates: [
+    {
+      event_id: "review",
+      subject: "DXC Review",
+      starts_at: "2026-10-17T11:00:00+00:00",
+      ends_at: "2026-10-17T11:45:00+00:00",
+    },
+    {
+      event_id: "standup",
+      subject: "Anthara Standup",
+      starts_at: "2026-10-17T11:15:00+00:00",
+      ends_at: "2026-10-17T11:30:00+00:00",
+    },
+  ],
+};
+
 function backend(
   snapshot: RecorderSnapshot,
   recent: readonly SessionSummary[] = FIVE_SESSIONS,
   modelDownload: ModelDownload = READY,
   outlook: unknown = SIGNED_OUT_OF_OUTLOOK,
+  callMeeting: CallMeetingView = NO_CALL_MEETING,
 ) {
   const responses: Readonly<Record<string, unknown>> = {
     recorder_snapshot: snapshot,
@@ -112,6 +145,8 @@ function backend(
     outlook_connection: outlook,
     todays_agenda: AGENDA_WITH_A_STANDUP,
     refresh_agenda: null,
+    call_meeting: callMeeting,
+    choose_meeting: callMeeting,
     connect_outlook: { ...SIGNED_OUT_OF_OUTLOOK, state: "connecting" },
     disconnect_outlook: SIGNED_OUT_OF_OUTLOOK,
     "plugin:app|version": SCRIBE_VERSION,
@@ -286,6 +321,53 @@ describe("the popover's home view follows the Outlook connection", () => {
     expect(await screen.findByRole("heading", { name: "Recent sessions" })).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /^Today · / })).not.toBeInTheDocument();
     expect(handler).not.toHaveBeenCalledWith("todays_agenda", {});
+  });
+});
+
+describe("the meeting line in the popover", () => {
+  it("asks which meeting a starting call is when several fit", async () => {
+    backend(idle, FIVE_SESSIONS, READY, SIGNED_OUT_OF_OUTLOOK, TWO_MEETINGS_FIT);
+    render(<Popover />);
+
+    expect(
+      await screen.findByRole("group", { name: "Which meeting is this?" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows no meeting line when the call matched no meeting", async () => {
+    backend(idle);
+    render(<Popover />);
+    await screen.findByRole("button", { name: "Start recording" });
+
+    expect(screen.queryByRole("group", { name: "Which meeting is this?" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+  });
+
+  it("appears in the live view and sends a correction made there", async () => {
+    const handler = backend(
+      recordingForSixtyFiveSeconds,
+      FIVE_SESSIONS,
+      READY,
+      SIGNED_OUT_OF_OUTLOOK,
+      TWO_MEETINGS_FIT,
+    );
+    render(<Popover />);
+
+    await userEvent.click(await screen.findByRole("radio", { name: /Anthara Standup/ }));
+
+    expect(handler).toHaveBeenCalledWith("choose_meeting", { eventId: "standup" });
+  });
+
+  it("follows the match the backend publishes after a call starts", async () => {
+    backend(idle);
+    render(<Popover />);
+    await screen.findByRole("button", { name: "Start recording" });
+
+    await act(() => emit("meeting://match", TWO_MEETINGS_FIT));
+
+    expect(
+      await screen.findByRole("group", { name: "Which meeting is this?" }),
+    ).toBeInTheDocument();
   });
 });
 

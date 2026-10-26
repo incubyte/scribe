@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { expecting, isString } from "../shared/guards";
 import {
   isAgendaView,
+  isCallMeetingView,
   isClaudeDesktopStatus,
   isFolderChange,
   isModelDownload,
@@ -85,3 +86,9 @@ export const fetchTodaysAgenda = () =>
   invoke<unknown>("todays_agenda").then(expecting(isAgendaView, "today's agenda"));
 
 export const refreshAgenda = () => invoke("refresh_agenda");
+
+export const fetchCallMeeting = () =>
+  invoke<unknown>("call_meeting").then(expecting(isCallMeetingView, "call meeting"));
+
+export const chooseMeeting = (eventId: string | null) =>
+  invoke<unknown>("choose_meeting", { eventId }).then(expecting(isCallMeetingView, "call meeting"));

@@ -260,11 +260,11 @@ The popover that opens when a Teams call starts now shows a meeting line under t
 
 **Acceptance criteria**
 
-- [ ] **5.5.1** On call start, while connected and not recording, the popover shows the matched meeting's subject and time range. When the match is `Ambiguous`, it shows "Which meeting is this?" with the top-ranked candidate preselected.
-- [ ] **5.5.2** Recording from that popover links the transcript to the selected meeting. Choosing "Not a calendar meeting" saves it without a `meeting` block.
-- [ ] **5.5.3** While recording, changing the meeting in the live view updates the transcript's title and `meeting` block when the recording finalises. The most recent choice wins.
-- [ ] **5.5.4** When the match is `Unmatched`, the call-start popover is exactly as it was before this spec.
-- [ ] **5.5.5** The meeting selector is a labelled radio group, operable by keyboard, with visible focus, and announces the selected meeting.
+- [x] **5.5.1** On call start, while connected and not recording, the popover shows the matched meeting's subject and time range. When the match is `Ambiguous`, it shows "Which meeting is this?" with the top-ranked candidate preselected.
+- [x] **5.5.2** Recording from that popover links the transcript to the selected meeting. Choosing "Not a calendar meeting" saves it without a `meeting` block.
+- [x] **5.5.3** While recording, changing the meeting in the live view updates the transcript's title and `meeting` block when the recording finalises. The most recent choice wins.
+- [x] **5.5.4** When the match is `Unmatched`, the call-start popover is exactly as it was before this spec.
+- [x] **5.5.5** The meeting selector is a labelled radio group, operable by keyboard, with visible focus, and announces the selected meeting.
 
 ### 5.6 Arm a meeting to record by itself
 

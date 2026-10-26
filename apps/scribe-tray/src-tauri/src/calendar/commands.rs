@@ -1,9 +1,13 @@
+use scribe_core::calendar::EventId;
 use tauri::{AppHandle, Manager, Runtime};
 
 use super::agenda_cache::AgendaCache;
 use super::agenda_view::AgendaView;
+use super::call_meeting_view::CallMeetingView;
 use super::connection;
 use super::connection_payload::ConnectionPayload;
+use super::selection::MeetingSelection;
+use super::session_link;
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
@@ -34,4 +38,24 @@ pub fn todays_agenda<R: Runtime>(app: AppHandle<R>) -> AgendaView {
 #[allow(clippy::needless_pass_by_value)]
 pub fn refresh_agenda<R: Runtime>(app: AppHandle<R>) {
     app.state::<AgendaCache>().nudge();
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn call_meeting<R: Runtime>(app: AppHandle<R>) -> CallMeetingView {
+    session_link::current_call_meeting(&app)
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn choose_meeting<R: Runtime>(
+    app: AppHandle<R>,
+    event_id: Option<String>,
+) -> Result<CallMeetingView, String> {
+    let chosen = event_id.map(EventId::new);
+    app.state::<MeetingSelection>()
+        .choose(chosen.as_ref())
+        .map_err(|_| "that meeting is not one of the candidates".to_owned())?;
+    session_link::publish_call_meeting(&app);
+    Ok(session_link::current_call_meeting(&app))
 }

@@ -75,6 +75,8 @@ fn with_commands<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         calendar::commands::disconnect_outlook,
         calendar::commands::todays_agenda,
         calendar::commands::refresh_agenda,
+        calendar::commands::call_meeting,
+        calendar::commands::choose_meeting,
     ])
 }
 

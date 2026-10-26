@@ -2,6 +2,7 @@ pub mod agenda_cache;
 mod agenda_refresh;
 pub mod agenda_snapshot;
 pub mod agenda_view;
+pub mod call_meeting_view;
 pub(crate) mod commands;
 mod connection;
 pub mod connection_payload;
@@ -22,7 +23,9 @@ use connection::OutlookConnection;
 use selection::MeetingSelection;
 use vault::KeyringVault;
 
-pub use session_link::{link_finished_session, note_call_started, note_recording_started};
+pub use session_link::{
+    link_finished_session, note_call_ended, note_call_started, note_recording_started,
+};
 
 pub fn install<R: Runtime>(app: &AppHandle<R>) {
     app.manage(OutlookConnection::new());

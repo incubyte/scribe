@@ -103,3 +103,19 @@ export interface AgendaView {
   readonly blocks: readonly AgendaBlock[];
   readonly overflow: readonly AgendaChip[];
 }
+
+export type CallMeetingState = "matched" | "ambiguous" | "unmatched";
+
+export interface MeetingCandidate {
+  readonly event_id: string;
+  readonly subject: string;
+  readonly starts_at: string;
+  readonly ends_at: string;
+}
+
+export interface CallMeetingView {
+  readonly state: CallMeetingState;
+  readonly selected_event_id: string | null;
+  readonly not_a_meeting: boolean;
+  readonly candidates: readonly MeetingCandidate[];
+}

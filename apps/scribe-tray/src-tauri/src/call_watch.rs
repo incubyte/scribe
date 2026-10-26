@@ -103,6 +103,9 @@ fn publish_presence<R: Runtime>(app: &AppHandle<R>, watch: &CallWatch) {
     if presence_changed && in_call {
         calendar::note_call_started(app);
     }
+    if presence_changed && !in_call {
+        calendar::note_call_ended(app);
+    }
 }
 
 fn open_if_call_started<R: Runtime>(app: &AppHandle<R>, watch: &mut CallWatch) {

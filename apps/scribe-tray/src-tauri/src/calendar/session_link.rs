@@ -7,21 +7,27 @@ use store_markdown::MarkdownTranscriptStore;
 use tauri::{AppHandle, Manager, Runtime};
 
 use super::agenda_cache::AgendaCache;
+use super::call_meeting_view::CallMeetingView;
 use super::connection;
-use super::selection::{MeetingSelection, chosen_meeting};
+use super::selection::{CallMatch, MeetingSelection, call_match, chosen_meeting};
 use super::titles;
 use crate::call_watch::CallPresence;
+use crate::webview;
+
+const MATCH_EVENT: &str = "meeting://match";
 
 pub fn note_recording_started<R: Runtime>(app: &AppHandle<R>, session: &SessionId) {
     let Some(selection) = app.try_state::<MeetingSelection>() else {
         return;
     };
-    let chosen = chosen_meeting(
-        connected_agenda(app).as_ref(),
-        &anchor_now(app),
-        &call_titles(app),
-    );
-    selection.begin(session.clone(), chosen);
+    selection.begin_from_call(session.clone(), || {
+        chosen_meeting(
+            connected_agenda(app).as_ref(),
+            &anchor_now(app),
+            &call_titles(app),
+        )
+    });
+    publish_call_meeting(app);
 }
 
 pub fn link_finished_session<R: Runtime>(app: &AppHandle<R>, session: &SessionId) {
@@ -58,13 +64,43 @@ fn call_titles<R: Runtime>(app: &AppHandle<R>) -> Vec<String> {
 }
 
 pub fn note_call_started<R: Runtime>(app: &AppHandle<R>) {
+    let Some(selection) = app.try_state::<MeetingSelection>() else {
+        return;
+    };
+    selection.note_call_started(match_for_call(app));
+    publish_call_meeting(app);
+}
+
+pub fn note_call_ended<R: Runtime>(app: &AppHandle<R>) {
+    if let Some(selection) = app.try_state::<MeetingSelection>() {
+        selection.note_call_ended();
+        publish_call_meeting(app);
+    }
+}
+
+pub fn current_call_meeting<R: Runtime>(app: &AppHandle<R>) -> CallMeetingView {
+    let found = app
+        .try_state::<MeetingSelection>()
+        .and_then(|selection| selection.current());
+    CallMeetingView::of(found.as_ref())
+}
+
+pub fn publish_call_meeting<R: Runtime>(app: &AppHandle<R>) {
+    webview::emit(app, MATCH_EVENT, current_call_meeting(app));
+}
+
+fn match_for_call<R: Runtime>(app: &AppHandle<R>) -> CallMatch {
     if !matches!(
         connection::current_connection(app),
         Connection::Connected(_)
     ) {
-        return;
+        return CallMatch::settled(None);
     }
-    if let Some(presence) = app.try_state::<CallPresence>() {
-        presence.remember_call_titles(titles::teams_titles().teams_window_titles());
-    }
+    let presence = app.state::<CallPresence>();
+    presence.remember_call_titles(titles::teams_titles().teams_window_titles());
+    call_match(
+        connected_agenda(app).as_ref(),
+        &anchor_now(app),
+        &presence.call_titles(),
+    )
 }

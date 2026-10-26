@@ -4,7 +4,9 @@ use scribe_core::calendar::{
     TodaysAgenda, todays_agenda,
 };
 use scribe_core::recording::SessionId;
-use scribe_tray::calendar::selection::{MeetingSelection, chosen_meeting};
+use scribe_tray::calendar::selection::{
+    CallMatch, ChooseError, MeetingSelection, adopt, call_match, chosen_meeting,
+};
 
 fn moment(text: &str) -> DateTime<FixedOffset> {
     DateTime::parse_from_rfc3339(text).unwrap()
@@ -140,4 +142,183 @@ fn a_new_recording_replaces_the_previous_choice() {
     selection.begin(session("2026-10-26-120000"), None);
 
     assert_eq!(selection.take_for(&session("2026-10-26-110500")), None);
+}
+
+fn other() -> Meeting {
+    meeting(
+        "other",
+        "2026-10-26T11:00:00+05:30",
+        "2026-10-26T11:30:00+05:30",
+    )
+}
+
+fn id(text: &str) -> EventId {
+    EventId::new(text)
+}
+
+fn two_overlapping() -> CallMatch {
+    let agenda = agenda_of(vec![review(), other()]);
+    call_match(Some(&agenda), &anchor_at("2026-10-26T11:05:00+05:30"), &[])
+}
+
+#[test]
+fn a_call_during_one_meeting_preselects_it() {
+    let agenda = agenda_of(vec![review()]);
+
+    let found = call_match(Some(&agenda), &anchor_at("2026-10-26T10:58:00+05:30"), &[]);
+
+    assert_eq!(found.state(), "matched");
+    assert_eq!(found.selected(), Some(&review()));
+}
+
+#[test]
+fn a_call_that_fits_two_meetings_offers_both_and_preselects_the_top_ranked() {
+    let found = two_overlapping();
+
+    assert_eq!(found.state(), "ambiguous");
+    assert_eq!(found.candidates().len(), 2);
+    assert_eq!(found.selected(), Some(&found.candidates()[0]));
+}
+
+#[test]
+fn a_call_named_by_the_teams_window_still_offers_the_other_candidates() {
+    let agenda = agenda_of(vec![review(), other()]);
+    let titles = vec!["Review | Microsoft Teams".to_owned()];
+
+    let found = call_match(
+        Some(&agenda),
+        &anchor_at("2026-10-26T11:05:00+05:30"),
+        &titles,
+    );
+
+    assert_eq!(found.state(), "matched");
+    assert_eq!(found.selected(), Some(&review()));
+    assert_eq!(found.candidates().len(), 2);
+}
+
+#[test]
+fn a_call_with_no_meeting_around_it_has_nothing_to_confirm() {
+    let agenda = agenda_of(vec![review()]);
+
+    let found = call_match(Some(&agenda), &anchor_at("2026-10-26T15:00:00+05:30"), &[]);
+
+    assert_eq!(found.state(), "unmatched");
+    assert!(found.candidates().is_empty());
+    assert_eq!(found.selected(), None);
+}
+
+#[test]
+fn choosing_a_candidate_selects_it() {
+    let mut found = two_overlapping();
+
+    found.choose(Some(&id("other"))).unwrap();
+
+    assert_eq!(found.selected(), Some(&other()));
+}
+
+#[test]
+fn choosing_not_a_calendar_meeting_selects_nothing() {
+    let mut found = two_overlapping();
+
+    found.choose(None).unwrap();
+
+    assert_eq!(found.selected(), None);
+}
+
+#[test]
+fn choosing_a_meeting_that_is_not_a_candidate_is_refused() {
+    let mut found = two_overlapping();
+    let before = found.clone();
+
+    let outcome = found.choose(Some(&id("elsewhere")));
+
+    assert_eq!(outcome, Err(ChooseError::NotACandidate));
+    assert_eq!(found, before);
+}
+
+#[test]
+fn a_recording_adopts_the_choice_made_for_the_call() {
+    let mut pending = two_overlapping();
+    pending.choose(Some(&id("other"))).unwrap();
+
+    let adopted = adopt(Some(pending), || Some(review()));
+
+    assert_eq!(adopted.selected(), Some(&other()));
+}
+
+#[test]
+fn a_recording_adopts_not_a_calendar_meeting_without_asking_the_calendar_again() {
+    let mut pending = two_overlapping();
+    pending.choose(None).unwrap();
+
+    let adopted = adopt(Some(pending), || Some(review()));
+
+    assert_eq!(adopted.selected(), None);
+}
+
+#[test]
+fn a_recording_without_a_call_falls_back_to_matching_the_calendar() {
+    let adopted = adopt(None, || Some(review()));
+
+    assert_eq!(adopted.selected(), Some(&review()));
+}
+
+#[test]
+fn the_selection_offers_the_call_match_until_the_call_ends() {
+    let selection = MeetingSelection::new();
+    selection.note_call_started(two_overlapping());
+
+    assert_eq!(selection.current(), Some(two_overlapping()));
+
+    selection.note_call_ended();
+
+    assert_eq!(selection.current(), None);
+}
+
+#[test]
+fn choosing_before_recording_decides_the_meeting_the_recording_is_linked_to() {
+    let selection = MeetingSelection::new();
+    let recording = session("2026-10-26-110500");
+    selection.note_call_started(two_overlapping());
+    selection.choose(Some(&id("other"))).unwrap();
+
+    selection.begin_from_call(recording.clone(), || None);
+
+    assert_eq!(selection.take_for(&recording), Some(other()));
+}
+
+#[test]
+fn the_latest_choice_made_while_recording_wins() {
+    let selection = MeetingSelection::new();
+    let recording = session("2026-10-26-110500");
+    selection.note_call_started(two_overlapping());
+    selection.begin_from_call(recording.clone(), || None);
+
+    selection.choose(Some(&id("other"))).unwrap();
+    selection.choose(Some(&id("review"))).unwrap();
+
+    assert_eq!(selection.take_for(&recording), Some(review()));
+}
+
+#[test]
+fn a_correction_made_while_recording_survives_the_call_ending() {
+    let selection = MeetingSelection::new();
+    let recording = session("2026-10-26-110500");
+    selection.note_call_started(two_overlapping());
+    selection.begin_from_call(recording.clone(), || None);
+    selection.note_call_ended();
+
+    selection.choose(Some(&id("other"))).unwrap();
+
+    assert_eq!(selection.take_for(&recording), Some(other()));
+}
+
+#[test]
+fn choosing_when_there_is_no_call_is_refused() {
+    let selection = MeetingSelection::new();
+
+    assert_eq!(
+        selection.choose(Some(&id("review"))),
+        Err(ChooseError::NotACandidate)
+    );
 }

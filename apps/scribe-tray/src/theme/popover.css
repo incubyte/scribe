@@ -605,3 +605,51 @@
   border-top: 2px solid var(--recording);
   pointer-events: none;
 }
+
+.meeting-line {
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--hairline);
+  font-size: var(--text-sm);
+}
+
+.meeting-line__summary {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.meeting-line__summary:hover {
+  background: var(--accent-soft);
+}
+
+.meeting-line__summary:focus-visible,
+.meeting-line__choice:focus-within {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.meeting-line__choices {
+  display: grid;
+  gap: var(--space-1);
+  margin: var(--space-1) 0 0;
+  padding: 0 var(--space-2);
+  border: 0;
+}
+
+.meeting-line__choice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) 0;
+  border-radius: var(--radius-control);
+}
