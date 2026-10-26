@@ -1,6 +1,6 @@
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
-use chrono::{DateTime, FixedOffset, NaiveDate};
+use chrono::NaiveDate;
 use scribe_core::calendar::{
     ArmedAction, ArmedEntry, ArmedMeetings, ArmedState, ArmedWatch, EventId, WatchInputs,
 };
@@ -115,10 +115,6 @@ impl ArmedStore {
     #[must_use]
     pub fn mark(&self, view: AgendaView) -> AgendaView {
         view.marked(|id| self.arming_of(id))
-    }
-
-    pub fn note_call_seen(&self, now: DateTime<FixedOffset>) {
-        locked(&self.watch).note_call_seen(now);
     }
 
     pub fn take_due_actions(&self, inputs: &WatchInputs) -> Vec<ArmedAction> {

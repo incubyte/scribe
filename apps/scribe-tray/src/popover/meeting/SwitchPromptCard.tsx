@@ -41,17 +41,20 @@ function useFocusWhileOpen(
   useLayoutEffect(() => {
     const focusedBefore = document.activeElement;
     const cardElement = card.current;
-    const fallback = fallbackFocus.current;
     heading.current?.focus();
-    return () => returnFocus(cardElement, focusedBefore, fallback);
+    return () => returnFocus(cardElement, focusedBefore, fallbackFocus);
   }, [card, heading, fallbackFocus]);
 }
 
-function returnFocus(card: HTMLElement | null, focusedBefore: Element | null, fallback: HTMLElement | null) {
+function returnFocus(
+  card: HTMLElement | null,
+  focusedBefore: Element | null,
+  fallbackFocus: RefObject<HTMLElement | null>,
+) {
   if (!isFocusLeftWith(card)) {
     return;
   }
-  const target = canTakeFocusBack(focusedBefore) ? focusedBefore : fallback;
+  const target = canTakeFocusBack(focusedBefore) ? focusedBefore : fallbackFocus.current;
   target?.focus();
 }
 

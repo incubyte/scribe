@@ -9,7 +9,6 @@ use url::Url;
 use crate::sign_in_error::SignInError;
 
 const ACCEPT_POLL: Duration = Duration::from_millis(200);
-const SHORTEST_READ_WAIT: Duration = Duration::from_millis(1);
 const LONGEST_READ_WAIT: Duration = Duration::from_secs(2);
 const MAX_REQUEST_BYTES: u64 = 16 * 1024;
 const CLOSE_TAB_PAGE: &str = "<!doctype html><meta charset=\"utf-8\"><title>Scribe</title>\
@@ -47,17 +46,17 @@ impl LoopbackListener {
         let give_up_at = Instant::now() + deadline;
         loop {
             let stream = self.accept_before(give_up_at)?;
-            if let Some(params) = self.redirect_on(stream) {
+            let request = BoundedRequest::on(&stream, give_up_at);
+            if let Some(params) = self.redirect_in(request) {
+                answer_close_tab(&stream);
                 return Ok(params);
             }
         }
     }
 
-    fn redirect_on(&self, mut stream: TcpStream) -> Option<RedirectParams> {
-        let target = read_request_target(&stream).ok()?;
-        let params = self.redirect_params(&target)?;
-        answer_close_tab(&mut stream);
-        Some(params)
+    fn redirect_in(&self, request: BoundedRequest) -> Option<RedirectParams> {
+        let target = read_request_target(request).ok()?;
+        self.redirect_params(&target)
     }
 
     fn accept_before(&self, give_up_at: Instant) -> Result<TcpStream, SignInError> {
@@ -66,7 +65,7 @@ impl LoopbackListener {
             .map_err(|_| SignInError::Listener)?;
         loop {
             match self.listener.accept() {
-                Ok((stream, _)) => return prepared(stream, give_up_at),
+                Ok((stream, _)) => return blocking(stream),
                 Err(error) if error.kind() == io::ErrorKind::WouldBlock => {
                     pause_until_next_poll(give_up_at)?;
                 }
@@ -89,20 +88,40 @@ fn pause_until_next_poll(give_up_at: Instant) -> Result<(), SignInError> {
     Ok(())
 }
 
-fn prepared(stream: TcpStream, give_up_at: Instant) -> Result<TcpStream, SignInError> {
-    let read_wait = give_up_at
-        .saturating_duration_since(Instant::now())
-        .min(LONGEST_READ_WAIT)
-        .max(SHORTEST_READ_WAIT);
+fn blocking(stream: TcpStream) -> Result<TcpStream, SignInError> {
     stream
         .set_nonblocking(false)
-        .and_then(|()| stream.set_read_timeout(Some(read_wait)))
         .map_err(|_| SignInError::Listener)?;
     Ok(stream)
 }
 
-fn read_request_target(stream: &TcpStream) -> Result<String, SignInError> {
-    let mut reader = BufReader::new(Read::take(stream, MAX_REQUEST_BYTES));
+struct BoundedRequest<'a> {
+    stream: &'a TcpStream,
+    read_until: Instant,
+}
+
+impl BoundedRequest<'_> {
+    fn on(stream: &TcpStream, give_up_at: Instant) -> BoundedRequest<'_> {
+        BoundedRequest {
+            stream,
+            read_until: give_up_at.min(Instant::now() + LONGEST_READ_WAIT),
+        }
+    }
+}
+
+impl Read for BoundedRequest<'_> {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        let remaining = self.read_until.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Err(io::ErrorKind::TimedOut.into());
+        }
+        self.stream.set_read_timeout(Some(remaining))?;
+        self.stream.read(buffer)
+    }
+}
+
+fn read_request_target(request: BoundedRequest) -> Result<String, SignInError> {
+    let mut reader = BufReader::new(request.take(MAX_REQUEST_BYTES));
     let mut request_line = String::new();
     reader
         .read_line(&mut request_line)
@@ -135,7 +154,7 @@ fn read_failed(error: &io::Error) -> SignInError {
     }
 }
 
-fn answer_close_tab(stream: &mut TcpStream) {
+fn answer_close_tab(mut stream: &TcpStream) {
     let response = format!(
         "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{CLOSE_TAB_PAGE}",
         CLOSE_TAB_PAGE.len()

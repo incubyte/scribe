@@ -461,7 +461,7 @@ sequenceDiagram
 
 **9.5 Offline after a restart shows "Connecting to Outlook…" — deferred.** When the token is stored but Microsoft can't be reached, `restored_connection` (`calendar/connection.rs`) keeps the state at `Connecting` until a retry succeeds. Settings offers no action, and the popover shows Recent sessions rather than "Couldn't load your calendar". The fix is a separate "stored, unreachable" state. Sources: [3].
 
-**9.6 Very short meetings let their switch or Record button overhang the block — deferred.** `.agenda__block` no longer hides overflow; only its subject, recurrence mark and Teams tag are clipped. The switch and Record button keep their full 24 px target and focus ring. A block shorter than 24 px, such as a 15-minute meeting, can't contain them, so they overhang its bottom edge and sit over the top of a back-to-back block below. Forcing a taller block made back-to-back meetings overlap (AC 5.2.3), so the block keeps its true height. The fix is to lay out controls for short blocks outside the block. Sources: [3].
+**9.6 Very short meetings let their switch or Record button overhang the block — deferred.** `.agenda__block` no longer hides overflow; only its subject, recurrence mark and Teams tag are clipped. The switch and Record button keep their full 24 px target and focus ring. A block shorter than 24 px, such as a 15-minute meeting, can't contain them, so they overhang its bottom edge and sit over the top of a back-to-back block below. Forcing a taller block made back-to-back meetings overlap (AC 5.2.3), so the block keeps its true height. On back-to-back meetings shorter than 24 px, the later block's switch or Record button also paints over part of the earlier block's control. The fix is to lay out controls for short blocks outside the block. Sources: [3].
 
 **9.7 Code-structure clean-ups from review — deferred.** None changes behaviour:
 - `recording.rs` and `call_watch.rs` import `calendar` and the reverse, where an event or port would decouple them.
@@ -471,6 +471,10 @@ sequenceDiagram
 - `agenda_refresh::refresh` returns a bare `bool`.
 - `answer_strength` and `HttpReply::is_success` use bare numbers.
 - The calendar-graph test support keeps a module-wide `dead_code` allow, because each test binary uses part of it.
+- `calendar::on_poll` and `auto_record::on_poll` both act (start recordings, report missed meetings) and also return the popover decision, where a query and a command would be separate.
+- `ConnectionState::is_current` doesn't say in its name that it means "no disconnect since the ticket".
+- The agenda grid's `.agenda__now` offset (48 px) and `.agenda__track` offset (52 px) are separate literals, which one custom property would unify.
+- `is_held_back` in the calendar-graph test support decides that a thread is blocked by sleeping and checking it hasn't finished, a timing heuristic rather than a signal.
 
 Sources: [3].
 

@@ -132,9 +132,6 @@ pub fn on_poll<R: Runtime>(app: &AppHandle<R>, in_call: bool) -> CallStartPopove
     if store.prune_for(Local::now().date_naive()) {
         save(app);
     }
-    if in_call {
-        store.note_call_seen(Local::now().fixed_offset());
-    }
     let due = take_due_actions(app, &store, in_call);
     let popover = popover_on_call_start(&due);
     for action in due {
@@ -149,11 +146,8 @@ fn take_due_actions<R: Runtime>(
     in_call: bool,
 ) -> Vec<ArmedAction> {
     let armed = store.armed();
-    let agenda = session_link::connected_agenda(app).filter(|_| !armed.is_empty());
-    let Some(agenda) = agenda else {
-        return Vec::new();
-    };
-    let matched = in_call
+    let agenda = session_link::connected_agenda(app).unwrap_or_default();
+    let matched = (in_call && !armed.is_empty())
         .then(|| meeting_to_record_by_itself(app, &agenda))
         .flatten();
     store.take_due_actions(&WatchInputs {
@@ -170,15 +164,14 @@ fn meeting_to_record_by_itself<R: Runtime>(
     app: &AppHandle<R>,
     agenda: &TodaysAgenda,
 ) -> Option<Meeting> {
-    if is_call_chosen_by_user(app) || is_switching(app) {
+    if is_switching(app) {
         return None;
     }
-    session_link::call_meeting_now(app, agenda)
-}
-
-fn is_call_chosen_by_user<R: Runtime>(app: &AppHandle<R>) -> bool {
-    app.try_state::<MeetingSelection>()
-        .is_some_and(|selection| selection.is_call_chosen_by_user())
+    let calendar_match = || session_link::call_meeting_now(app, agenda);
+    match app.try_state::<MeetingSelection>() {
+        Some(selection) => selection.meeting_for_the_call(calendar_match),
+        None => calendar_match(),
+    }
 }
 
 fn is_switching<R: Runtime>(app: &AppHandle<R>) -> bool {

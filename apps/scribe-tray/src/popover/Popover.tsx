@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import {
   copyMcpConfig,
   hidePopover,
@@ -42,7 +42,6 @@ export function Popover() {
   const outlook = useOutlookConnection();
   const callMeeting = useCallMeeting();
   const switchPrompt = useSwitchPrompt();
-  const popoverHeading = useRef<HTMLHeadingElement>(null);
   const { view, openSettings, leaveSettings, settingsButton } =
     usePopoverView();
   useEscapeToHide();
@@ -61,9 +60,7 @@ export function Popover() {
 
   return (
     <main className="popover">
-      <h1 className="visually-hidden" ref={popoverHeading} tabIndex={-1}>
-        Scribe
-      </h1>
+      <h1 className="visually-hidden">Scribe</h1>
       <StatusBar
         phase={feed.phase}
         startedAt={feed.startedAt}
@@ -77,7 +74,7 @@ export function Popover() {
           prompt={switchPrompt.prompt}
           onSwitch={switchPrompt.switchToNext}
           onKeep={switchPrompt.keep}
-          fallbackFocus={popoverHeading}
+          fallbackFocus={settingsButton}
         />
       )}
       <ModelDownloadPanel download={download} onRetry={retry} />

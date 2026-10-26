@@ -14,16 +14,16 @@ const PROMPT: SwitchPromptView = {
 afterEach(cleanup);
 
 function PopoverWithPrompt({ isOpen }: Readonly<{ isOpen: boolean }>) {
-  const heading = useRef<HTMLHeadingElement>(null);
+  const settings = useRef<HTMLButtonElement>(null);
   return (
     <main>
-      <h1 ref={heading} tabIndex={-1}>
-        Scribe
-      </h1>
       <button type="button">Earlier control</button>
       {isOpen ? (
-        <SwitchPromptCard prompt={PROMPT} onSwitch={vi.fn()} onKeep={vi.fn()} fallbackFocus={heading} />
+        <SwitchPromptCard prompt={PROMPT} onSwitch={vi.fn()} onKeep={vi.fn()} fallbackFocus={settings} />
       ) : null}
+      <button type="button" ref={settings}>
+        Settings
+      </button>
     </main>
   );
 }
@@ -99,12 +99,12 @@ describe("the switch prompt", () => {
     expect(document.activeElement).toBe(screen.getByRole("button", { name: "Earlier control" }));
   });
 
-  it("moves focus to the popover heading once the prompt closes when nothing had focus before", () => {
+  it("moves focus to the fallback control once the prompt closes when nothing had focus before", () => {
     const { rerender } = render(<PopoverWithPrompt isOpen />);
 
     rerender(<PopoverWithPrompt isOpen={false} />);
 
-    expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Scribe" }));
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "Settings" }));
   });
 
   it("leaves focus where the user moved it before the prompt closed", () => {

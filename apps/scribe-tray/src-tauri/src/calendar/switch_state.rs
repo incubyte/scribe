@@ -79,15 +79,11 @@ impl SwitchState {
         self.switching().open.as_ref().map(SwitchPromptView::from)
     }
 
-    pub fn take_for_switch(&self) -> Option<Meeting> {
+    pub fn take_for_switch(&self) -> Option<SwitchInProgress<'_>> {
         let mut switching = self.switching();
         let next = switching.open.take().map(|prompt| prompt.to)?;
         switching.switch_in_progress = true;
-        Some(next)
-    }
-
-    pub fn finish_switch(&self) {
-        self.switching().switch_in_progress = false;
+        Some(SwitchInProgress { state: self, next })
     }
 
     #[must_use]
@@ -103,5 +99,23 @@ impl SwitchState {
         self.switching
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
+pub struct SwitchInProgress<'a> {
+    state: &'a SwitchState,
+    next: Meeting,
+}
+
+impl SwitchInProgress<'_> {
+    #[must_use]
+    pub fn next(&self) -> &Meeting {
+        &self.next
+    }
+}
+
+impl Drop for SwitchInProgress<'_> {
+    fn drop(&mut self) {
+        self.state.switching().switch_in_progress = false;
     }
 }

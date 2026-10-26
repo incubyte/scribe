@@ -75,18 +75,19 @@ fn named_in_titles(
 }
 
 pub fn switch<R: Runtime>(app: &AppHandle<R>) {
-    let Some(next) = app.state::<SwitchState>().take_for_switch() else {
+    let state = app.state::<SwitchState>();
+    let Some(switch) = state.take_for_switch() else {
         return;
     };
+    let next = switch.next();
     publish(app, None);
     let start = app
         .try_state::<ArmedStore>()
         .map_or(AutoStart::No, |armed| armed.start_for(&next.event_id));
     app.state::<RecordingController>().stop();
-    if recording::start_for_meeting(app, &next, start).is_err() {
+    if recording::start_for_meeting(app, next, start).is_err() {
         tracing::warn!("could not start recording the next meeting after switching");
     }
-    app.state::<SwitchState>().finish_switch();
 }
 
 pub fn keep<R: Runtime>(app: &AppHandle<R>) {

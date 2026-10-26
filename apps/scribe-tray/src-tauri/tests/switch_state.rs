@@ -1,3 +1,4 @@
+use std::panic::{self, AssertUnwindSafe};
 use std::time::{Duration, Instant};
 
 use chrono::{DateTime, FixedOffset};
@@ -100,7 +101,7 @@ fn switching_hands_over_the_next_meeting_and_closes_the_prompt() {
     let next = state.take_for_switch();
 
     assert_eq!(
-        next.map(|meeting| meeting.subject),
+        next.map(|switch| switch.next().subject.clone()),
         Some("Sprint Retro".to_owned())
     );
     assert_eq!(state.open_view(), None);
@@ -115,7 +116,7 @@ fn keeping_the_recording_closes_the_prompt_and_never_offers_that_meeting_again()
 
     assert_eq!(state.open_view(), None);
     assert_eq!(offer_retro(&state), None);
-    assert_eq!(state.take_for_switch(), None);
+    assert!(state.take_for_switch().is_none());
 }
 
 #[test]
@@ -159,15 +160,29 @@ fn titles_are_read_at_most_once_per_recheck_interval() {
 }
 
 #[test]
-fn a_switch_is_in_progress_from_handing_over_the_next_meeting_until_it_finishes() {
+fn a_switch_is_in_progress_from_handing_over_the_next_meeting_until_it_is_dropped() {
     let state = SwitchState::new();
     offer_retro(&state);
 
-    state.take_for_switch();
+    let switch = state.take_for_switch();
     let while_switching = state.is_switching();
-    state.finish_switch();
+    drop(switch);
 
     assert!(while_switching);
+    assert!(!state.is_switching());
+}
+
+#[test]
+fn a_switch_that_panics_part_way_is_no_longer_in_progress() {
+    let state = SwitchState::new();
+    offer_retro(&state);
+
+    let outcome = panic::catch_unwind(AssertUnwindSafe(|| {
+        let _switch = state.take_for_switch();
+        panic!("starting the next recording failed");
+    }));
+
+    assert!(outcome.is_err());
     assert!(!state.is_switching());
 }
 
@@ -175,7 +190,8 @@ fn a_switch_is_in_progress_from_handing_over_the_next_meeting_until_it_finishes(
 fn no_switch_is_in_progress_when_there_was_no_prompt_to_switch_from() {
     let state = SwitchState::new();
 
-    state.take_for_switch();
+    let switch = state.take_for_switch();
 
+    assert!(switch.is_none());
     assert!(!state.is_switching());
 }

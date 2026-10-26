@@ -411,6 +411,17 @@ describe("the popover offering the next meeting", () => {
     expect(screen.queryByRole("button", { name: "Switch" })).toBeNull();
   });
 
+  it("moves focus to the settings button once the prompt is answered elsewhere", async () => {
+    openSwitchPrompt = RETRO_PROMPT;
+    backend(recordingForSixtyFiveSeconds);
+    render(<Popover />);
+    await screen.findByRole("heading", { name: "Switch meeting?" });
+
+    await act(() => emit("meeting://switch-prompt", null));
+
+    expect(screen.getByRole("button", { name: "Settings" })).toHaveFocus();
+  });
+
   it("asks the backend to switch when Switch is pressed", async () => {
     openSwitchPrompt = RETRO_PROMPT;
     const handler = backend(recordingForSixtyFiveSeconds);

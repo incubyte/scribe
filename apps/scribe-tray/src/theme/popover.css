@@ -629,6 +629,8 @@
 }
 
 .agenda__chip-button {
+  position: relative;
+  z-index: 2;
   min-width: var(--space-5);
   min-height: var(--space-5);
   padding: 0 var(--space-1);
@@ -644,7 +646,7 @@
 .agenda__chip-list {
   position: absolute;
   right: 0;
-  z-index: 2;
+  z-index: 3;
   min-width: 160px;
   margin: 0;
   padding: var(--space-2);

@@ -1,12 +1,14 @@
 use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::thread::{self, JoinHandle};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use calendar_graph::{LoopbackListener, RedirectParams, SignInError};
 
 const PATIENT: Duration = Duration::from_secs(5);
 const IMPATIENT: Duration = Duration::from_millis(300);
+const TRICKLE_GAP: Duration = Duration::from_millis(250);
+const TRICKLE_LENGTH: Duration = Duration::from_secs(8);
 
 fn address_of(listener: &LoopbackListener) -> SocketAddr {
     listener.redirect_uri().socket_addrs(|| None).unwrap()[0]
@@ -141,6 +143,30 @@ fn an_idle_local_connection_does_not_hold_up_the_redirect() {
 
     browser.join().unwrap();
     assert!(matches!(params, RedirectParams::Code { .. }));
+}
+
+fn connection_trickling_bytes(listener: &LoopbackListener) -> JoinHandle<()> {
+    let mut stream = TcpStream::connect(address_of(listener)).unwrap();
+    thread::spawn(move || {
+        let stop_at = Instant::now() + TRICKLE_LENGTH;
+        while Instant::now() < stop_at && stream.write_all(b"G").is_ok() {
+            thread::sleep(TRICKLE_GAP);
+        }
+    })
+}
+
+#[test]
+fn a_local_client_trickling_bytes_does_not_hold_up_the_redirect_behind_it() {
+    let listener = LoopbackListener::bind().unwrap();
+    let _trickling = connection_trickling_bytes(&listener);
+    let browser = browser_requests(&listener, "/?code=auth-code&state=expected-state");
+    let waiting_since = Instant::now();
+
+    let params = listener.wait_for_redirect(PATIENT).unwrap();
+
+    browser.join().unwrap();
+    assert!(matches!(params, RedirectParams::Code { .. }));
+    assert!(waiting_since.elapsed() < PATIENT);
 }
 
 #[test]

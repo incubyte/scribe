@@ -471,17 +471,17 @@ fn a_second_recording_in_the_same_call_keeps_the_correction_made_in_the_first() 
 }
 
 #[test]
-fn choosing_not_a_calendar_meeting_for_the_call_holds_back_armed_meetings() {
+fn choosing_not_a_calendar_meeting_for_the_call_overrides_the_calendars_match() {
     let selection = MeetingSelection::new();
     selection.note_call_started(two_overlapping());
 
     selection.choose(None).unwrap();
 
-    assert!(selection.is_call_chosen_by_user());
+    assert_eq!(selection.meeting_for_the_call(|| Some(review())), None);
 }
 
 #[test]
-fn choosing_not_a_calendar_meeting_on_a_recording_holds_back_armed_meetings_for_the_rest_of_the_call()
+fn choosing_not_a_calendar_meeting_on_a_recording_overrides_the_calendars_match_for_the_rest_of_the_call()
  {
     let selection = MeetingSelection::new();
     let recording = session("2026-10-26-110500");
@@ -491,16 +491,19 @@ fn choosing_not_a_calendar_meeting_on_a_recording_holds_back_armed_meetings_for_
 
     selection.take_for(&recording);
 
-    assert!(selection.is_call_chosen_by_user());
+    assert_eq!(selection.meeting_for_the_call(|| Some(review())), None);
 }
 
 #[test]
-fn a_call_the_calendar_could_not_match_does_not_hold_back_armed_meetings() {
+fn a_call_the_calendar_could_not_match_keeps_the_calendars_current_match() {
     let selection = MeetingSelection::new();
 
     selection.note_call_started(CallMatch::settled(None));
 
-    assert!(!selection.is_call_chosen_by_user());
+    assert_eq!(
+        selection.meeting_for_the_call(|| Some(review())),
+        Some(review())
+    );
 }
 
 #[test]
@@ -511,21 +514,28 @@ fn a_new_call_forgets_that_the_last_one_was_not_a_calendar_meeting() {
 
     selection.note_call_ended();
 
-    assert!(!selection.is_call_chosen_by_user());
+    assert_eq!(
+        selection.meeting_for_the_call(|| Some(review())),
+        Some(review())
+    );
 }
 
 #[test]
-fn choosing_another_meeting_for_the_call_holds_back_armed_meetings() {
+fn choosing_another_meeting_for_the_call_overrides_the_calendars_match() {
     let selection = MeetingSelection::new();
     selection.note_call_started(two_overlapping());
 
     selection.choose(Some(&id("other"))).unwrap();
 
-    assert!(selection.is_call_chosen_by_user());
+    assert_eq!(
+        selection.meeting_for_the_call(|| Some(review())),
+        Some(other())
+    );
 }
 
 #[test]
-fn choosing_another_meeting_on_a_recording_holds_back_armed_meetings_for_the_rest_of_the_call() {
+fn choosing_another_meeting_on_a_recording_overrides_the_calendars_match_for_the_rest_of_the_call()
+{
     let selection = MeetingSelection::new();
     let recording = session("2026-10-26-110500");
     selection.note_call_started(two_overlapping());
@@ -534,14 +544,30 @@ fn choosing_another_meeting_on_a_recording_holds_back_armed_meetings_for_the_res
 
     selection.take_for(&recording);
 
-    assert!(selection.is_call_chosen_by_user());
+    assert_eq!(
+        selection.meeting_for_the_call(|| Some(review())),
+        Some(other())
+    );
 }
 
 #[test]
-fn a_call_the_calendar_matched_by_itself_does_not_hold_back_armed_meetings() {
+fn choosing_the_meeting_the_calendar_could_not_decide_on_makes_it_the_calls_meeting() {
+    let selection = MeetingSelection::new();
+    selection.note_call_started(two_overlapping());
+
+    selection.choose(Some(&id("other"))).unwrap();
+
+    assert_eq!(selection.meeting_for_the_call(|| None), Some(other()));
+}
+
+#[test]
+fn a_call_the_calendar_matched_by_itself_keeps_the_calendars_current_match() {
     let selection = MeetingSelection::new();
 
     selection.note_call_started(two_overlapping());
 
-    assert!(!selection.is_call_chosen_by_user());
+    assert_eq!(
+        selection.meeting_for_the_call(|| Some(review())),
+        Some(review())
+    );
 }

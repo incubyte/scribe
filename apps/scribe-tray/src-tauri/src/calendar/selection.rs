@@ -265,11 +265,17 @@ impl MeetingSelection {
     }
 
     #[must_use]
-    pub fn is_call_chosen_by_user(&self) -> bool {
-        self.selection()
+    pub fn meeting_for_the_call(
+        &self,
+        calendar_match: impl FnOnce() -> Option<Meeting>,
+    ) -> Option<Meeting> {
+        let user_choice = self
+            .selection()
             .pending_call
             .as_ref()
-            .is_some_and(CallMatch::is_chosen_by_user)
+            .filter(|found| found.is_chosen_by_user())
+            .map(|found| found.selected().cloned());
+        user_choice.unwrap_or_else(calendar_match)
     }
 
     pub fn note_call_started(&self, found: CallMatch) {

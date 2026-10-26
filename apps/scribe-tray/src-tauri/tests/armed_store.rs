@@ -1,13 +1,13 @@
 use chrono::{DateTime, FixedOffset, NaiveDate};
 use scribe_core::calendar::{
     ArmedAction, ArmedEntry, ArmedMeetings, CalendarEvent, DayBounds, EventId, Meeting, Person,
-    Response, ShowAs, WatchInputs, todays_agenda,
+    Response, ShowAs, TodaysAgenda, WatchInputs, todays_agenda,
 };
 use scribe_tray::calendar::agenda_view::Arming;
 use scribe_tray::calendar::armed::{
     ArmedStore, CallStartPopover, entries_from, popover_on_call_start, settings_value,
 };
-use scribe_tray::calendar::selection::AutoStart;
+use scribe_tray::calendar::selection::{AutoStart, CallMatch, MeetingSelection};
 use serde_json::json;
 
 fn today() -> NaiveDate {
@@ -40,27 +40,83 @@ fn review() -> Meeting {
     }
 }
 
-fn poll_without_a_call(store: &ArmedStore, now: &str) -> Vec<ArmedAction> {
+fn standup() -> Meeting {
+    Meeting {
+        event_id: EventId::new("standup"),
+        subject: "Standup".to_owned(),
+        ..review()
+    }
+}
+
+fn agenda_of(meetings: Vec<Meeting>) -> TodaysAgenda {
     let day = DayBounds {
         start: moment("2026-10-26T00:00:00+05:30"),
         end: moment("2026-10-27T00:00:00+05:30"),
     };
-    let event = CalendarEvent {
-        meeting: review(),
-        is_all_day: false,
-        is_cancelled: false,
-        show_as: ShowAs::Busy,
-    };
-    let agenda = todays_agenda(vec![event], &day);
+    let events = meetings
+        .into_iter()
+        .map(|meeting| CalendarEvent {
+            meeting,
+            is_all_day: false,
+            is_cancelled: false,
+            show_as: ShowAs::Busy,
+        })
+        .collect();
+    todays_agenda(events, &day)
+}
+
+struct Poll<'a> {
+    in_call: bool,
+    matched: Option<&'a Meeting>,
+    now: &'a str,
+}
+
+fn poll(store: &ArmedStore, when: &Poll) -> Vec<ArmedAction> {
+    let agenda = agenda_of(vec![review(), standup()]);
     let armed = store.armed();
     store.take_due_actions(&WatchInputs {
         agenda: &agenda,
         armed: &armed,
-        matched: None,
-        in_call: false,
+        matched: when.matched,
+        in_call: when.in_call,
         recording: false,
-        now: moment(now),
+        now: moment(when.now),
     })
+}
+
+fn poll_without_a_call(store: &ArmedStore, now: &str) -> Vec<ArmedAction> {
+    poll(
+        store,
+        &Poll {
+            in_call: false,
+            matched: None,
+            now,
+        },
+    )
+}
+
+fn poll_in_a_call_matched_to(store: &ArmedStore, matched: Option<&Meeting>) -> Vec<ArmedAction> {
+    poll(
+        store,
+        &Poll {
+            in_call: true,
+            matched,
+            now: "2026-10-26T11:05:00+05:30",
+        },
+    )
+}
+
+fn review_armed() -> ArmedStore {
+    let store = ArmedStore::new(ArmedMeetings::default());
+    store.arm(review_id(), today());
+    store
+}
+
+fn call_where_the_user_chose(id: Option<&EventId>) -> MeetingSelection {
+    let selection = MeetingSelection::new();
+    selection.note_call_started(CallMatch::decided(review(), vec![review(), standup()]));
+    selection.choose(id).unwrap();
+    selection
 }
 
 #[test]
@@ -236,4 +292,48 @@ fn a_missed_meeting_reported_as_a_call_starts_still_opens_the_popover() {
     let due = [ArmedAction::ReportMissed(review())];
 
     assert_eq!(popover_on_call_start(&due), CallStartPopover::Open);
+}
+
+#[test]
+fn choosing_the_armed_meeting_for_the_call_lets_it_record_by_itself() {
+    let store = review_armed();
+    let selection = call_where_the_user_chose(Some(&review_id()));
+
+    let matched = selection.meeting_for_the_call(|| None);
+    let actions = poll_in_a_call_matched_to(&store, matched.as_ref());
+
+    assert_eq!(actions, vec![ArmedAction::StartRecording(review())]);
+}
+
+#[test]
+fn choosing_another_meeting_for_the_call_holds_the_armed_one_back() {
+    let store = review_armed();
+    let selection = call_where_the_user_chose(Some(&EventId::new("standup")));
+
+    let matched = selection.meeting_for_the_call(|| Some(review()));
+    let actions = poll_in_a_call_matched_to(&store, matched.as_ref());
+
+    assert!(actions.is_empty());
+}
+
+#[test]
+fn choosing_not_a_calendar_meeting_for_the_call_holds_the_armed_one_back() {
+    let store = review_armed();
+    let selection = call_where_the_user_chose(None);
+
+    let matched = selection.meeting_for_the_call(|| Some(review()));
+    let actions = poll_in_a_call_matched_to(&store, matched.as_ref());
+
+    assert!(actions.is_empty());
+}
+
+#[test]
+fn a_call_seen_while_nothing_was_armed_excuses_a_meeting_armed_during_it() {
+    let store = ArmedStore::new(ArmedMeetings::default());
+    poll_in_a_call_matched_to(&store, None);
+    store.arm(review_id(), today());
+
+    let actions = poll_without_a_call(&store, "2026-10-26T11:20:00+05:30");
+
+    assert!(actions.is_empty());
 }

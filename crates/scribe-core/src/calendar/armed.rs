@@ -120,13 +120,9 @@ impl ArmedWatch {
         self.states.get(id).copied().unwrap_or(ArmedState::Armed)
     }
 
-    pub fn note_call_seen(&mut self, now: DateTime<FixedOffset>) {
-        self.last_call_seen = Some(now);
-    }
-
     pub fn take_due_actions(&mut self, inputs: &WatchInputs) -> Vec<ArmedAction> {
         if inputs.in_call {
-            self.note_call_seen(inputs.now);
+            self.last_call_seen = Some(inputs.now);
         }
         let due: Vec<(ArmedAction, ArmedState)> = inputs
             .agenda
