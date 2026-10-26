@@ -3,7 +3,7 @@ use scribe_core::calendar::{
     CalendarEvent, DayBounds, EventId, Meeting, Person, Response, ShowAs, todays_agenda,
 };
 use scribe_tray::calendar::agenda_snapshot::{AgendaSnapshot, FetchedAgenda};
-use scribe_tray::calendar::agenda_view::AgendaView;
+use scribe_tray::calendar::agenda_view::{AgendaView, Arming};
 use serde_json::{Value, json};
 
 fn moment(text: &str) -> DateTime<FixedOffset> {
@@ -58,7 +58,9 @@ fn a_block_carries_what_the_webview_needs_to_place_and_name_it() {
             "top_minutes": 570,
             "height_minutes": 30,
             "column": 0,
-            "columns": 1
+            "columns": 1,
+            "armed": false,
+            "armed_state": null
         })
     );
 }
@@ -92,4 +94,46 @@ fn a_chip_lists_the_meetings_it_hides() {
             }]
         }])
     );
+}
+
+fn marked_view_of(events: Vec<CalendarEvent>, arming: fn(&EventId) -> Arming) -> Value {
+    let day = DayBounds {
+        start: moment("2026-10-26T00:00:00+05:30"),
+        end: moment("2026-10-27T00:00:00+05:30"),
+    };
+    let snapshot = AgendaSnapshot::after_fetch(FetchedAgenda {
+        agenda: todays_agenda(events, &day),
+        day,
+        at: moment("2026-10-26T08:55:00+05:30"),
+    });
+    serde_json::to_value(AgendaView::of(&snapshot).marked(arming)).unwrap()
+}
+
+fn arming_shown(view: &Value, index: usize) -> Value {
+    let block = &view["blocks"][index];
+    json!([block["armed"], block["armed_state"]])
+}
+
+fn review_missed_standup_armed(id: &EventId) -> Arming {
+    match id.as_str() {
+        "review" => Arming::Missed,
+        "standup" => Arming::Armed,
+        _ => Arming::Off,
+    }
+}
+
+#[test]
+fn a_block_says_whether_its_meeting_is_armed_and_whether_it_was_missed() {
+    let view = marked_view_of(
+        vec![
+            event("standup", "09:00", "09:30"),
+            event("review", "11:00", "11:30"),
+            event("lunch", "13:00", "14:00"),
+        ],
+        review_missed_standup_armed,
+    );
+
+    assert_eq!(arming_shown(&view, 0), json!([true, null]));
+    assert_eq!(arming_shown(&view, 1), json!([true, "missed"]));
+    assert_eq!(arming_shown(&view, 2), json!([false, null]));
 }

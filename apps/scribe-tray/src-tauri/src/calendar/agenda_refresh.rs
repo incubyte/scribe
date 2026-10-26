@@ -14,6 +14,7 @@ use tauri::{AppHandle, Manager, Runtime};
 use super::agenda_cache::AgendaCache;
 use super::agenda_snapshot::FetchedAgenda;
 use super::agenda_view::AgendaView;
+use super::armed::ArmedStore;
 use super::connection;
 use super::day_bounds::today_bounds;
 use crate::webview;
@@ -135,6 +136,10 @@ fn calendar_source<R: Runtime>(app: &AppHandle<R>) -> Option<Arc<dyn CalendarSou
     Some(Arc::clone(&account) as Arc<dyn CalendarSource>)
 }
 
-fn publish<R: Runtime>(app: &AppHandle<R>, view: &AgendaView) {
-    webview::emit(app, AGENDA_EVENT, view.clone());
+pub(super) fn publish<R: Runtime>(app: &AppHandle<R>, view: &AgendaView) {
+    let marked = match app.try_state::<ArmedStore>() {
+        Some(armed) => armed.mark(view.clone()),
+        None => view.clone(),
+    };
+    webview::emit(app, AGENDA_EVENT, marked);
 }

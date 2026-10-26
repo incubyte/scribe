@@ -4,6 +4,7 @@ use chrono::{DateTime, FixedOffset};
 
 use super::CANDIDATE_LEAD;
 use super::agenda::TodaysAgenda;
+use super::armed::ArmedMeetings;
 use super::meeting::{Meeting, Response};
 use super::titles::meeting_named_in_titles;
 
@@ -22,6 +23,7 @@ pub struct MatchInputs<'a> {
     pub agenda: &'a TodaysAgenda,
     pub anchor: MatchAnchor,
     pub titles: &'a [String],
+    pub armed: &'a ArmedMeetings,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,9 +56,22 @@ pub fn meeting_candidates<'a>(agenda: &'a TodaysAgenda, anchor: &MatchAnchor) ->
 #[must_use]
 pub fn match_meeting(inputs: &MatchInputs) -> MatchOutcome {
     let candidates = meeting_candidates(inputs.agenda, &inputs.anchor);
-    match meeting_named_in_titles(&candidates, inputs.titles) {
-        Some(named) => MatchOutcome::Matched(named.clone()),
+    let decided = meeting_named_in_titles(&candidates, inputs.titles)
+        .or_else(|| only_armed(&candidates, inputs.armed));
+    match decided {
+        Some(meeting) => MatchOutcome::Matched(meeting.clone()),
         None => rank_candidates(candidates, &inputs.anchor),
+    }
+}
+
+fn only_armed<'a>(candidates: &[&'a Meeting], armed: &ArmedMeetings) -> Option<&'a Meeting> {
+    let mut armed_candidates = candidates
+        .iter()
+        .copied()
+        .filter(|meeting| armed.is_armed(&meeting.event_id));
+    match (armed_candidates.next(), armed_candidates.next()) {
+        (Some(only), None) => Some(only),
+        _ => None,
     }
 }
 

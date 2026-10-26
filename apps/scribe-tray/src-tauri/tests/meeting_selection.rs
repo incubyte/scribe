@@ -1,11 +1,12 @@
-use chrono::{DateTime, FixedOffset};
+use chrono::{DateTime, FixedOffset, NaiveDate};
 use scribe_core::calendar::{
-    CalendarEvent, DayBounds, EventId, MatchAnchor, Meeting, Person, Response, ShowAs,
-    TodaysAgenda, todays_agenda,
+    ArmedMeetings, CalendarEvent, DayBounds, EventId, MatchAnchor, MatchInputs, Meeting, Person,
+    Response, ShowAs, TodaysAgenda, todays_agenda,
 };
 use scribe_core::recording::SessionId;
 use scribe_tray::calendar::selection::{
-    CallMatch, ChooseError, MeetingSelection, adopt, call_match, chosen_meeting,
+    AutoStart, CallMatch, ChooseError, FinishedChoice, MeetingSelection, adopt, call_match,
+    chosen_meeting,
 };
 
 fn moment(text: &str) -> DateTime<FixedOffset> {
@@ -59,11 +60,29 @@ fn session(text: &str) -> SessionId {
     SessionId::parse(text).unwrap()
 }
 
+const NOTHING_ARMED: &ArmedMeetings = &ArmedMeetings::new();
+
+fn inputs<'a>(agenda: &'a TodaysAgenda, at: &str, titles: &'a [String]) -> MatchInputs<'a> {
+    MatchInputs {
+        agenda,
+        anchor: anchor_at(at),
+        titles,
+        armed: NOTHING_ARMED,
+    }
+}
+
+fn linked(meeting: Meeting) -> FinishedChoice {
+    FinishedChoice {
+        meeting,
+        start: AutoStart::No,
+    }
+}
+
 #[test]
 fn a_recording_during_a_meeting_is_linked_to_it() {
     let agenda = agenda_of(vec![review()]);
 
-    let chosen = chosen_meeting(Some(&agenda), &anchor_at("2026-10-26T10:58:00+05:30"), &[]);
+    let chosen = chosen_meeting(Some(inputs(&agenda, "2026-10-26T10:58:00+05:30", &[])));
 
     assert_eq!(chosen, Some(review()));
 }
@@ -72,7 +91,7 @@ fn a_recording_during_a_meeting_is_linked_to_it() {
 fn a_recording_with_no_meeting_around_it_is_linked_to_nothing() {
     let agenda = agenda_of(vec![review()]);
 
-    let chosen = chosen_meeting(Some(&agenda), &anchor_at("2026-10-26T15:00:00+05:30"), &[]);
+    let chosen = chosen_meeting(Some(inputs(&agenda, "2026-10-26T15:00:00+05:30", &[])));
 
     assert_eq!(chosen, None);
 }
@@ -86,7 +105,7 @@ fn a_recording_that_fits_two_meetings_equally_is_linked_to_neither() {
     );
     let agenda = agenda_of(vec![review(), other]);
 
-    let chosen = chosen_meeting(Some(&agenda), &anchor_at("2026-10-26T11:05:00+05:30"), &[]);
+    let chosen = chosen_meeting(Some(inputs(&agenda, "2026-10-26T11:05:00+05:30", &[])));
 
     assert_eq!(chosen, None);
 }
@@ -101,18 +120,14 @@ fn a_recording_that_fits_two_meetings_is_linked_to_the_one_the_teams_window_name
     let agenda = agenda_of(vec![review(), other]);
     let titles = vec!["Review | Microsoft Teams".to_owned()];
 
-    let chosen = chosen_meeting(
-        Some(&agenda),
-        &anchor_at("2026-10-26T11:05:00+05:30"),
-        &titles,
-    );
+    let chosen = chosen_meeting(Some(inputs(&agenda, "2026-10-26T11:05:00+05:30", &titles)));
 
     assert_eq!(chosen, Some(review()));
 }
 
 #[test]
 fn a_recording_with_no_agenda_to_look_at_is_linked_to_nothing() {
-    let chosen = chosen_meeting(None, &anchor_at("2026-10-26T11:05:00+05:30"), &[]);
+    let chosen = chosen_meeting(None);
 
     assert_eq!(chosen, None);
 }
@@ -123,7 +138,7 @@ fn the_meeting_chosen_for_a_recording_is_handed_over_once_for_that_recording() {
     let recording = session("2026-10-26-110500");
     selection.begin(recording.clone(), Some(review()));
 
-    assert_eq!(selection.take_for(&recording), Some(review()));
+    assert_eq!(selection.take_for(&recording), Some(linked(review())));
     assert_eq!(selection.take_for(&recording), None);
 }
 
@@ -158,14 +173,14 @@ fn id(text: &str) -> EventId {
 
 fn two_overlapping() -> CallMatch {
     let agenda = agenda_of(vec![review(), other()]);
-    call_match(Some(&agenda), &anchor_at("2026-10-26T11:05:00+05:30"), &[])
+    call_match(Some(inputs(&agenda, "2026-10-26T11:05:00+05:30", &[])))
 }
 
 #[test]
 fn a_call_during_one_meeting_preselects_it() {
     let agenda = agenda_of(vec![review()]);
 
-    let found = call_match(Some(&agenda), &anchor_at("2026-10-26T10:58:00+05:30"), &[]);
+    let found = call_match(Some(inputs(&agenda, "2026-10-26T10:58:00+05:30", &[])));
 
     assert_eq!(found.state(), "matched");
     assert_eq!(found.selected(), Some(&review()));
@@ -185,11 +200,7 @@ fn a_call_named_by_the_teams_window_still_offers_the_other_candidates() {
     let agenda = agenda_of(vec![review(), other()]);
     let titles = vec!["Review | Microsoft Teams".to_owned()];
 
-    let found = call_match(
-        Some(&agenda),
-        &anchor_at("2026-10-26T11:05:00+05:30"),
-        &titles,
-    );
+    let found = call_match(Some(inputs(&agenda, "2026-10-26T11:05:00+05:30", &titles)));
 
     assert_eq!(found.state(), "matched");
     assert_eq!(found.selected(), Some(&review()));
@@ -200,7 +211,7 @@ fn a_call_named_by_the_teams_window_still_offers_the_other_candidates() {
 fn a_call_with_no_meeting_around_it_has_nothing_to_confirm() {
     let agenda = agenda_of(vec![review()]);
 
-    let found = call_match(Some(&agenda), &anchor_at("2026-10-26T15:00:00+05:30"), &[]);
+    let found = call_match(Some(inputs(&agenda, "2026-10-26T15:00:00+05:30", &[])));
 
     assert_eq!(found.state(), "unmatched");
     assert!(found.candidates().is_empty());
@@ -284,7 +295,7 @@ fn choosing_before_recording_decides_the_meeting_the_recording_is_linked_to() {
 
     selection.begin_from_call(recording.clone(), || None);
 
-    assert_eq!(selection.take_for(&recording), Some(other()));
+    assert_eq!(selection.take_for(&recording), Some(linked(other())));
 }
 
 #[test]
@@ -297,7 +308,7 @@ fn the_latest_choice_made_while_recording_wins() {
     selection.choose(Some(&id("other"))).unwrap();
     selection.choose(Some(&id("review"))).unwrap();
 
-    assert_eq!(selection.take_for(&recording), Some(review()));
+    assert_eq!(selection.take_for(&recording), Some(linked(review())));
 }
 
 #[test]
@@ -310,7 +321,7 @@ fn a_correction_made_while_recording_survives_the_call_ending() {
 
     selection.choose(Some(&id("other"))).unwrap();
 
-    assert_eq!(selection.take_for(&recording), Some(other()));
+    assert_eq!(selection.take_for(&recording), Some(linked(other())));
 }
 
 #[test]
@@ -321,4 +332,92 @@ fn choosing_when_there_is_no_call_is_refused() {
         selection.choose(Some(&id("review"))),
         Err(ChooseError::NotACandidate)
     );
+}
+
+fn armed_other() -> ArmedMeetings {
+    let mut armed = ArmedMeetings::default();
+    armed.arm(id("other"), NaiveDate::from_ymd_opt(2026, 10, 26).unwrap());
+    armed
+}
+
+#[test]
+fn a_call_that_fits_two_meetings_matches_the_armed_one() {
+    let agenda = agenda_of(vec![review(), other()]);
+    let armed = armed_other();
+
+    let found = call_match(Some(MatchInputs {
+        armed: &armed,
+        ..inputs(&agenda, "2026-10-26T11:05:00+05:30", &[])
+    }));
+
+    assert_eq!(found.state(), "matched");
+    assert_eq!(found.selected(), Some(&other()));
+}
+
+#[test]
+fn a_recording_started_for_an_armed_meeting_is_linked_to_it_and_marked_automatic() {
+    let selection = MeetingSelection::new();
+    let recording = session("2026-10-26-110500");
+    selection.note_call_started(two_overlapping());
+    selection.prepare(other(), AutoStart::Yes);
+
+    selection.begin_from_call(recording.clone(), || None);
+
+    assert_eq!(selection.auto_started_session(), Some(recording.clone()));
+    assert_eq!(
+        selection.take_for(&recording),
+        Some(FinishedChoice {
+            meeting: other(),
+            start: AutoStart::Yes,
+        })
+    );
+}
+
+#[test]
+fn a_recording_started_for_a_meeting_shows_that_meeting_in_the_live_view() {
+    let selection = MeetingSelection::new();
+    selection.prepare(review(), AutoStart::No);
+
+    selection.begin_from_call(session("2026-10-26-110500"), || None);
+
+    let shown = selection.current().unwrap();
+    assert_eq!(shown.state(), "matched");
+    assert_eq!(shown.selected(), Some(&review()));
+}
+
+#[test]
+fn a_recording_started_by_hand_is_never_treated_as_automatic() {
+    let selection = MeetingSelection::new();
+    let recording = session("2026-10-26-110500");
+
+    selection.begin_from_call(recording.clone(), || Some(review()));
+
+    assert_eq!(selection.auto_started_session(), None);
+    assert_eq!(selection.take_for(&recording), Some(linked(review())));
+}
+
+#[test]
+fn a_start_that_failed_does_not_decide_the_next_recording() {
+    let selection = MeetingSelection::new();
+    let recording = session("2026-10-26-110500");
+    selection.prepare(other(), AutoStart::Yes);
+    selection.abandon_prepared();
+
+    selection.begin_from_call(recording.clone(), || Some(review()));
+
+    assert_eq!(selection.auto_started_session(), None);
+    assert_eq!(selection.take_for(&recording), Some(linked(review())));
+}
+
+#[test]
+fn the_meeting_being_recorded_is_known_until_the_recording_is_handed_over() {
+    let selection = MeetingSelection::new();
+    let recording = session("2026-10-26-110500");
+    selection.begin(recording.clone(), Some(review()));
+
+    assert_eq!(selection.active_meeting(), Some(review()));
+
+    selection.take_for(&recording);
+
+    assert_eq!(selection.active_meeting(), None);
 }

@@ -80,7 +80,11 @@ export interface AgendaBlock {
   readonly height_minutes: number;
   readonly column: number;
   readonly columns: number;
+  readonly armed: boolean;
+  readonly armed_state: ArmedState | null;
 }
+
+export type ArmedState = "missed";
 
 export interface HiddenMeeting {
   readonly event_id: string;

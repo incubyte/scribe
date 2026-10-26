@@ -2,11 +2,14 @@ pub mod agenda_cache;
 mod agenda_refresh;
 pub mod agenda_snapshot;
 pub mod agenda_view;
+pub mod armed;
+mod auto_record;
 pub mod call_meeting_view;
 pub(crate) mod commands;
 mod connection;
 pub mod connection_payload;
 pub mod day_bounds;
+mod notify;
 pub mod selection;
 mod session_link;
 mod titles;
@@ -23,6 +26,8 @@ use connection::OutlookConnection;
 use selection::MeetingSelection;
 use vault::KeyringVault;
 
+pub use auto_record::{note_going_to_sleep, note_meeting_finished, on_poll, stop_if_auto_started};
+pub use notify::notify_meeting_not_started;
 pub use session_link::{
     link_finished_session, note_call_ended, note_call_started, note_recording_started,
 };
@@ -31,6 +36,7 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) {
     app.manage(OutlookConnection::new());
     app.manage(AgendaCache::new());
     app.manage(MeetingSelection::new());
+    auto_record::install(app);
     match outlook_account() {
         Ok(account) => {
             app.manage(account);

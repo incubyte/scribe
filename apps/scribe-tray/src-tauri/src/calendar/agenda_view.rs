@@ -1,6 +1,6 @@
 use chrono::{DateTime, FixedOffset, SecondsFormat};
 use scribe_core::calendar::{
-    AgendaLayout, Meeting, OverflowChip, PlacedMeeting, TodaysAgenda, lay_out,
+    AgendaLayout, EventId, Meeting, OverflowChip, PlacedMeeting, TodaysAgenda, lay_out,
 };
 use serde::Serialize;
 
@@ -28,6 +28,25 @@ pub struct BlockView {
     height_minutes: u32,
     column: u8,
     columns: u8,
+    armed: bool,
+    armed_state: Option<&'static str>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Arming {
+    Off,
+    Armed,
+    Missed,
+}
+
+impl Arming {
+    fn is_armed(self) -> bool {
+        self != Arming::Off
+    }
+
+    fn state(self) -> Option<&'static str> {
+        (self == Arming::Missed).then_some("missed")
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -52,6 +71,21 @@ impl AgendaView {
             Some(fetched) => ready(fetched, snapshot.refresh_failed),
             None => without_meetings(snapshot.refresh_failed),
         }
+    }
+
+    #[must_use]
+    pub fn marked(mut self, arming: impl Fn(&EventId) -> Arming) -> AgendaView {
+        for block in &mut self.blocks {
+            block.mark(arming(&EventId::new(block.event_id.as_str())));
+        }
+        self
+    }
+}
+
+impl BlockView {
+    fn mark(&mut self, arming: Arming) {
+        self.armed = arming.is_armed();
+        self.armed_state = arming.state();
     }
 }
 
@@ -100,6 +134,8 @@ impl From<&PlacedMeeting> for BlockView {
             height_minutes: placed.height_minutes,
             column: placed.column,
             columns: placed.columns,
+            armed: false,
+            armed_state: None,
         }
     }
 }

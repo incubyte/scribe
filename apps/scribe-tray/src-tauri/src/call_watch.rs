@@ -87,6 +87,7 @@ fn watch_forever<R: Runtime>(app: &AppHandle<R>, probe: &dyn CallProbe, watch: &
             Ok(holds_microphone) => {
                 watch.observe(holds_microphone, Instant::now());
                 publish_presence(app, watch);
+                calendar::on_poll(app, watch.is_in_call());
                 open_if_call_started(app, watch);
             }
             Err(error) => tracing::debug!(%error, "could not read which apps hold the microphone"),
@@ -104,6 +105,7 @@ fn publish_presence<R: Runtime>(app: &AppHandle<R>, watch: &CallWatch) {
         calendar::note_call_started(app);
     }
     if presence_changed && !in_call {
+        calendar::stop_if_auto_started(app);
         calendar::note_call_ended(app);
     }
 }

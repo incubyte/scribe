@@ -7,6 +7,19 @@ use scribe_core::calendar::{
 use scribe_core::recording::SessionId;
 
 const UNMATCHED: &str = "unmatched";
+const MATCHED: &str = "matched";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AutoStart {
+    Yes,
+    No,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FinishedChoice {
+    pub meeting: Meeting,
+    pub start: AutoStart,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MeetingChoice {
@@ -39,6 +52,15 @@ impl CallMatch {
             state: UNMATCHED,
             candidates: Vec::new(),
             choice: MeetingChoice::of(meeting),
+        }
+    }
+
+    #[must_use]
+    pub fn decided(meeting: Meeting) -> CallMatch {
+        CallMatch {
+            state: MATCHED,
+            candidates: vec![meeting.clone()],
+            choice: MeetingChoice::Meeting(meeting),
         }
     }
 
@@ -82,21 +104,13 @@ impl CallMatch {
 }
 
 #[must_use]
-pub fn call_match(
-    agenda: Option<&TodaysAgenda>,
-    anchor: &MatchAnchor,
-    titles: &[String],
-) -> CallMatch {
-    let Some(agenda) = agenda else {
+pub fn call_match(inputs: Option<MatchInputs>) -> CallMatch {
+    let Some(inputs) = inputs else {
         return CallMatch::settled(None);
     };
-    let outcome = match_meeting(&MatchInputs {
-        agenda,
-        anchor: *anchor,
-        titles,
-    });
+    let outcome = match_meeting(&inputs);
     tracing::info!(r#match = outcome.kind(), "matched a call to the calendar");
-    settle(outcome, agenda, anchor)
+    settle(outcome, inputs.agenda, &inputs.anchor)
 }
 
 fn settle(outcome: MatchOutcome, agenda: &TodaysAgenda, anchor: &MatchAnchor) -> CallMatch {
@@ -134,10 +148,17 @@ pub fn adopt(pending: Option<CallMatch>, fallback: impl FnOnce() -> Option<Meeti
     pending.unwrap_or_else(|| CallMatch::settled(fallback()))
 }
 
+struct ActiveRecording {
+    session: SessionId,
+    found: CallMatch,
+    start: AutoStart,
+}
+
 #[derive(Default)]
 struct Selection {
     pending_call: Option<CallMatch>,
-    recording: Option<(SessionId, CallMatch)>,
+    prepared: Option<(CallMatch, AutoStart)>,
+    recording: Option<ActiveRecording>,
 }
 
 #[derive(Default)]
@@ -152,26 +173,68 @@ impl MeetingSelection {
     }
 
     pub fn begin(&self, session: SessionId, meeting: Option<Meeting>) {
-        self.selection().recording = Some((session, CallMatch::settled(meeting)));
+        self.selection().recording = Some(ActiveRecording {
+            session,
+            found: CallMatch::settled(meeting),
+            start: AutoStart::No,
+        });
+    }
+
+    pub fn prepare(&self, meeting: Meeting, start: AutoStart) {
+        self.selection().prepared = Some((CallMatch::decided(meeting), start));
+    }
+
+    pub fn abandon_prepared(&self) {
+        self.selection().prepared = None;
     }
 
     pub fn begin_from_call(&self, session: SessionId, fallback: impl FnOnce() -> Option<Meeting>) {
         let mut selection = self.selection();
-        let adopted = adopt(selection.pending_call.clone(), fallback);
-        selection.recording = Some((session, adopted));
+        let (found, start) = match selection.prepared.take() {
+            Some(prepared) => prepared,
+            None => (
+                adopt(selection.pending_call.clone(), fallback),
+                AutoStart::No,
+            ),
+        };
+        selection.recording = Some(ActiveRecording {
+            session,
+            found,
+            start,
+        });
     }
 
-    pub fn take_for(&self, session: &SessionId) -> Option<Meeting> {
+    pub fn take_for(&self, session: &SessionId) -> Option<FinishedChoice> {
         let mut selection = self.selection();
         let is_for_session = selection
             .recording
             .as_ref()
-            .is_some_and(|(recording, _)| recording == session);
+            .is_some_and(|recording| &recording.session == session);
         if !is_for_session {
             return None;
         }
-        let (_, finished) = selection.recording.take()?;
-        finished.selected().cloned()
+        let finished = selection.recording.take()?;
+        Some(FinishedChoice {
+            meeting: finished.found.selected()?.clone(),
+            start: finished.start,
+        })
+    }
+
+    #[must_use]
+    pub fn auto_started_session(&self) -> Option<SessionId> {
+        self.selection()
+            .recording
+            .as_ref()
+            .filter(|recording| recording.start == AutoStart::Yes)
+            .map(|recording| recording.session.clone())
+    }
+
+    #[must_use]
+    pub fn active_meeting(&self) -> Option<Meeting> {
+        self.selection()
+            .recording
+            .as_ref()
+            .and_then(|recording| recording.found.selected().cloned())
     }
 
     pub fn note_call_started(&self, found: CallMatch) {
@@ -186,7 +249,7 @@ impl MeetingSelection {
     pub fn current(&self) -> Option<CallMatch> {
         let selection = self.selection();
         match &selection.recording {
-            Some((_, found)) => Some(found.clone()),
+            Some(recording) => Some(recording.found.clone()),
             None => selection.pending_call.clone(),
         }
     }
@@ -194,7 +257,7 @@ impl MeetingSelection {
     pub fn choose(&self, id: Option<&EventId>) -> Result<(), ChooseError> {
         let mut selection = self.selection();
         let target = match selection.recording.as_mut() {
-            Some((_, found)) => Some(found),
+            Some(recording) => Some(&mut recording.found),
             None => selection.pending_call.as_mut(),
         };
         target.ok_or(ChooseError::NotACandidate)?.choose(id)
@@ -208,18 +271,8 @@ impl MeetingSelection {
 }
 
 #[must_use]
-pub fn chosen_meeting(
-    agenda: Option<&TodaysAgenda>,
-    anchor: &MatchAnchor,
-    titles: &[String],
-) -> Option<Meeting> {
-    let outcome = agenda.map_or(MatchOutcome::Unmatched, |agenda| {
-        match_meeting(&MatchInputs {
-            agenda,
-            anchor: *anchor,
-            titles,
-        })
-    });
+pub fn chosen_meeting(inputs: Option<MatchInputs>) -> Option<Meeting> {
+    let outcome = inputs.map_or(MatchOutcome::Unmatched, |inputs| match_meeting(&inputs));
     tracing::info!(
         r#match = outcome.kind(),
         "matched a recording to the calendar"

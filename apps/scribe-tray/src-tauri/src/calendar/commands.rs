@@ -3,6 +3,7 @@ use tauri::{AppHandle, Manager, Runtime};
 
 use super::agenda_cache::AgendaCache;
 use super::agenda_view::AgendaView;
+use super::auto_record;
 use super::call_meeting_view::CallMeetingView;
 use super::connection;
 use super::connection_payload::ConnectionPayload;
@@ -31,7 +32,7 @@ pub async fn disconnect_outlook<R: Runtime>(
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
 pub fn todays_agenda<R: Runtime>(app: AppHandle<R>) -> AgendaView {
-    app.state::<AgendaCache>().view()
+    auto_record::agenda_view(&app)
 }
 
 #[tauri::command]
@@ -58,4 +59,22 @@ pub fn choose_meeting<R: Runtime>(
         .map_err(|_| "that meeting is not one of the candidates".to_owned())?;
     session_link::publish_call_meeting(&app);
     Ok(session_link::current_call_meeting(&app))
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn arm_meeting<R: Runtime>(app: AppHandle<R>, event_id: String) {
+    auto_record::arm(&app, EventId::new(event_id));
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn disarm_meeting<R: Runtime>(app: AppHandle<R>, event_id: String) {
+    auto_record::disarm(&app, &EventId::new(event_id));
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn record_meeting<R: Runtime>(app: AppHandle<R>, event_id: String) {
+    auto_record::record(&app, &EventId::new(event_id));
 }

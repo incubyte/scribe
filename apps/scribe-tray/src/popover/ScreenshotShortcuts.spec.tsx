@@ -28,6 +28,9 @@ function backend(
     outlook_connection: () => ({ state: "disconnected", display_name: null, email: null, error: null }),
     todays_agenda: () => ({ status: "loading", stale: false, day_start: null, fetched_at: null, blocks: [], overflow: [] }),
     refresh_agenda: () => null,
+    arm_meeting: () => null,
+    disarm_meeting: () => null,
+    record_meeting: () => null,
     rebind_screenshot_shortcut: () => {
       const outcome = rebind();
       shortcuts = outcome.outcome === "accepted" ? shortcutsWithRegion(outcome.label) : shortcuts;

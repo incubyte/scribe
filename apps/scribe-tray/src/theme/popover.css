@@ -532,13 +532,65 @@
   line-height: 14px;
 }
 
+.agenda__block--upcoming {
+  min-height: var(--space-5);
+}
+
 .agenda__block--ended {
   border-left-style: dashed;
   background: var(--surface-sunken);
   color: var(--text-muted);
 }
 
+.agenda__switch {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--space-5);
+  min-height: var(--space-5);
+  cursor: pointer;
+}
+
+.agenda__switch-input {
+  width: 28px;
+  height: 16px;
+  margin: 0;
+  border: 1px solid var(--text-muted);
+  border-radius: 8px;
+  background: radial-gradient(circle at 7px 50%, var(--text-muted) 5px, transparent 5.5px) var(--surface);
+  cursor: pointer;
+  appearance: none;
+}
+
+.agenda__switch-input:checked {
+  border-color: var(--accent);
+  background: radial-gradient(circle at 19px 50%, var(--on-accent) 5px, transparent 5.5px) var(--accent);
+}
+
+.agenda__missed {
+  display: inline-flex;
+  flex: none;
+  gap: var(--space-1);
+  align-items: center;
+  font-weight: 600;
+}
+
+.agenda__record {
+  min-width: var(--space-5);
+  min-height: var(--space-5);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+
 .agenda__block:focus-visible,
+.agenda__switch-input:focus-visible,
+.agenda__record:focus-visible,
 .agenda__chip-button:focus-visible {
   outline: var(--focus-ring);
   outline-offset: var(--focus-ring-offset);

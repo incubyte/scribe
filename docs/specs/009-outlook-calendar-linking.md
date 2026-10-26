@@ -285,15 +285,15 @@ stateDiagram-v2
 
 **Acceptance criteria**
 
-- [ ] **5.6.1** Blocks for meetings that haven't ended show a switch named "Record <subject> automatically". Blocks for ended meetings show no switch.
-- [ ] **5.6.2** Turning a switch on writes the event id and today's date to `settings.json`. It survives a Scribe restart, and entries from earlier days are pruned on the first read each day ([4.9](#4-invariants)).
-- [ ] **5.6.3** When a Teams call starts in an armed meeting's window and matching resolves to that meeting, recording starts without the popover, a "Recording <subject>" notification shows, and the transcript is linked. When an armed meeting is one of several candidates and no window title decides, the armed one wins.
-- [ ] **5.6.4** An automatically started recording finalises when the call ends (`CALL_END_GRACE` after Teams releases the mic), and a "Saved <subject>" notification shows. Manually started recordings keep today's stop behaviour.
-- [ ] **5.6.5** Five minutes after an armed meeting's start with no call detected, a notification says the meeting was set to record but no Teams call was detected. The block shows "No call detected" with a Record button, which starts a recording linked to that meeting.
-- [ ] **5.6.6** Scribe never starts a recording from an armed switch without a detected Teams call ([4.7](#4-invariants)).
-- [ ] **5.6.7** If recording can't start (model not ready or permission denied), the existing "Scribe couldn't start recording" notification shows, naming the meeting, and the meeting becomes `Missed`.
-- [ ] **5.6.8** If the computer wakes after an armed meeting's call has already started, the next poll after wake still starts the recording, as long as the meeting hasn't ended.
-- [ ] **5.6.9** The switch is a native switch role with an on/off state announced, operable by keyboard, with a target of at least 24×24 px, and meets 3:1 boundary contrast.
+- [x] **5.6.1** Blocks for meetings that haven't ended show a switch named "Record <subject> automatically". Blocks for ended meetings show no switch.
+- [x] **5.6.2** Turning a switch on writes the event id and today's date to `settings.json`. It survives a Scribe restart, and entries from earlier days are pruned on the first read each day ([4.9](#4-invariants)).
+- [x] **5.6.3** When a Teams call starts in an armed meeting's window and matching resolves to that meeting, recording starts without the popover, a "Recording <subject>" notification shows, and the transcript is linked. When an armed meeting is one of several candidates and no window title decides, the armed one wins.
+- [x] **5.6.4** An automatically started recording finalises when the call ends (`CALL_END_GRACE` after Teams releases the mic), and a "Saved <subject>" notification shows. Manually started recordings keep today's stop behaviour.
+- [x] **5.6.5** Five minutes after an armed meeting's start with no call detected, a notification says the meeting was set to record but no Teams call was detected. The block shows "No call detected" with a Record button, which starts a recording linked to that meeting.
+- [x] **5.6.6** Scribe never starts a recording from an armed switch without a detected Teams call ([4.7](#4-invariants)).
+- [x] **5.6.7** If recording can't start (model not ready or permission denied), the existing "Scribe couldn't start recording" notification shows, naming the meeting, and the meeting becomes `Missed`.
+- [x] **5.6.8** If the computer wakes after an armed meeting's call has already started, the next poll after wake still starts the recording, as long as the meeting hasn't ended.
+- [x] **5.6.9** The switch is a native switch role with an on/off state announced, operable by keyboard, with a target of at least 24×24 px, and meets 3:1 boundary contrast.
 
 ### 5.7 Switch to the next meeting without leaving the call
 

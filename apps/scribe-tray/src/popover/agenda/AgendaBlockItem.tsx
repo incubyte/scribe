@@ -1,4 +1,6 @@
 import { blockName } from "./agendaTimes";
+import { ArmSwitch } from "./ArmSwitch";
+import { MissedNotice } from "./MissedNotice";
 import type { AgendaBlock } from "../types";
 
 interface AgendaBlockItemProps {
@@ -13,7 +15,7 @@ export function AgendaBlockItem({ block, ended }: AgendaBlockItemProps) {
     left: `${(block.column / block.columns) * 100}%`,
     width: `${100 / block.columns}%`,
   };
-  const className = ended ? "agenda__block agenda__block--ended" : "agenda__block";
+  const className = ended ? "agenda__block agenda__block--ended" : "agenda__block agenda__block--upcoming";
 
   return (
     <li className={className} style={style} tabIndex={0} aria-label={blockName(block, ended)}>
@@ -30,6 +32,16 @@ export function AgendaBlockItem({ block, ended }: AgendaBlockItemProps) {
           Teams
         </span>
       ) : null}
+      {ended ? null : <UpcomingControls block={block} />}
     </li>
+  );
+}
+
+function UpcomingControls({ block }: { readonly block: AgendaBlock }) {
+  return (
+    <>
+      {block.armed_state === "missed" ? <MissedNotice block={block} /> : null}
+      <ArmSwitch block={block} />
+    </>
   );
 }

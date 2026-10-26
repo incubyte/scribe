@@ -21,6 +21,8 @@ const block = (overrides: Partial<AgendaBlock>): AgendaBlock => ({
   height_minutes: 15,
   column: 0,
   columns: 1,
+  armed: false,
+  armed_state: null,
   ...overrides,
 });
 
@@ -226,6 +228,78 @@ describe("today's agenda in the popover", () => {
     backend(readyWith([STANDUP, REVIEW]));
     const { container } = render(<TodayAgenda />);
     await screen.findByRole("listitem", { name: /^Standup/ });
+
+    expect((await axe(container)).violations).toEqual([]);
+  });
+
+  it("offers a switch to record each meeting that has not ended", async () => {
+    await renderAgenda(readyWith([STANDUP, REVIEW]));
+
+    const review = await screen.findByRole("switch", { name: "Record Design review automatically" });
+    expect(review).not.toBeChecked();
+    expect(screen.queryByRole("switch", { name: /Standup/ })).not.toBeInTheDocument();
+  });
+
+  it("arms a meeting when its switch is turned on", async () => {
+    const handler = await renderAgenda(readyWith([REVIEW]));
+
+    await userEvent.click(await screen.findByRole("switch", { name: /Design review/ }));
+
+    expect(handler).toHaveBeenCalledWith("arm_meeting", { eventId: "review" });
+  });
+
+  it("disarms an armed meeting when its switch is turned off", async () => {
+    const handler = await renderAgenda(readyWith([{ ...REVIEW, armed: true }]));
+    const armed = await screen.findByRole("switch", { name: /Design review/ });
+    expect(armed).toBeChecked();
+
+    await userEvent.click(armed);
+
+    expect(handler).toHaveBeenCalledWith("disarm_meeting", { eventId: "review" });
+  });
+
+  it("turns the switch with the space key", async () => {
+    const handler = await renderAgenda(readyWith([REVIEW]));
+    const toggle = await screen.findByRole("switch", { name: /Design review/ });
+    toggle.focus();
+
+    await userEvent.keyboard(" ");
+
+    expect(handler).toHaveBeenCalledWith("arm_meeting", { eventId: "review" });
+  });
+
+  it("shows the switch on once the app says the meeting is armed", async () => {
+    await renderAgenda(readyWith([REVIEW]));
+    await screen.findByRole("switch", { name: /Design review/ });
+
+    await act(() => emit("agenda://updated", readyWith([{ ...REVIEW, armed: true }])));
+
+    expect(screen.getByRole("switch", { name: /Design review/ })).toBeChecked();
+  });
+
+  it("says no call was detected for a missed meeting and offers to record it", async () => {
+    const missed = { ...REVIEW, armed: true, armed_state: "missed" as const };
+    const handler = await renderAgenda(readyWith([missed]));
+
+    expect(await screen.findByText("No call detected")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Record Design review" }));
+
+    expect(handler).toHaveBeenCalledWith("record_meeting", { eventId: "review" });
+  });
+
+  it("offers nothing to record for a missed meeting that has ended", async () => {
+    await renderAgenda(readyWith([{ ...STANDUP, armed: true, armed_state: "missed" }]));
+
+    await screen.findByRole("listitem", { name: /^Standup/ });
+    expect(screen.queryByText("No call detected")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Record/ })).not.toBeInTheDocument();
+  });
+
+  it("has no accessibility violations with switches and a missed meeting", async () => {
+    const missed = { ...REVIEW, armed: true, armed_state: "missed" as const };
+    backend(readyWith([STANDUP, missed]));
+    const { container } = render(<TodayAgenda />);
+    await screen.findByText("No call detected");
 
     expect((await axe(container)).violations).toEqual([]);
   });

@@ -1,7 +1,7 @@
 use chrono::{DateTime, FixedOffset};
 use scribe_core::calendar::{
-    CalendarEvent, DayBounds, EventId, MatchAnchor, Meeting, Person, Response, ShowAs,
-    todays_agenda,
+    ArmedMeetings, CalendarEvent, DayBounds, EventId, MatchAnchor, MatchInputs, Meeting, Person,
+    Response, ShowAs, todays_agenda,
 };
 use scribe_tray::calendar::call_meeting_view::CallMeetingView;
 use scribe_tray::calendar::selection::{CallMatch, call_match};
@@ -43,7 +43,12 @@ fn match_for(ids: &[&str], at: &str) -> CallMatch {
         end: moment("2026-10-27T00:00:00+05:30"),
     };
     let agenda = todays_agenda(ids.iter().map(|id| event(id)).collect(), &day);
-    call_match(Some(&agenda), &MatchAnchor::new(moment(at)), &[])
+    call_match(Some(MatchInputs {
+        agenda: &agenda,
+        anchor: MatchAnchor::new(moment(at)),
+        titles: &[],
+        armed: &ArmedMeetings::default(),
+    }))
 }
 
 fn rendered(found: Option<&CallMatch>) -> Value {

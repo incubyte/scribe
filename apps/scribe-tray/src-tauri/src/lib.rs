@@ -77,6 +77,9 @@ fn with_commands<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         calendar::commands::refresh_agenda,
         calendar::commands::call_meeting,
         calendar::commands::choose_meeting,
+        calendar::commands::arm_meeting,
+        calendar::commands::disarm_meeting,
+        calendar::commands::record_meeting,
     ])
 }
 

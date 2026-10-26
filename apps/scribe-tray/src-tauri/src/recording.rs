@@ -4,6 +4,7 @@ use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
 use std::thread;
 
 use chrono::Local;
+use scribe_core::calendar::Meeting;
 use scribe_core::ports::{RecordingListener, StoreError, TranscriptStore};
 use scribe_core::recording::{
     CapturingLanes, LiveSession, LiveSessionSlot, Readiness, Recorder, RecorderError,
@@ -13,12 +14,13 @@ use serde::Serialize;
 use store_markdown::{MarkdownTranscriptStore, SETTINGS_FILE_NAME, TranscriptsFolder};
 use tauri::{AppHandle, Manager, Runtime};
 
+use crate::calendar::{self, selection::AutoStart, selection::MeetingSelection};
 use crate::lanes::{self, SpeechEngine};
 use crate::live_feed::{LiveFeed, state_name};
 use crate::model_setup;
 use crate::notifications;
 use crate::privacy;
-use crate::start_failure::StartError;
+use crate::start_failure::{StartError, StartFailureKind};
 use crate::tray;
 use crate::tray_listener::TrayRecordingListener;
 use crate::updates;
@@ -182,14 +184,35 @@ pub fn start_in_background<R: Runtime>(app: AppHandle<R>) {
     });
 }
 
+pub fn start_for_meeting<R: Runtime>(
+    app: &AppHandle<R>,
+    meeting: &Meeting,
+    start: AutoStart,
+) -> Result<SessionId, StartError> {
+    let selection = app.state::<MeetingSelection>();
+    selection.prepare(meeting.clone(), start);
+    let started = app.state::<RecordingController>().start();
+    if let Err(error) = &started {
+        selection.abandon_prepared();
+        let kind = announce_start_failure(app, error);
+        calendar::notify_meeting_not_started(app, &meeting.subject, kind);
+    }
+    started
+}
+
 fn report_start_failure<R: Runtime>(app: &AppHandle<R>, error: &StartError) {
+    let kind = announce_start_failure(app, error);
+    notifications::notify_recording_not_started(app, kind);
+}
+
+fn announce_start_failure<R: Runtime>(app: &AppHandle<R>, error: &StartError) -> StartFailureKind {
     let kind = error.kind();
     tracing::warn!(kind = kind.as_str(), "could not start recording");
-    notifications::notify_recording_not_started(app, kind);
     let payload = StartFailedPayload {
         reason_kind: kind.as_str(),
     };
     webview::emit(app, START_FAILED_EVENT, payload);
+    kind
 }
 
 pub fn install<R: Runtime>(app: &AppHandle<R>) -> Result<(), StoreError> {
@@ -242,7 +265,10 @@ fn mark_abandoned_sessions(store: &MarkdownTranscriptStore) {
 #[cfg(any(target_os = "macos", windows))]
 fn stop_before_sleep<R: Runtime>(app: &AppHandle<R>) {
     let app = app.clone();
-    crate::power::on_will_sleep(move || app.state::<RecordingController>().stop());
+    crate::power::on_will_sleep(move || {
+        calendar::note_going_to_sleep(&app);
+        app.state::<RecordingController>().stop();
+    });
 }
 
 #[cfg(not(any(target_os = "macos", windows)))]

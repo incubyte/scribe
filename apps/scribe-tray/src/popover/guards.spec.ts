@@ -124,12 +124,16 @@ describe("messages from the app are checked before the popover trusts them", () 
       height_minutes: 15,
       column: 0,
       columns: 1,
+      armed: false,
+      armed_state: null,
     };
 
     expect(isAgendaView(view)).toBe(true);
     expect(isAgendaView({ ...view, blocks: [block] })).toBe(true);
     expect(isAgendaView({ ...view, status: "stuck" })).toBe(false);
     expect(isAgendaView({ ...view, blocks: [{ ...block, columns: "2" }] })).toBe(false);
+    expect(isAgendaView({ ...view, blocks: [{ ...block, armed: true, armed_state: "missed" }] })).toBe(true);
+    expect(isAgendaView({ ...view, blocks: [{ ...block, armed_state: "recording" }] })).toBe(false);
     expect(isAgendaView({ ...view, overflow: [{ top_minutes: 1, height_minutes: 1 }] })).toBe(false);
   });
 });

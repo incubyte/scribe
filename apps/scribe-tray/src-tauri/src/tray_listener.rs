@@ -138,7 +138,9 @@ impl<R: Runtime> TrayUpdater<R> {
         self.recording_since = None;
         self.app.state::<LiveFeed>().stopped();
         self.app.state::<RecordingController>().stop_session(id);
-        calendar::link_finished_session(&self.app, id);
+        if let Some(finished) = calendar::link_finished_session(&self.app, id) {
+            calendar::note_meeting_finished(&self.app, &finished);
+        }
         recording::publish_state(&self.app);
         self.emit(STOPPED_EVENT, SessionPayload { id: id.to_string() });
     }

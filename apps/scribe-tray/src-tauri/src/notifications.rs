@@ -24,7 +24,7 @@ const SCREEN_RECORDING_NEEDED_TITLE: &str =
 #[cfg(target_os = "macos")]
 const SCREEN_RECORDING_NEEDED_BODY: &str = "Allow Scribe in Screen & System Audio Recording. If screenshots still fail after allowing it, quit and reopen Scribe.";
 
-const RECORDING_NOT_STARTED_TITLE: &str = "Scribe couldn't start recording";
+pub(crate) const RECORDING_NOT_STARTED_TITLE: &str = "Scribe couldn't start recording";
 const RECORDING_AUTO_STOPPED_TITLE: &str = "Recording auto-stopped";
 const SECONDS_PER_MINUTE: u64 = 60;
 

@@ -1,15 +1,19 @@
 use std::sync::Arc;
 
 use chrono::Local;
-use scribe_core::calendar::{Connection, MatchAnchor, MeetingLink, TodaysAgenda};
+use scribe_core::calendar::{
+    ArmedMeetings, Connection, MatchAnchor, MatchInputs, MatchOutcome, Meeting, MeetingLink,
+    TodaysAgenda, match_meeting,
+};
 use scribe_core::recording::SessionId;
 use store_markdown::MarkdownTranscriptStore;
 use tauri::{AppHandle, Manager, Runtime};
 
 use super::agenda_cache::AgendaCache;
+use super::armed::ArmedStore;
 use super::call_meeting_view::CallMeetingView;
 use super::connection;
-use super::selection::{CallMatch, MeetingSelection, call_match, chosen_meeting};
+use super::selection::{CallMatch, FinishedChoice, MeetingSelection, call_match, chosen_meeting};
 use super::titles;
 use crate::call_watch::CallPresence;
 use crate::webview;
@@ -21,29 +25,73 @@ pub fn note_recording_started<R: Runtime>(app: &AppHandle<R>, session: &SessionI
         return;
     };
     selection.begin_from_call(session.clone(), || {
+        let clues = call_clues(app);
         chosen_meeting(
-            connected_agenda(app).as_ref(),
-            &anchor_now(app),
-            &call_titles(app),
+            connected_agenda(app)
+                .as_ref()
+                .map(|agenda| clues.inputs(agenda)),
         )
     });
+    if let (Some(meeting), Some(armed)) =
+        (selection.active_meeting(), app.try_state::<ArmedStore>())
+    {
+        armed.note_recording(&meeting.event_id);
+    }
     publish_call_meeting(app);
 }
 
-pub fn link_finished_session<R: Runtime>(app: &AppHandle<R>, session: &SessionId) {
-    let Some(meeting) = app
-        .try_state::<MeetingSelection>()
-        .and_then(|selection| selection.take_for(session))
-    else {
-        return;
-    };
+pub fn link_finished_session<R: Runtime>(
+    app: &AppHandle<R>,
+    session: &SessionId,
+) -> Option<FinishedChoice> {
+    let finished = app.try_state::<MeetingSelection>()?.take_for(session)?;
     let store = app.state::<Arc<MarkdownTranscriptStore>>();
-    if let Err(error) = store.link_meeting(session, MeetingLink::from_meeting(&meeting)) {
+    let link = MeetingLink::from_meeting(&finished.meeting);
+    if let Err(error) = store.link_meeting(session, link) {
         tracing::warn!(%error, "could not save the meeting with the transcript");
+    }
+    Some(finished)
+}
+
+pub(super) fn call_meeting_now<R: Runtime>(
+    app: &AppHandle<R>,
+    agenda: &TodaysAgenda,
+) -> Option<Meeting> {
+    match match_meeting(&call_clues(app).inputs(agenda)) {
+        MatchOutcome::Matched(meeting) => Some(meeting),
+        MatchOutcome::Ambiguous(_) | MatchOutcome::Unmatched => None,
     }
 }
 
-fn connected_agenda<R: Runtime>(app: &AppHandle<R>) -> Option<TodaysAgenda> {
+struct CallClues {
+    anchor: MatchAnchor,
+    titles: Vec<String>,
+    armed: ArmedMeetings,
+}
+
+impl CallClues {
+    fn inputs<'a>(&'a self, agenda: &'a TodaysAgenda) -> MatchInputs<'a> {
+        MatchInputs {
+            agenda,
+            anchor: self.anchor,
+            titles: &self.titles,
+            armed: &self.armed,
+        }
+    }
+}
+
+fn call_clues<R: Runtime>(app: &AppHandle<R>) -> CallClues {
+    CallClues {
+        anchor: anchor_now(app),
+        titles: call_titles(app),
+        armed: app
+            .try_state::<ArmedStore>()
+            .map(|store| store.armed())
+            .unwrap_or_default(),
+    }
+}
+
+pub(super) fn connected_agenda<R: Runtime>(app: &AppHandle<R>) -> Option<TodaysAgenda> {
     match connection::current_connection(app) {
         Connection::Connected(_) => app.try_state::<AgendaCache>()?.agenda(),
         _ => None,
@@ -96,11 +144,12 @@ fn match_for_call<R: Runtime>(app: &AppHandle<R>) -> CallMatch {
     ) {
         return CallMatch::settled(None);
     }
-    let presence = app.state::<CallPresence>();
-    presence.remember_call_titles(titles::teams_titles().teams_window_titles());
+    app.state::<CallPresence>()
+        .remember_call_titles(titles::teams_titles().teams_window_titles());
+    let clues = call_clues(app);
     call_match(
-        connected_agenda(app).as_ref(),
-        &anchor_now(app),
-        &presence.call_titles(),
+        connected_agenda(app)
+            .as_ref()
+            .map(|agenda| clues.inputs(agenda)),
     )
 }

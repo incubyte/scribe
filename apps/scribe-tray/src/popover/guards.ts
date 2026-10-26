@@ -3,6 +3,7 @@ import type {
   AgendaChip,
   AgendaStatus,
   AgendaView,
+  ArmedState,
   CallMeetingState,
   CallMeetingView,
   ClaudeDesktopStatus,
@@ -163,6 +164,7 @@ export function isOutlookConnection(value: unknown): value is OutlookConnection 
 }
 
 const AGENDA_STATUSES: readonly AgendaStatus[] = ["ready", "loading", "failed"];
+const ARMED_STATES: readonly ArmedState[] = ["missed"];
 
 const isHiddenMeeting = (value: unknown): value is HiddenMeeting =>
   hasFields(value, {
@@ -184,6 +186,8 @@ const isAgendaBlock = (value: unknown): value is AgendaBlock =>
     height_minutes: isNumber,
     column: isNumber,
     columns: isNumber,
+    armed: isBoolean,
+    armed_state: isNullable(isOneOf<ArmedState>(ARMED_STATES)),
   });
 
 const isAgendaChip = (value: unknown): value is AgendaChip =>

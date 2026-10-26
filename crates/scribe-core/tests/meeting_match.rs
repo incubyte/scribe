@@ -1,7 +1,8 @@
+use chrono::NaiveDate;
 use chrono::{DateTime, FixedOffset};
 use scribe_core::calendar::{
-    CalendarEvent, DayBounds, EventId, MatchAnchor, MatchInputs, MatchOutcome, Meeting, Person,
-    Response, ShowAs, TodaysAgenda, match_meeting, todays_agenda,
+    ArmedMeetings, CalendarEvent, DayBounds, EventId, MatchAnchor, MatchInputs, MatchOutcome,
+    Meeting, Person, Response, ShowAs, TodaysAgenda, match_meeting, todays_agenda,
 };
 
 const START_OF_REVIEW: &str = "2026-10-26T11:00:00+05:30";
@@ -52,6 +53,7 @@ fn matched_at(meetings: Vec<Meeting>, anchor: &str) -> MatchOutcome {
         agenda: &agenda,
         anchor: MatchAnchor::new(moment(anchor)),
         titles: &[],
+        armed: &ArmedMeetings::default(),
     })
 }
 
@@ -61,6 +63,30 @@ fn matched_with_titles(meetings: Vec<Meeting>, anchor: &str, titles: &[String]) 
         agenda: &agenda,
         anchor: MatchAnchor::new(moment(anchor)),
         titles,
+        armed: &ArmedMeetings::default(),
+    })
+}
+
+fn armed(id: &str) -> ArmedMeetings {
+    let mut armed = ArmedMeetings::default();
+    armed.arm(
+        EventId::new(id),
+        NaiveDate::from_ymd_opt(2026, 10, 26).unwrap(),
+    );
+    armed
+}
+
+fn matched_with_armed(
+    meetings: Vec<Meeting>,
+    titles: &[String],
+    armed: &ArmedMeetings,
+) -> MatchOutcome {
+    let agenda = agenda_of(meetings);
+    match_meeting(&MatchInputs {
+        agenda: &agenda,
+        anchor: MatchAnchor::new(moment("2026-10-26T11:05:00+05:30")),
+        titles,
+        armed,
     })
 }
 
@@ -202,6 +228,50 @@ fn titles_that_name_no_candidate_leave_the_ranking_in_charge() {
     let titles = vec!["Unrelated chat | Microsoft Teams".to_owned()];
 
     let outcome = matched_with_titles(vec![review()], "2026-10-26T11:05:00+05:30", &titles);
+
+    assert_eq!(outcome, MatchOutcome::Matched(review()));
+}
+
+#[test]
+fn an_armed_candidate_wins_when_no_title_decides() {
+    let standup = meeting("standup", START_OF_REVIEW, END_OF_REVIEW);
+
+    let outcome = matched_with_armed(vec![review(), standup.clone()], &[], &armed("standup"));
+
+    assert_eq!(outcome, MatchOutcome::Matched(standup));
+}
+
+#[test]
+fn an_armed_candidate_wins_over_a_higher_ranked_one() {
+    let tentative = Meeting {
+        response: Response::Tentative,
+        ..meeting("tentative", START_OF_REVIEW, END_OF_REVIEW)
+    };
+
+    let outcome = matched_with_armed(vec![review(), tentative.clone()], &[], &armed("tentative"));
+
+    assert_eq!(outcome, MatchOutcome::Matched(tentative));
+}
+
+#[test]
+fn a_teams_window_title_still_beats_an_armed_candidate() {
+    let standup = meeting("standup", START_OF_REVIEW, END_OF_REVIEW);
+    let titles = vec!["Review | Microsoft Teams".to_owned()];
+
+    let outcome = matched_with_armed(vec![review(), standup], &titles, &armed("standup"));
+
+    assert_eq!(outcome, MatchOutcome::Matched(review()));
+}
+
+#[test]
+fn an_armed_meeting_that_is_not_a_candidate_does_not_match() {
+    let later = meeting(
+        "later",
+        "2026-10-26T15:00:00+05:30",
+        "2026-10-26T15:30:00+05:30",
+    );
+
+    let outcome = matched_with_armed(vec![review(), later], &[], &armed("later"));
 
     assert_eq!(outcome, MatchOutcome::Matched(review()));
 }

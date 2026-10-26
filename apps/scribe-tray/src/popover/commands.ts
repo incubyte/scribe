@@ -87,6 +87,12 @@ export const fetchTodaysAgenda = () =>
 
 export const refreshAgenda = () => invoke("refresh_agenda");
 
+export const armMeeting = (eventId: string) => invoke("arm_meeting", { eventId });
+
+export const disarmMeeting = (eventId: string) => invoke("disarm_meeting", { eventId });
+
+export const recordMeeting = (eventId: string) => invoke("record_meeting", { eventId });
+
 export const fetchCallMeeting = () =>
   invoke<unknown>("call_meeting").then(expecting(isCallMeetingView, "call meeting"));
 
