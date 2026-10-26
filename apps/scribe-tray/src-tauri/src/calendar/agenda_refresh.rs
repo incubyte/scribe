@@ -16,6 +16,7 @@ use super::agenda_snapshot::FetchedAgenda;
 use super::agenda_view::AgendaView;
 use super::armed::ArmedStore;
 use super::connection;
+use super::connection_state::AttemptTicket;
 use super::day_bounds::today_bounds;
 use crate::webview;
 
@@ -95,18 +96,19 @@ fn fetch<R: Runtime>(app: &AppHandle<R>) -> bool {
         tracing::warn!("could not work out today's bounds");
         return false;
     };
+    let ticket = connection::ticket(app);
     match source.events_between(&day) {
         Ok(events) => {
-            let agenda = todays_agenda(events, &day);
-            publish(
-                app,
-                &app.state::<AgendaCache>()
-                    .record_fetch(fetched(agenda, day, now)),
-            );
+            let agenda = fetched(todays_agenda(events, &day), day, now);
+            connection::while_connected_since(app, ticket, || keep_fetched(app, agenda));
             true
         }
-        Err(error) => settle_failure(app, &error),
+        Err(error) => settle_failure(app, ticket, &error),
     }
+}
+
+fn keep_fetched<R: Runtime>(app: &AppHandle<R>, agenda: FetchedAgenda) {
+    publish(app, &app.state::<AgendaCache>().record_fetch(agenda));
 }
 
 fn fetched(
@@ -121,13 +123,19 @@ fn fetched(
     }
 }
 
-fn settle_failure<R: Runtime>(app: &AppHandle<R>, error: &CalendarError) -> bool {
+fn settle_failure<R: Runtime>(
+    app: &AppHandle<R>,
+    ticket: AttemptTicket,
+    error: &CalendarError,
+) -> bool {
     if matches!(error, CalendarError::ReconnectNeeded) {
-        connection::require_reconnect(app);
+        connection::require_reconnect(app, ticket);
         return true;
     }
     tracing::warn!(kind = error.kind(), "could not refresh the agenda");
-    publish(app, &app.state::<AgendaCache>().record_failure());
+    connection::while_connected_since(app, ticket, || {
+        publish(app, &app.state::<AgendaCache>().record_failure());
+    });
     false
 }
 

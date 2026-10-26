@@ -425,3 +425,14 @@ fn forgetting_a_missed_meeting_arms_it_afresh() {
 
     assert_eq!(watch.state_of(&review_id()), ArmedState::Armed);
 }
+
+#[test]
+fn a_meeting_armed_after_a_call_overlapped_its_start_is_not_reported_missed() {
+    let mut watch = ArmedWatch::new();
+    watch.note_call_seen(moment(FOUR_MINUTES_IN));
+
+    let actions = poll_at(&mut watch, &NO_CALL, TWENTY_MINUTES_IN);
+
+    assert!(actions.is_empty());
+    assert_eq!(watch.state_of(&review_id()), ArmedState::Armed);
+}

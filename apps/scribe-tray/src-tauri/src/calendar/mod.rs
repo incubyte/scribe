@@ -8,6 +8,7 @@ pub mod call_meeting_view;
 pub(crate) mod commands;
 mod connection;
 pub mod connection_payload;
+pub mod connection_state;
 pub mod day_bounds;
 mod notify;
 pub mod selection;
@@ -24,6 +25,7 @@ use calendar_graph::{OutlookAccount, ReqwestTransport};
 use tauri::{AppHandle, Manager, Runtime};
 
 use agenda_cache::AgendaCache;
+use armed::CallStartPopover;
 use connection::OutlookConnection;
 use selection::MeetingSelection;
 use switch_state::SwitchState;
@@ -55,9 +57,10 @@ pub fn install<R: Runtime>(app: &AppHandle<R>) {
     }
 }
 
-pub fn on_poll<R: Runtime>(app: &AppHandle<R>, in_call: bool) {
-    auto_record::on_poll(app, in_call);
+pub fn on_poll<R: Runtime>(app: &AppHandle<R>, in_call: bool) -> CallStartPopover {
+    let popover = auto_record::on_poll(app, in_call);
     switching::on_poll(app, in_call);
+    popover
 }
 
 fn outlook_account() -> Result<Arc<OutlookAccount>, Box<dyn Error>> {

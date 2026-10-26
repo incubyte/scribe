@@ -39,7 +39,6 @@ function OpenableLine({ view, onChoose }: Readonly<{ view: CallMeetingView } & P
   const [expanded, setExpanded] = useState<boolean | null>(null);
   const choicesId = useId();
   const open = expanded ?? view.state === "ambiguous";
-
   return (
     <section className="meeting-line" aria-label="Meeting">
       <button

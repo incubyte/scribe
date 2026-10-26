@@ -9,6 +9,7 @@ use scribe_core::ports::CallProbe;
 use tauri::{AppHandle, Manager, Runtime};
 
 use crate::calendar;
+use crate::calendar::armed::CallStartPopover;
 use crate::call_probes;
 use crate::popover;
 use crate::recording;
@@ -105,8 +106,8 @@ fn watch_forever<R: Runtime>(app: &AppHandle<R>, probe: &dyn CallProbe, watch: &
             Ok(holds_microphone) => {
                 watch.observe(holds_microphone, Instant::now());
                 publish_presence(app, watch);
-                calendar::on_poll(app, watch.is_in_call());
-                open_if_call_started(app, watch);
+                let popover = calendar::on_poll(app, watch.is_in_call());
+                open_if_call_started(app, watch, popover);
             }
             Err(error) => tracing::debug!(%error, "could not read which apps hold the microphone"),
         }
@@ -137,12 +138,21 @@ fn call_ended<R: Runtime>(app: &AppHandle<R>) {
     calendar::note_call_ended(app);
 }
 
-fn open_if_call_started<R: Runtime>(app: &AppHandle<R>, watch: &mut CallWatch) {
+fn open_if_call_started<R: Runtime>(
+    app: &AppHandle<R>,
+    watch: &mut CallWatch,
+    popover: CallStartPopover,
+) {
     if !watch.is_start_due() {
         return;
     }
     watch.mark_reported();
-    open_unless_recording(app);
+    match popover {
+        CallStartPopover::Open => open_unless_recording(app),
+        CallStartPopover::StayClosed => {
+            tracing::info!("a call started a meeting set to record; the popover stays closed");
+        }
+    }
 }
 
 fn open_unless_recording<R: Runtime>(app: &AppHandle<R>) {

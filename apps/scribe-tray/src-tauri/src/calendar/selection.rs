@@ -117,11 +117,7 @@ impl CallMatch {
     }
 
     #[must_use]
-    pub fn is_declared_not_a_meeting(&self) -> bool {
-        self.source == ChoiceSource::User && self.choice == MeetingChoice::NotAMeeting
-    }
-
-    fn is_chosen_by_user(&self) -> bool {
+    pub fn is_chosen_by_user(&self) -> bool {
         self.source == ChoiceSource::User
     }
 
@@ -269,11 +265,11 @@ impl MeetingSelection {
     }
 
     #[must_use]
-    pub fn is_call_declared_not_a_meeting(&self) -> bool {
+    pub fn is_call_chosen_by_user(&self) -> bool {
         self.selection()
             .pending_call
             .as_ref()
-            .is_some_and(CallMatch::is_declared_not_a_meeting)
+            .is_some_and(CallMatch::is_chosen_by_user)
     }
 
     pub fn note_call_started(&self, found: CallMatch) {

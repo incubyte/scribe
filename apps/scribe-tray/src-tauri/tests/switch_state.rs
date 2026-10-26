@@ -157,3 +157,25 @@ fn titles_are_read_at_most_once_per_recheck_interval() {
     assert!(!just_after);
     assert!(after_the_interval);
 }
+
+#[test]
+fn a_switch_is_in_progress_from_handing_over_the_next_meeting_until_it_finishes() {
+    let state = SwitchState::new();
+    offer_retro(&state);
+
+    state.take_for_switch();
+    let while_switching = state.is_switching();
+    state.finish_switch();
+
+    assert!(while_switching);
+    assert!(!state.is_switching());
+}
+
+#[test]
+fn no_switch_is_in_progress_when_there_was_no_prompt_to_switch_from() {
+    let state = SwitchState::new();
+
+    state.take_for_switch();
+
+    assert!(!state.is_switching());
+}

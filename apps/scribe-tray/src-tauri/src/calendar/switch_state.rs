@@ -33,6 +33,7 @@ struct Switching {
     prompts: SwitchPrompts,
     open: Option<SwitchPrompt>,
     last_title_check: Option<Instant>,
+    switch_in_progress: bool,
 }
 
 #[derive(Default)]
@@ -79,7 +80,19 @@ impl SwitchState {
     }
 
     pub fn take_for_switch(&self) -> Option<Meeting> {
-        self.switching().open.take().map(|prompt| prompt.to)
+        let mut switching = self.switching();
+        let next = switching.open.take().map(|prompt| prompt.to)?;
+        switching.switch_in_progress = true;
+        Some(next)
+    }
+
+    pub fn finish_switch(&self) {
+        self.switching().switch_in_progress = false;
+    }
+
+    #[must_use]
+    pub fn is_switching(&self) -> bool {
+        self.switching().switch_in_progress
     }
 
     pub fn withdraw(&self) -> bool {

@@ -86,6 +86,7 @@ pub fn switch<R: Runtime>(app: &AppHandle<R>) {
     if recording::start_for_meeting(app, &next, start).is_err() {
         tracing::warn!("could not start recording the next meeting after switching");
     }
+    app.state::<SwitchState>().finish_switch();
 }
 
 pub fn keep<R: Runtime>(app: &AppHandle<R>) {

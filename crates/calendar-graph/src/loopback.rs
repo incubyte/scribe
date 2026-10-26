@@ -10,6 +10,7 @@ use crate::sign_in_error::SignInError;
 
 const ACCEPT_POLL: Duration = Duration::from_millis(200);
 const SHORTEST_READ_WAIT: Duration = Duration::from_millis(1);
+const LONGEST_READ_WAIT: Duration = Duration::from_secs(2);
 const MAX_REQUEST_BYTES: u64 = 16 * 1024;
 const CLOSE_TAB_PAGE: &str = "<!doctype html><meta charset=\"utf-8\"><title>Scribe</title>\
 <p>You can close this tab and return to Scribe.</p>";
@@ -44,10 +45,19 @@ impl LoopbackListener {
 
     pub fn wait_for_redirect(self, deadline: Duration) -> Result<RedirectParams, SignInError> {
         let give_up_at = Instant::now() + deadline;
-        let mut stream = self.accept_before(give_up_at)?;
-        let target = read_request_target(&stream)?;
+        loop {
+            let stream = self.accept_before(give_up_at)?;
+            if let Some(params) = self.redirect_on(stream) {
+                return Ok(params);
+            }
+        }
+    }
+
+    fn redirect_on(&self, mut stream: TcpStream) -> Option<RedirectParams> {
+        let target = read_request_target(&stream).ok()?;
+        let params = self.redirect_params(&target)?;
         answer_close_tab(&mut stream);
-        self.redirect_params(&target)
+        Some(params)
     }
 
     fn accept_before(&self, give_up_at: Instant) -> Result<TcpStream, SignInError> {
@@ -65,12 +75,8 @@ impl LoopbackListener {
         }
     }
 
-    fn redirect_params(&self, target: &str) -> Result<RedirectParams, SignInError> {
-        let url = self
-            .redirect_uri
-            .join(target)
-            .map_err(|_| SignInError::Malformed)?;
-        params_from(&url)
+    fn redirect_params(&self, target: &str) -> Option<RedirectParams> {
+        params_from(&self.redirect_uri.join(target).ok()?)
     }
 }
 
@@ -86,6 +92,7 @@ fn pause_until_next_poll(give_up_at: Instant) -> Result<(), SignInError> {
 fn prepared(stream: TcpStream, give_up_at: Instant) -> Result<TcpStream, SignInError> {
     let read_wait = give_up_at
         .saturating_duration_since(Instant::now())
+        .min(LONGEST_READ_WAIT)
         .max(SHORTEST_READ_WAIT);
     stream
         .set_nonblocking(false)
@@ -136,21 +143,21 @@ fn answer_close_tab(stream: &mut TcpStream) {
     let _ = stream.write_all(response.as_bytes());
 }
 
-fn params_from(url: &Url) -> Result<RedirectParams, SignInError> {
+fn params_from(url: &Url) -> Option<RedirectParams> {
     let value = |name: &str| {
         url.query_pairs()
             .find(|(key, _)| key == name)
             .map(|(_, value)| value.into_owned())
     };
-    if let (Some(code), Some(state)) = (value("code"), value("state")) {
-        return Ok(RedirectParams::Code {
+    let state = value("state")?;
+    if let Some(code) = value("code") {
+        return Some(RedirectParams::Code {
             code: Secret::new(code),
             state,
         });
     }
-    let error = value("error").ok_or(SignInError::Malformed)?;
-    Ok(RedirectParams::Refused {
-        error,
+    Some(RedirectParams::Refused {
+        error: value("error")?,
         description: value("error_description").unwrap_or_default(),
     })
 }

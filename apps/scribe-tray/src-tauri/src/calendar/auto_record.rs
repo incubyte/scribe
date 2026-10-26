@@ -11,10 +11,14 @@ use tauri_plugin_store::StoreExt;
 use super::agenda_cache::AgendaCache;
 use super::agenda_refresh;
 use super::agenda_view::AgendaView;
-use super::armed::{ARMED_MEETINGS_KEY, ArmedStore, entries_from, settings_value};
+use super::armed::{
+    ARMED_MEETINGS_KEY, ArmedStore, CallStartPopover, entries_from, popover_on_call_start,
+    settings_value,
+};
 use super::notify;
 use super::selection::{AutoStart, FinishedChoice, MeetingSelection};
 use super::session_link;
+use super::switch_state::SwitchState;
 use crate::recording::{self, RecordingController};
 
 const RECORD_THREAD: &str = "record-meeting";
@@ -22,7 +26,18 @@ const AUTO_START_THREAD: &str = "auto-start-meeting";
 const AUTO_STOP_THREAD: &str = "auto-stop-meeting";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct NotOnTodaysAgenda;
+pub enum ArmError {
+    NotOnTodaysAgenda,
+}
+
+impl ArmError {
+    #[must_use]
+    pub fn reason(self) -> &'static str {
+        match self {
+            ArmError::NotOnTodaysAgenda => "that meeting is not on today's agenda",
+        }
+    }
+}
 
 pub fn install<R: Runtime>(app: &AppHandle<R>) {
     let saved = saved_entries(app);
@@ -69,8 +84,8 @@ pub fn agenda_view<R: Runtime>(app: &AppHandle<R>) -> AgendaView {
         .mark(app.state::<AgendaCache>().view())
 }
 
-pub fn arm<R: Runtime>(app: &AppHandle<R>, id: EventId) -> Result<(), NotOnTodaysAgenda> {
-    todays_meeting(app, &id).ok_or(NotOnTodaysAgenda)?;
+pub fn arm<R: Runtime>(app: &AppHandle<R>, id: EventId) -> Result<(), ArmError> {
+    todays_meeting(app, &id).ok_or(ArmError::NotOnTodaysAgenda)?;
     app.state::<ArmedStore>().arm(id, Local::now().date_naive());
     save(app);
     publish_agenda(app);
@@ -97,7 +112,7 @@ pub fn record<R: Runtime>(app: &AppHandle<R>, id: &EventId) {
 fn run_on_thread(name: &str, job: impl FnOnce() + Send + 'static) {
     let spawned = thread::Builder::new().name(name.to_owned()).spawn(job);
     if let Err(error) = spawned {
-        tracing::error!(%error, thread = name, "could not start the meeting recording thread");
+        tracing::error!(%error, thread = name, "could not start a background thread");
     }
 }
 
@@ -110,19 +125,25 @@ fn todays_meeting<R: Runtime>(app: &AppHandle<R>, id: &EventId) -> Option<Meetin
         .cloned()
 }
 
-pub fn on_poll<R: Runtime>(app: &AppHandle<R>, in_call: bool) {
+pub fn on_poll<R: Runtime>(app: &AppHandle<R>, in_call: bool) -> CallStartPopover {
     let Some(store) = app.try_state::<ArmedStore>() else {
-        return;
+        return CallStartPopover::Open;
     };
     if store.prune_for(Local::now().date_naive()) {
         save(app);
     }
-    for action in due_actions(app, &store, in_call) {
+    if in_call {
+        store.note_call_seen(Local::now().fixed_offset());
+    }
+    let due = take_due_actions(app, &store, in_call);
+    let popover = popover_on_call_start(&due);
+    for action in due {
         perform(app, action);
     }
+    popover
 }
 
-fn due_actions<R: Runtime>(
+fn take_due_actions<R: Runtime>(
     app: &AppHandle<R>,
     store: &ArmedStore,
     in_call: bool,
@@ -149,13 +170,20 @@ fn meeting_to_record_by_itself<R: Runtime>(
     app: &AppHandle<R>,
     agenda: &TodaysAgenda,
 ) -> Option<Meeting> {
-    let declined = app
-        .try_state::<MeetingSelection>()
-        .is_some_and(|selection| selection.is_call_declared_not_a_meeting());
-    if declined {
+    if is_call_chosen_by_user(app) || is_switching(app) {
         return None;
     }
     session_link::call_meeting_now(app, agenda)
+}
+
+fn is_call_chosen_by_user<R: Runtime>(app: &AppHandle<R>) -> bool {
+    app.try_state::<MeetingSelection>()
+        .is_some_and(|selection| selection.is_call_chosen_by_user())
+}
+
+fn is_switching<R: Runtime>(app: &AppHandle<R>) -> bool {
+    app.try_state::<SwitchState>()
+        .is_some_and(|state| state.is_switching())
 }
 
 fn perform<R: Runtime>(app: &AppHandle<R>, action: ArmedAction) {

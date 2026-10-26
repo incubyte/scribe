@@ -4,7 +4,9 @@ use scribe_core::calendar::{
     Response, ShowAs, WatchInputs, todays_agenda,
 };
 use scribe_tray::calendar::agenda_view::Arming;
-use scribe_tray::calendar::armed::{ArmedStore, entries_from, settings_value};
+use scribe_tray::calendar::armed::{
+    ArmedStore, CallStartPopover, entries_from, popover_on_call_start, settings_value,
+};
 use scribe_tray::calendar::selection::AutoStart;
 use serde_json::json;
 
@@ -215,4 +217,23 @@ fn a_start_failure_shows_the_meeting_as_missed() {
     store.note_start_failed(&review_id());
 
     assert_eq!(store.arming_of(&review_id()), Arming::Missed);
+}
+
+#[test]
+fn a_call_that_starts_an_armed_meeting_by_itself_keeps_the_popover_closed() {
+    let due = [ArmedAction::StartRecording(review())];
+
+    assert_eq!(popover_on_call_start(&due), CallStartPopover::StayClosed);
+}
+
+#[test]
+fn a_call_with_nothing_starting_by_itself_opens_the_popover() {
+    assert_eq!(popover_on_call_start(&[]), CallStartPopover::Open);
+}
+
+#[test]
+fn a_missed_meeting_reported_as_a_call_starts_still_opens_the_popover() {
+    let due = [ArmedAction::ReportMissed(review())];
+
+    assert_eq!(popover_on_call_start(&due), CallStartPopover::Open);
 }

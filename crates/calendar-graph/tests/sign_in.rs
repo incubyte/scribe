@@ -7,7 +7,7 @@ use calendar_graph::{OutlookAccount, SignInError, challenge_for};
 use scribe_core::calendar::{AccountIdentity, CalendarError, Secret, VaultError};
 use support::{
     DISPLAY_NAME, EMAIL, FakeTransport, FakeVault, HeldTransport, ScriptedBrowser, error_reply,
-    query_value, token_reply, unreachable,
+    is_held_back, query_value, started_on_thread, token_reply, unreachable,
 };
 
 const AN_HOUR: u64 = 3600;
@@ -312,13 +312,33 @@ fn disconnecting_while_an_access_token_refreshes_leaves_the_vault_empty() {
     });
     gate.wait_for_request();
 
-    let disconnecting = thread::spawn({
+    let disconnecting = started_on_thread({
         let account = Arc::clone(&account);
         move || account.disconnect()
     });
+    let held_back_by_the_refresh = is_held_back(&disconnecting);
+    let token_while_held_back = vault.stored();
     gate.release();
     refreshing.join().unwrap().unwrap();
     disconnecting.join().unwrap().unwrap();
 
+    assert!(held_back_by_the_refresh);
+    assert_eq!(token_while_held_back.as_deref(), Some("refresh-1"));
     assert_eq!(vault.stored(), None);
+}
+
+#[test]
+fn disconnecting_before_the_redirect_arrives_leaves_the_vault_empty() {
+    let transport = FakeTransport::replying(vec![token_reply("access-1", "refresh-1", AN_HOUR)]);
+    let vault = FakeVault::empty();
+    let account = OutlookAccount::new(transport, vault.clone());
+    let browser = ScriptedBrowser::approving();
+
+    let outcome = account.connect(&|url| {
+        account.disconnect().unwrap();
+        browser.open(url);
+    });
+
+    assert_eq!(vault.stored(), None);
+    assert!(matches!(outcome, Err(SignInError::Disconnected)));
 }

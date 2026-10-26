@@ -1,6 +1,6 @@
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
-use chrono::NaiveDate;
+use chrono::{DateTime, FixedOffset, NaiveDate};
 use scribe_core::calendar::{
     ArmedAction, ArmedEntry, ArmedMeetings, ArmedState, ArmedWatch, EventId, WatchInputs,
 };
@@ -43,6 +43,24 @@ pub fn settings_value(armed: &ArmedMeetings) -> Value {
             })
         })
         .collect()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CallStartPopover {
+    Open,
+    StayClosed,
+}
+
+#[must_use]
+pub fn popover_on_call_start(due: &[ArmedAction]) -> CallStartPopover {
+    let starts_by_itself = due
+        .iter()
+        .any(|action| matches!(action, ArmedAction::StartRecording(_)));
+    if starts_by_itself {
+        CallStartPopover::StayClosed
+    } else {
+        CallStartPopover::Open
+    }
 }
 
 pub struct ArmedStore {
@@ -97,6 +115,10 @@ impl ArmedStore {
     #[must_use]
     pub fn mark(&self, view: AgendaView) -> AgendaView {
         view.marked(|id| self.arming_of(id))
+    }
+
+    pub fn note_call_seen(&self, now: DateTime<FixedOffset>) {
+        locked(&self.watch).note_call_seen(now);
     }
 
     pub fn take_due_actions(&self, inputs: &WatchInputs) -> Vec<ArmedAction> {

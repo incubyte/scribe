@@ -10,30 +10,12 @@ use url::Url;
 
 use super::agenda_refresh;
 use super::connection_payload::ConnectionPayload;
+use super::connection_state::{AttemptTicket, ConnectionState, ConnectionView};
 use crate::webview;
 
 const CONNECTION_EVENT: &str = "outlook://connection";
 const SIGN_IN_THREAD: &str = "outlook-sign-in";
 const RESTORE_THREAD: &str = "outlook-restore";
-
-struct ConnectionView {
-    connection: Connection,
-    failure: Option<&'static str>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-struct AttemptTicket(u64);
-
-struct ConnectionState {
-    view: ConnectionView,
-    disconnects: u64,
-}
-
-impl ConnectionState {
-    fn ticket(&self) -> AttemptTicket {
-        AttemptTicket(self.disconnects)
-    }
-}
 
 pub struct OutlookConnection {
     state: Mutex<ConnectionState>,
@@ -43,13 +25,7 @@ pub struct OutlookConnection {
 impl OutlookConnection {
     pub fn new() -> OutlookConnection {
         OutlookConnection {
-            state: Mutex::new(ConnectionState {
-                view: ConnectionView {
-                    connection: Connection::Connecting,
-                    failure: None,
-                },
-                disconnects: 0,
-            }),
+            state: Mutex::new(ConnectionState::new()),
             attempt_running: AtomicBool::new(false),
         }
     }
@@ -65,12 +41,11 @@ impl OutlookConnection {
     }
 
     fn payload(&self) -> ConnectionPayload {
-        let state = self.state();
-        ConnectionPayload::new(&state.view.connection, state.view.failure)
+        self.state().view().payload()
     }
 
     fn connection(&self) -> Connection {
-        self.state().view.connection.clone()
+        self.state().view().connection.clone()
     }
 
     fn ticket(&self) -> AttemptTicket {
@@ -90,8 +65,24 @@ pub fn current_connection<R: Runtime>(app: &AppHandle<R>) -> Connection {
     app.state::<OutlookConnection>().connection()
 }
 
-pub fn require_reconnect<R: Runtime>(app: &AppHandle<R>) {
-    publish(app, settled(Connection::ReconnectNeeded));
+pub fn ticket<R: Runtime>(app: &AppHandle<R>) -> AttemptTicket {
+    app.state::<OutlookConnection>().ticket()
+}
+
+pub fn require_reconnect<R: Runtime>(app: &AppHandle<R>, ticket: AttemptTicket) {
+    publish_unless_disconnected(app, ticket, settled(Connection::ReconnectNeeded));
+}
+
+pub fn while_connected_since<R: Runtime>(
+    app: &AppHandle<R>,
+    ticket: AttemptTicket,
+    job: impl FnOnce(),
+) {
+    let connection = app.state::<OutlookConnection>();
+    let state = connection.state();
+    if state.is_connected_since(ticket) {
+        job();
+    }
 }
 
 pub fn connect_in_background<R: Runtime>(app: &AppHandle<R>) {
@@ -118,7 +109,7 @@ pub fn disconnect<R: Runtime>(app: &AppHandle<R>) -> Result<ConnectionPayload, V
     }
     let connection = app.state::<OutlookConnection>();
     let mut state = connection.state();
-    state.disconnects += 1;
+    state.note_disconnect();
     Ok(announce(app, &mut state, settled(Connection::Disconnected)))
 }
 
@@ -165,10 +156,7 @@ fn restore<R: Runtime>(app: &AppHandle<R>) -> ConnectionView {
 }
 
 fn settled(connection: Connection) -> ConnectionView {
-    ConnectionView {
-        connection,
-        failure: None,
-    }
+    ConnectionView::settled(connection)
 }
 
 fn restored_connection(outcome: Result<Option<AccountIdentity>, CalendarError>) -> Connection {
@@ -209,7 +197,7 @@ fn publish_unless_disconnected<R: Runtime>(
 ) {
     let connection = app.state::<OutlookConnection>();
     let mut state = connection.state();
-    if state.ticket() == ticket {
+    if state.is_current(ticket) {
         announce(app, &mut state, view);
     }
 }
@@ -220,8 +208,8 @@ fn announce<R: Runtime>(
     view: ConnectionView,
 ) -> ConnectionPayload {
     agenda_refresh::follow_connection(app, &view.connection);
-    let payload = ConnectionPayload::new(&view.connection, view.failure);
-    state.view = view;
+    let payload = view.payload();
+    state.replace_view(view);
     webview::emit(app, CONNECTION_EVENT, payload.clone());
     payload
 }

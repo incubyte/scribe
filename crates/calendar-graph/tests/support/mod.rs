@@ -5,7 +5,8 @@ use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, PoisonError};
-use std::thread;
+use std::thread::{self, JoinHandle};
+use std::time::Duration;
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
@@ -15,6 +16,7 @@ use scribe_core::ports::CredentialVault;
 use url::Url;
 
 pub const DISPLAY_NAME: &str = "Riya Shah";
+const CONTENTION_WINDOW: Duration = Duration::from_millis(100);
 pub const EMAIL: &str = "riya@example.com";
 
 #[derive(Debug, Clone)]
@@ -329,4 +331,23 @@ pub fn query_value(url: &Url, name: &str) -> String {
         .find(|(key, _)| key == name)
         .map(|(_, value)| value.into_owned())
         .unwrap_or_default()
+}
+
+pub fn started_on_thread<T: Send + 'static>(
+    job: impl FnOnce() -> T + Send + 'static,
+) -> JoinHandle<T> {
+    let (started, has_started) = mpsc::channel();
+    let handle = thread::spawn(move || {
+        started
+            .send(())
+            .expect("the test stopped waiting for the thread");
+        job()
+    });
+    has_started.recv().expect("the thread never started");
+    handle
+}
+
+pub fn is_held_back<T>(running: &JoinHandle<T>) -> bool {
+    thread::sleep(CONTENTION_WINDOW);
+    !running.is_finished()
 }

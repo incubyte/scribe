@@ -66,8 +66,7 @@ pub fn choose_meeting<R: Runtime>(
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
 pub fn arm_meeting<R: Runtime>(app: AppHandle<R>, event_id: String) -> Result<(), String> {
-    auto_record::arm(&app, EventId::new(event_id))
-        .map_err(|_| "that meeting is not on today's agenda".to_owned())
+    auto_record::arm(&app, EventId::new(event_id)).map_err(|refusal| refusal.reason().to_owned())
 }
 
 #[tauri::command]

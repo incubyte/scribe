@@ -154,7 +154,7 @@ sequenceDiagram
 
 - [x] **5.1.1** Signed out, Settings shows "Connect Outlook". After a successful sign-in it shows the account's display name and email, and a "Disconnect" button.
 - [x] **5.1.2** Sign-in uses the authorization-code flow with PKCE (S256) and a random `state`. A redirect whose `state` doesn't match is rejected, and the connection stays `Disconnected`.
-- [x] **5.1.3** The redirect listener binds to `127.0.0.1` only, accepts one request, and closes after that request or after 5 minutes, whichever comes first.
+- [x] **5.1.3** The redirect listener binds to `127.0.0.1` only. It ignores requests that carry no `state` with a `code` or `error`, and an idle connection holds it for at most 2 seconds. It closes after the redirect or after 5 minutes, whichever comes first.
 - [x] **5.1.4** The requested scopes are exactly `openid profile offline_access Calendars.Read`, and sign-in accepts work and school accounts only.
 - [x] **5.1.5** The refresh token is stored in the macOS Keychain or Windows Credential Manager under the Scribe service name. It never appears in `settings.json`, the logs or the webview.
 - [x] **5.1.6** After restarting Scribe, the connection is still `Connected` without a new sign-in.
@@ -461,7 +461,7 @@ sequenceDiagram
 
 **9.5 Offline after a restart shows "Connecting to Outlook…" — deferred.** When the token is stored but Microsoft can't be reached, `restored_connection` (`calendar/connection.rs`) keeps the state at `Connecting` until a retry succeeds. Settings offers no action, and the popover shows Recent sessions rather than "Couldn't load your calendar". The fix is a separate "stored, unreachable" state. Sources: [3].
 
-**9.6 Very short meetings can clip their switch or Record button — deferred.** A 15-minute block is shorter than the 24 px targets, and `.agenda__block` hides overflow. Forcing a taller block made back-to-back meetings overlap (AC 5.2.3), so the block keeps its true height. The fix is to lay controls for short blocks outside the block. Sources: [3].
+**9.6 Very short meetings let their switch or Record button overhang the block — deferred.** `.agenda__block` no longer hides overflow; only its subject, recurrence mark and Teams tag are clipped. The switch and Record button keep their full 24 px target and focus ring. A block shorter than 24 px, such as a 15-minute meeting, can't contain them, so they overhang its bottom edge and sit over the top of a back-to-back block below. Forcing a taller block made back-to-back meetings overlap (AC 5.2.3), so the block keeps its true height. The fix is to lay out controls for short blocks outside the block. Sources: [3].
 
 **9.7 Code-structure clean-ups from review — deferred.** None changes behaviour:
 - `recording.rs` and `call_watch.rs` import `calendar` and the reverse, where an event or port would decouple them.
@@ -473,6 +473,10 @@ sequenceDiagram
 - The calendar-graph test support keeps a module-wide `dead_code` allow, because each test binary uses part of it.
 
 Sources: [3].
+
+**9.8 "Connecting to Outlook…" offers no cancel — deferred.** After the user closes the sign-in tab, Connect is ignored until the 5-minute sign-in deadline passes, because `begin_attempt` (`calendar/connection.rs`) admits one attempt at a time and `OutlookRow.tsx` shows no Cancel. The fix is a Cancel action that ends the waiting listener. Sources: [3].
+
+**9.9 Disconnect can wait for a token refresh — deferred.** `OutlookAccount::fresh_access_token` (`crates/calendar-graph/src/account.rs`) holds the access lock across the vault read and the HTTP refresh, so Disconnect can wait as long as the refresh takes. The transport bounds that at its 30 s request timeout (`REQUEST_TIMEOUT`, which includes the 10 s connect timeout). Holding the lock is what keeps a refresh from writing a token back after Disconnect. The fix is to refresh outside the lock and drop the grant when a disconnect happened meanwhile, as `connect` and `restore` already do. Sources: [3].
 
 ## 10. Established behaviour — documented, not changed
 
