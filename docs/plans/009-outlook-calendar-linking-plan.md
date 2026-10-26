@@ -41,7 +41,7 @@ Slices 3, 4 and 6 extend the same `match_meeting` function. Slice 5 reuses slice
 
 **2. The refresh token goes into the OS credential store through the `keyring` crate, version 3.6, with `apple-native` and `windows-native`.** It's one small wrapper with no `unsafe`, and the workspace denies `unsafe_code`. The token is stored as UTF-8 bytes through `set_secret` to stay under the Windows Credential Manager size limit. Lands in slice 1 and is recorded in ADR 10. *Rejected: `security-framework` plus `Win32_Security_Credentials` by hand, which means two unsafe implementations for no gain. Also rejected: keyring 4.x, which splits the API across store crates and is still settling.*
 
-**3. The account's name and email come from the `id_token` that sign-in and every refresh already return.** Nothing about the account is persisted except the refresh token. After a restart, the first refresh restores the name. This keeps the scopes exactly `openid profile offline_access Calendars.ReadBasic` (AC 5.1.4). *Rejected: calling `/me`, which needs `User.Read`, and caching the name in `settings.json`, which the webview can read.*
+**3. The account's name and email come from the `id_token` that sign-in and every refresh already return.** Nothing about the account is persisted except the refresh token. After a restart, the first refresh restores the name. This keeps the scopes exactly `openid profile offline_access Calendars.Read` (AC 5.1.4). *Rejected: calling `/me`, which needs `User.Read`, and caching the name in `settings.json`, which the webview can read.*
 
 **4. Only work and school accounts can sign in, enforced by using the `/organizations` authority.** It's a URL choice, not code. *Rejected: `/common` with a check after sign-in, which would let a personal account reach consent first.*
 
@@ -61,7 +61,7 @@ Slices 3, 4 and 6 extend the same `match_meeting` function. Slice 5 reuses slice
 
 ## Where this could go wrong
 
-- **Tenant consent and attendees are unknown until a real sign-in ([spec §8.1](../specs/009-outlook-calendar-linking.md#8-open-questions), [§8.2](../specs/009-outlook-calendar-linking.md#8-open-questions)).** If users can't consent, or `ReadBasic` withholds attendees, slice 1 ships but slice 3's attendee list is empty. Slice 1's *Open at build time* probe settles both before slice 3 starts. A switch to `Calendars.Read` is a one-constant change.
+- **Tenant consent is unknown until a real sign-in ([spec §8.1](../specs/009-outlook-calendar-linking.md#8-open-questions)).** A tenant can block user consent even for `Calendars.Read`. The scope is `Calendars.Read`, not `ReadBasic`, because Microsoft doesn't document that `ReadBasic` returns attendees (see the Escalation log). Sapan runs every real-tenant check at the end of the build, not between slices.
 - **The refresh token may be too large for Windows Credential Manager.** It caps the secret at 2,560 bytes. Slice 1 stores UTF-8 bytes and fails the connection with a named error rather than truncating; a quality check guards this. A Windows probe at build time confirms the real size.
 - **Auto-record could start or stop when it shouldn't.** The pure `ArmedWatch` has a test for each transition in [spec slice 5.6](../specs/009-outlook-calendar-linking.md#56-arm-a-meeting-to-record-by-itself)'s state diagram. The bold quality check in slice 6 asserts that no start happens without a detected call (invariant 4.7).
 - **Transcripts are on-disk data.** A malformed `meeting` block must never make a transcript unreadable. Slice 3 parses the block separately and drops it on error, and old files without the block are covered by a test fixture.
@@ -137,7 +137,7 @@ None of those is part of this plan. Meeting notifications go in a new module tha
   - `DayBounds` and `CalendarEvent` are declared in slice 2. Put `CalendarSource` in this slice only if `OutlookAccount` needs it to compile; otherwise add it in slice 2.
 - `crates/scribe-core/src/calendar/error.rs` (new): `VaultError` (`thiserror`, `kind()`), and `CalendarError::{NotConnected, ReconnectNeeded, Unreachable, Malformed}` with `kind() -> &'static str`, mirroring `DownloadError::kind` `[verified]`.
 - `crates/calendar-graph/Cargo.toml` (new): dependencies as in the module map. `[lints] workspace = true`.
-- `crates/calendar-graph/src/authority.rs` (new): consts `CLIENT_ID`, `AUTHORIZE_URL = "https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize"`, `TOKEN_URL = ".../organizations/oauth2/v2.0/token"`, `SCOPES = "openid profile offline_access Calendars.ReadBasic"`. `[verified]` the endpoint shape and the `organizations` tenant value against the Entra auth-code docs.
+- `crates/calendar-graph/src/authority.rs` (new): consts `CLIENT_ID`, `AUTHORIZE_URL = "https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize"`, `TOKEN_URL = ".../organizations/oauth2/v2.0/token"`, `SCOPES = "openid profile offline_access Calendars.Read"`. `[verified]` the endpoint shape and the `organizations` tenant value against the Entra auth-code docs.
 - `crates/calendar-graph/src/pkce.rs` (new):
   - `struct SignInRequest { verifier: Secret, challenge: String, state: String }`
   - `SignInRequest::generate() -> SignInRequest`, using 32 random bytes encoded as base64url without padding; the challenge is `base64url(sha256(verifier))`.
@@ -233,7 +233,7 @@ None of those is part of this plan. Meeting notifications go in a new module tha
 **Quality checks**
 
 - **No command, event, log line or `settings.json` key ever carries a token, `code`, verifier or `state`. `Secret`'s `Debug` prints `***`, and `ConnectionPayload` has no secret field (AC 5.1.5, invariant 4.3).**
-- The scopes string equals `openid profile offline_access Calendars.ReadBasic` exactly, and the authority path segment is `organizations` (AC 5.1.4).
+- The scopes string equals `openid profile offline_access Calendars.Read` exactly, and the authority path segment is `organizations` (AC 5.1.4).
 - The listener binds `127.0.0.1`, never `localhost` or `0.0.0.0`, serves one request, and closes by `SIGN_IN_TIMEOUT` (AC 5.1.3).
 - A token over the Windows secret limit fails as a named `VaultError` kind, never by truncating.
 - `scribe-core` gains no dependency on `reqwest`, `keyring`, Tauri or `cfg(target_os)` ([spec §7.2](../specs/009-outlook-calendar-linking.md#72-architectural-style) anti-patterns).
@@ -782,4 +782,5 @@ No other slice touches a designated category. Slice 3 changes the transcript fro
 
 ## Escalation log
 
-*(empty — `/anthara:plan-implementer` appends tier bumps and build-time probe results here)*
+- 2026-10-26 — slice 1 — scope `Calendars.ReadBasic` → `Calendars.Read`. Reason: Microsoft documents only what `ReadBasic` withholds ("properties such as body, attachments, and extensions"), not that it returns `attendees` and `organizer`, which slice 3 needs. `Calendars.Read` is still read-only and needs no admin consent for delegated use, so invariant 4.2 holds. Spec OQ 8.2 closed; changed `authority.rs` `SCOPES`, its tests, ADR 10 and spec 4.2, 5.1.4, 6.1.4. Decided by Sapan.
+- 2026-10-26 — all slices — real-tenant probes (OQ 8.1, refresh-token size on Windows, `id_token` claim names, OQ 8.4 Teams titles) and the slice 7 gap measurement move to one manual test pass after slice 7. Builders use fakes and the placeholder `CLIENT_ID`. Decided by Sapan.

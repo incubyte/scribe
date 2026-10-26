@@ -13,7 +13,7 @@
 | **Slices** | 7, built in the order listed in [§5](#5-slices) |
 | **Architectural style** | Hexagonal, inherited from `docs/ARCHITECTURE.md`, see [§7.2](#72-architectural-style) |
 | **Active packs** | Org-wide engineering standards (Clean Code · Incubyte Engineering Standards · Design Standards with WCAG 2.2 AA); no regulated packs |
-| **Open questions** | 4. The one that matters most: whether Incubyte's and client tenants let users consent to `Calendars.ReadBasic` ([§8.1](#8-open-questions)) |
+| **Open questions** | 3. The one that matters most: whether Incubyte's and client tenants let users consent to `Calendars.Read` ([§8.1](#8-open-questions)) |
 
 ## 1. Overview & business context
 
@@ -41,6 +41,7 @@
 | 5 | Live spec-writing session with Sapan Parikh | Sapan Parikh | 2026-10-25 | Feasibility review and decisions: Graph OAuth, work/school accounts only, one account, time-grid layout, recents removed when signed in, window-title matching, auto-record on call detection, notify on a missed armed meeting, ask before switching meetings, stop on call end |
 | 6 | Org Memory (search: "Scribe calendar Outlook meeting call detection Teams popover") | Fabric | 2026-10-25 | Prior art: your-steno-desktop listed upcoming meetings through a server-side calendar function. Scribe has no server, so Scribe fetches directly from the desktop |
 | 7 | `docs/specs/004-auto-stop-on-silence-context.md`, `docs/specs/006-teams-call-auto-open-context.md` | Codebase | 2026-10-25 | Auto-stop after 5 minutes of quiet. The Teams call latch (rising edge, grace period, probe errors are not a release) and the popover opening without toggling |
+| 8 | Public docs (graphpermissions.merill.net/permission/Calendars.ReadBasic, …/Calendars.Read) | Web | 2026-10-26 | `Calendars.ReadBasic` reads events "except for properties such as body, attachments, and extensions" without listing what it returns. Both permissions are delegated with admin consent not required |
 
 ## 3. Type ontology
 
@@ -94,7 +95,7 @@
 
 **4.1 Signed-out Scribe is unchanged.** With no Outlook connection, the popover, call detection, recording and front matter behave exactly as they did before this spec. Sources: [3, 5].
 
-**4.2 Scribe only reads the calendar.** Scribe requests `Calendars.ReadBasic` and `offline_access` (plus the OpenID scopes sign-in needs), and never sends a write to Graph. Sources: [1, 5].
+**4.2 Scribe only reads the calendar.** Scribe requests `Calendars.Read` and `offline_access` (plus the OpenID scopes sign-in needs), and never sends a write to Graph. Sources: [1, 5].
 
 **4.3 Tokens never leave the credential store or memory.** The refresh token lives only in the OS credential store and the access token only in memory. Neither, nor any meeting subject or attendee, is ever written to a log or to `settings.json`. Sources: [3].
 
@@ -154,7 +155,7 @@ sequenceDiagram
 - [x] **5.1.1** Signed out, Settings shows "Connect Outlook". After a successful sign-in it shows the account's display name and email, and a "Disconnect" button.
 - [x] **5.1.2** Sign-in uses the authorization-code flow with PKCE (S256) and a random `state`. A redirect whose `state` doesn't match is rejected, and the connection stays `Disconnected`.
 - [x] **5.1.3** The redirect listener binds to `127.0.0.1` only, accepts one request, and closes after that request or after 5 minutes, whichever comes first.
-- [x] **5.1.4** The requested scopes are exactly `openid profile offline_access Calendars.ReadBasic`, and sign-in accepts work and school accounts only.
+- [x] **5.1.4** The requested scopes are exactly `openid profile offline_access Calendars.Read`, and sign-in accepts work and school accounts only.
 - [x] **5.1.5** The refresh token is stored in the macOS Keychain or Windows Credential Manager under the Scribe service name. It never appears in `settings.json`, the logs or the webview.
 - [x] **5.1.6** After restarting Scribe, the connection is still `Connected` without a new sign-in.
 - [x] **5.1.7** "Disconnect" deletes the stored token, returns Settings to "Connect Outlook", and the popover shows Recent sessions again.
@@ -321,7 +322,7 @@ No regulated packs are active. The NFRs below come from the org-wide standards a
 
 **6.1.3 Secrets stay in the OS credential store.** Derived from: ARCHITECTURE §5 "File safety" and "Logging". Sources: [3].
 
-**6.1.4 Least privilege.** `Calendars.ReadBasic` only, with `$select` limited to the fields Scribe uses. Derived from: rule "YAGNI" and the Graph least-privilege guidance. Sources: [1].
+**6.1.4 Least privilege.** `Calendars.Read` only, which is read-only and user-consentable, with `$select` limited to the fields Scribe uses and never the body. `Calendars.ReadBasic` would be smaller, but Microsoft documents only what it withholds ("properties such as body, attachments, and extensions"), not that it returns attendees and organizer, which slice 5.3 depends on. Derived from: rule "YAGNI" and the Graph least-privilege guidance. Sources: [1, 8].
 
 **6.1.5 Validate at the boundary.** Graph responses and front-matter `meeting` blocks are parsed into typed values. A malformed event is skipped and doesn't fail the agenda, and a malformed `meeting` block makes the transcript parse without a meeting. Derived from: rule "Fail fast at boundaries". Sources: [3].
 
@@ -439,9 +440,7 @@ sequenceDiagram
 
 ## 8. Open questions
 
-**8.1 Will users be able to consent to `Calendars.ReadBasic` themselves in the Incubyte tenant and in client tenants?** If not, an admin must approve, per tenant. Settle this with a test app registration before building slice 5.1. Awaiting: a sign-in test by Sapan and Incubyte IT's consent policy.
-
-**8.2 Does a `Calendars.ReadBasic` token return `attendees` and `organizer`?** Microsoft documents only that body, attachments and extensions are withheld. If attendees are withheld too, the scope becomes `Calendars.Read`. Awaiting: the same test as 8.1.
+**8.1 Will users be able to consent to `Calendars.Read` themselves in the Incubyte tenant and in client tenants?** If not, an admin must approve, per tenant. Settle this with a test app registration before building slice 5.1. Awaiting: a sign-in test by Sapan and Incubyte IT's consent policy.
 
 **8.3 Who owns the Entra app registration and publisher verification?** Verification needs a Microsoft partner (MPN) ID, and without it users see an "unverified" consent screen. Awaiting: Incubyte IT.
 
@@ -468,3 +467,4 @@ sequenceDiagram
 ## Changelog
 
 - 2026-10-25 — Sapan Parikh — Initial spec from a feasibility review and a live session [5].
+- 2026-10-26 — Sapan Parikh — Scope changed from `Calendars.ReadBasic` to `Calendars.Read` so attendees and organizer are certain to come back; still read-only and user-consentable [8]. Former open question 8.2 closed.

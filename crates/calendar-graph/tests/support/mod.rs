@@ -184,7 +184,7 @@ pub fn token_reply(
 ) -> Result<HttpReply, TransportError> {
     let body = serde_json::json!({
         "token_type": "Bearer",
-        "scope": "openid profile offline_access Calendars.ReadBasic",
+        "scope": "openid profile offline_access Calendars.Read",
         "expires_in": expires_in,
         "access_token": access,
         "refresh_token": refresh,

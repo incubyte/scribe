@@ -38,7 +38,7 @@ fn sign_in_asks_for_exactly_the_read_only_calendar_scopes() {
 
     assert_eq!(
         query_value(&url, "scope").as_deref(),
-        Some("openid profile offline_access Calendars.ReadBasic")
+        Some("openid profile offline_access Calendars.Read")
     );
 }
 

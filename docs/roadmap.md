@@ -9,7 +9,7 @@ What is planned, in rough order. Each item becomes a spec in `docs/specs/` when 
 Sign in with a work Outlook account, show today's meetings in the popover, save the meeting name and invitees in each transcript, and record armed meetings automatically.
 
 - Spec: [009 Outlook calendar linking](specs/009-outlook-calendar-linking.md)
-- Before building: test that Incubyte and client tenants allow users to consent to `Calendars.ReadBasic` (spec 009, §8.1).
+- Before building: test that Incubyte and client tenants allow users to consent to `Calendars.Read` (spec 009, §8.1).
 
 ## Later
 
