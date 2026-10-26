@@ -18,6 +18,7 @@ import type {
   ModelDownload,
   RecorderSnapshot,
   SessionSummary,
+  SwitchPromptView,
 } from "./types";
 
 const NOW = Date.parse("2026-10-17T09:10:00+00:00");
@@ -132,6 +133,8 @@ const TWO_MEETINGS_FIT: CallMeetingView = {
   ],
 };
 
+let openSwitchPrompt: SwitchPromptView | null = null;
+
 function backend(
   snapshot: RecorderSnapshot,
   recent: readonly SessionSummary[] = FIVE_SESSIONS,
@@ -149,6 +152,9 @@ function backend(
     refresh_agenda: null,
     call_meeting: callMeeting,
     choose_meeting: callMeeting,
+    switch_prompt: () => openSwitchPrompt,
+    switch_meeting: null,
+    keep_recording: null,
     arm_meeting: null,
     disarm_meeting: null,
     record_meeting: null,
@@ -171,6 +177,7 @@ function backend(
 }
 
 beforeEach(() => {
+  openSwitchPrompt = null;
   currentFolder = INITIAL_FOLDER;
   readFolder = defaultReadFolder;
   changeFolder = defaultChangeFolder;
@@ -373,6 +380,55 @@ describe("the meeting line in the popover", () => {
     expect(
       await screen.findByRole("group", { name: "Which meeting is this?" }),
     ).toBeInTheDocument();
+  });
+});
+
+const RETRO_PROMPT: SwitchPromptView = {
+  from_subject: "DXC Review",
+  to_subject: "Sprint Retro",
+};
+
+describe("the popover offering the next meeting", () => {
+  it("shows a switch prompt already open when the popover opens", async () => {
+    openSwitchPrompt = RETRO_PROMPT;
+    backend(recordingForSixtyFiveSeconds);
+    render(<Popover />);
+
+    expect(
+      await screen.findByText("Still recording DXC Review. Switch to Sprint Retro?"),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the prompt the backend publishes and removes it when answered elsewhere", async () => {
+    backend(recordingForSixtyFiveSeconds);
+    render(<Popover />);
+    await screen.findByRole("button", { name: "Stop recording" });
+
+    await act(() => emit("meeting://switch-prompt", RETRO_PROMPT));
+    expect(await screen.findByRole("button", { name: "Switch" })).toBeInTheDocument();
+    await act(() => emit("meeting://switch-prompt", null));
+
+    expect(screen.queryByRole("button", { name: "Switch" })).toBeNull();
+  });
+
+  it("asks the backend to switch when Switch is pressed", async () => {
+    openSwitchPrompt = RETRO_PROMPT;
+    const handler = backend(recordingForSixtyFiveSeconds);
+    render(<Popover />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Switch" }));
+
+    expect(handler).toHaveBeenCalledWith("switch_meeting", {});
+  });
+
+  it("asks the backend to keep recording when Keep recording is pressed", async () => {
+    openSwitchPrompt = RETRO_PROMPT;
+    const handler = backend(recordingForSixtyFiveSeconds);
+    render(<Popover />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Keep recording" }));
+
+    expect(handler).toHaveBeenCalledWith("keep_recording", {});
   });
 });
 

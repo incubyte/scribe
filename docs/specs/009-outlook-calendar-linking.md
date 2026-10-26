@@ -303,12 +303,12 @@ Sometimes a recording linked to meeting A continues while meeting B starts in th
 
 **Acceptance criteria**
 
-- [ ] **5.7.1** While recording a transcript linked to A, when armed meeting B starts, the popover opens with the switch prompt naming both meetings.
-- [ ] **5.7.2** While recording a transcript linked to A, when the Teams title changes to match B (a candidate at that moment), the same prompt appears. It appears once per meeting B.
-- [ ] **5.7.3** "Switch" finalises A's transcript (linked to A) and starts a new recording linked to B, with no more than 2 seconds of audio lost between them.
-- [ ] **5.7.4** "Keep recording" or no response leaves A recording and linked to A, and the prompt does not return for B ([4.8](#4-invariants)).
-- [ ] **5.7.5** No prompt appears when B is neither armed nor matched by the Teams title.
-- [ ] **5.7.6** On macOS the prompt lives in the popover, because Scribe's macOS notifications carry no buttons. The prompt's buttons are keyboard-operable, and focus moves to the prompt when it opens.
+- [x] **5.7.1** While recording a transcript linked to A, when armed meeting B starts, the popover opens with the switch prompt naming both meetings.
+- [x] **5.7.2** While recording a transcript linked to A, when the Teams title changes to match B (a candidate at that moment), the same prompt appears. It appears once per meeting B.
+- [x] **5.7.3** "Switch" finalises A's transcript (linked to A) and starts a new recording linked to B, with no more than 2 seconds of audio lost between them.
+- [x] **5.7.4** "Keep recording" or no response leaves A recording and linked to A, and the prompt does not return for B ([4.8](#4-invariants)).
+- [x] **5.7.5** No prompt appears when B is neither armed nor matched by the Teams title.
+- [x] **5.7.6** On macOS the prompt lives in the popover, because Scribe's macOS notifications carry no buttons. The prompt's buttons are keyboard-operable, and focus moves to the prompt when it opens.
 
 ## 6. NFRs & regulatory compliance
 

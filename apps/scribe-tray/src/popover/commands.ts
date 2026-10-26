@@ -1,6 +1,6 @@
 import { getVersion } from "@tauri-apps/api/app";
 import { invoke } from "@tauri-apps/api/core";
-import { expecting, isString } from "../shared/guards";
+import { expecting, isNullable, isString } from "../shared/guards";
 import {
   isAgendaView,
   isCallMeetingView,
@@ -10,6 +10,7 @@ import {
   isOutlookConnection,
   isRebindOutcome,
   isRecorderSnapshot,
+  isSwitchPromptView,
   isSessionSummaries,
   isShortcutViewList,
 } from "./guards";
@@ -98,3 +99,10 @@ export const fetchCallMeeting = () =>
 
 export const chooseMeeting = (eventId: string | null) =>
   invoke<unknown>("choose_meeting", { eventId }).then(expecting(isCallMeetingView, "call meeting"));
+
+export const fetchSwitchPrompt = () =>
+  invoke<unknown>("switch_prompt").then(expecting(isNullable(isSwitchPromptView), "switch prompt"));
+
+export const switchMeeting = () => invoke("switch_meeting");
+
+export const keepRecording = () => invoke("keep_recording");

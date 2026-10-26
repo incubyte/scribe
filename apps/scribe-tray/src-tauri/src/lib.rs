@@ -80,6 +80,9 @@ fn with_commands<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         calendar::commands::arm_meeting,
         calendar::commands::disarm_meeting,
         calendar::commands::record_meeting,
+        calendar::commands::switch_prompt,
+        calendar::commands::switch_meeting,
+        calendar::commands::keep_recording,
     ])
 }
 

@@ -6,6 +6,7 @@ mod layout;
 mod link;
 mod matching;
 mod meeting;
+mod switching;
 mod titles;
 
 use std::time::Duration;
@@ -20,9 +21,11 @@ pub use layout::{
 pub use link::{MAX_LISTED_ATTENDEES, MeetingLink};
 pub use matching::{MatchAnchor, MatchInputs, MatchOutcome, match_meeting, meeting_candidates};
 pub use meeting::{CalendarEvent, DayBounds, EventId, Meeting, Person, Response, ShowAs};
+pub use switching::{SwitchInputs, SwitchPrompt, SwitchPrompts};
 pub use titles::meeting_named_in_titles;
 
 pub const SIGN_IN_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 pub const AGENDA_REFRESH_INTERVAL: Duration = Duration::from_secs(5 * 60);
 pub const CANDIDATE_LEAD: Duration = Duration::from_secs(10 * 60);
 pub const MISSED_AFTER: Duration = Duration::from_secs(5 * 60);
+pub const TITLE_RECHECK_INTERVAL: Duration = Duration::from_secs(30);

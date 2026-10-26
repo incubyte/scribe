@@ -9,6 +9,8 @@ use super::connection;
 use super::connection_payload::ConnectionPayload;
 use super::selection::MeetingSelection;
 use super::session_link;
+use super::switch_state::SwitchPromptView;
+use super::switching;
 
 #[tauri::command]
 #[allow(clippy::needless_pass_by_value)]
@@ -77,4 +79,21 @@ pub fn disarm_meeting<R: Runtime>(app: AppHandle<R>, event_id: String) {
 #[allow(clippy::needless_pass_by_value)]
 pub fn record_meeting<R: Runtime>(app: AppHandle<R>, event_id: String) {
     auto_record::record(&app, &EventId::new(event_id));
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn switch_prompt<R: Runtime>(app: AppHandle<R>) -> Option<SwitchPromptView> {
+    switching::current(&app)
+}
+
+#[tauri::command]
+pub async fn switch_meeting<R: Runtime>(app: AppHandle<R>) {
+    switching::switch(&app);
+}
+
+#[tauri::command]
+#[allow(clippy::needless_pass_by_value)]
+pub fn keep_recording<R: Runtime>(app: AppHandle<R>) {
+    switching::keep(&app);
 }

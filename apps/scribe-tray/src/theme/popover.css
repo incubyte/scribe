@@ -705,3 +705,30 @@
   padding: var(--space-1) 0;
   border-radius: var(--radius-control);
 }
+
+.switch-prompt {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--hairline);
+  font-size: var(--text-sm);
+}
+
+.switch-prompt__heading {
+  margin: 0;
+  font-size: var(--text-md);
+}
+
+.switch-prompt__heading:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.switch-prompt__text {
+  margin: 0;
+}
+
+.switch-prompt__actions {
+  display: flex;
+  gap: var(--space-2);
+}

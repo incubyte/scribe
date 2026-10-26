@@ -22,6 +22,7 @@ import type {
   ShortcutView,
   SnapshotLine,
   Speaker,
+  SwitchPromptView,
 } from "./types";
 import {
   type Guard,
@@ -218,5 +219,12 @@ export function isCallMeetingView(value: unknown): value is CallMeetingView {
     selected_event_id: isNullable(isString),
     not_a_meeting: isBoolean,
     candidates: isListOf(isMeetingCandidate),
+  });
+}
+
+export function isSwitchPromptView(value: unknown): value is SwitchPromptView {
+  return hasFields(value, {
+    from_subject: isString,
+    to_subject: isString,
   });
 }

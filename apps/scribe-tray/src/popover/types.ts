@@ -123,3 +123,8 @@ export interface CallMeetingView {
   readonly not_a_meeting: boolean;
   readonly candidates: readonly MeetingCandidate[];
 }
+
+export interface SwitchPromptView {
+  readonly from_subject: string;
+  readonly to_subject: string;
+}
