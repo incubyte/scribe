@@ -1,3 +1,3 @@
-- Scribe now also checks for updates shortly after your computer wakes from sleep, as well as every hour. Settings shows which version is running.
+- Connect your Outlook work account in Settings to see today's meetings in Scribe. Each transcript now saves the meeting's name and invitees, you can set a meeting to record by itself, and Scribe offers to switch to the next meeting when one starts during a call. Some organisations need an admin to approve Scribe before you can connect.
 - macOS (Apple Silicon, macOS 26 or later): signed and notarized by Apple. If you used an earlier version, allow the Microphone, System Audio Recording and Screen Recording permissions again when Scribe asks; this happens once.
 - Windows: unsigned. On the SmartScreen prompt, choose More info → Run anyway.
