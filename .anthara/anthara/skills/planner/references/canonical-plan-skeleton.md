@@ -64,6 +64,8 @@ Confidence markers, used throughout Part 2: `[verified]` = the planner read the 
 - **Module map:** <one line per module this plan touches — `path` · responsibility · depends on. From the context file's §1 Affected modules, placed within the spec's §7.3 boundaries; every path `[verified]`.>
 - **Lexicon (from context §4b — do not rename):** <the shared names every slice uses verbatim: components, hooks, factories, params, enums, cycles>.
 - **Tests:** <the plan-wide test convention and its justification — new files vs extending which existing ones>.
+- **Project rules (from context §6a):** <delivery workflow — pull request or direct push — with its source; each other project rule the build must follow>.
+- **Local CI gates (end of spec, once — from context §6a):** <one line per gate: name · threshold · command; a lint gate is marked `covered per slice`. Then `CI only:` each gate that cannot run locally, with its reason. Or `None.`>
 
 ---
 
