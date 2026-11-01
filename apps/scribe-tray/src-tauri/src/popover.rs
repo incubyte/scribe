@@ -7,8 +7,10 @@ use tauri_plugin_positioner::{Position, WindowExt};
 use crate::blur_guard::BlurGuard;
 use crate::tray;
 use crate::tray_anchor::{ScreenArea, anchored_to_tray};
+use crate::webview;
 
 const WINDOW_LABEL: &str = "popover";
+const HIDDEN_EVENT: &str = "popover://hidden";
 
 #[cfg(target_os = "macos")]
 const FALLBACK_POSITION: Position = Position::TopRight;
@@ -21,7 +23,7 @@ pub fn toggle<R: Runtime>(app: &AppHandle<R>) {
         return;
     };
     if window.is_visible().unwrap_or(false) {
-        log_failure(window.hide(), "could not hide the popover");
+        log_failure(hide(app, &window), "could not hide the popover");
     } else if with_guard(app, |guard| guard.click_may_show(Instant::now())) {
         log_failure(show(app, &window), "could not show the popover");
     }
@@ -66,7 +68,7 @@ pub fn install_blur_hide<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
 #[allow(clippy::needless_pass_by_value)]
 pub fn hide_popover<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
     let window = popover_window(&app).map_err(|error| error.to_string())?;
-    window.hide().map_err(|error| error.to_string())
+    hide(&app, &window).map_err(|error| error.to_string())
 }
 
 pub fn keep_open_during<R: Runtime, T>(app: &AppHandle<R>, show_dialog: impl FnOnce() -> T) -> T {
@@ -126,8 +128,14 @@ fn area_of(monitor: &Monitor) -> ScreenArea {
 
 fn hide_after_blur<R: Runtime>(app: &AppHandle<R>, window: &WebviewWindow<R>) {
     if with_guard(app, |guard| guard.blur_should_hide(Instant::now())) {
-        log_failure(window.hide(), "could not hide the popover");
+        log_failure(hide(app, window), "could not hide the popover");
     }
+}
+
+fn hide<R: Runtime>(app: &AppHandle<R>, window: &WebviewWindow<R>) -> tauri::Result<()> {
+    window.hide()?;
+    webview::emit(app, HIDDEN_EVENT, ());
+    Ok(())
 }
 
 fn popover_window<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<WebviewWindow<R>> {

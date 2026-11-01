@@ -1,4 +1,4 @@
-import type { Ref } from "react";
+import type { ReactNode, Ref } from "react";
 import type { ClaudeDesktopStatus } from "./types";
 
 interface PopoverActionsProps {
@@ -8,6 +8,7 @@ interface PopoverActionsProps {
   readonly onOpenFolder: () => void;
   readonly onOpenSettings: () => void;
   readonly settingsButtonRef?: Ref<HTMLButtonElement>;
+  readonly liveCaption?: ReactNode;
 }
 
 const CONNECT_LABEL = "Connect to Claude Desktop";
@@ -20,13 +21,16 @@ export function PopoverActions({
   onOpenFolder,
   onOpenSettings,
   settingsButtonRef,
+  liveCaption,
 }: PopoverActionsProps) {
   return (
     <nav className="actions" aria-label="Scribe actions">
-      <ClaudeDesktopAction
-        status={claudeStatus}
-        onConnect={onConnectClaudeDesktop}
-      />
+      {liveCaption ?? (
+        <ClaudeDesktopAction
+          status={claudeStatus}
+          onConnect={onConnectClaudeDesktop}
+        />
+      )}
       <div className="actions__secondary">
         <button
           className="actions__link"

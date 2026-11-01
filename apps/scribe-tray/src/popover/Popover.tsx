@@ -7,7 +7,7 @@ import {
   startRecording,
   stopRecording,
 } from "./commands";
-import { LiveTranscript } from "./LiveTranscript";
+import { LiveCaption } from "./LiveCaption";
 import { MeetingLine } from "./meeting/MeetingLine";
 import { SwitchPromptCard } from "./meeting/SwitchPromptCard";
 import { useSwitchPrompt } from "./meeting/useSwitchPrompt";
@@ -78,9 +78,6 @@ export function Popover() {
         />
       )}
       <ModelDownloadPanel download={download} onRetry={retry} />
-      {feed.phase === "recording" ? (
-        <LiveTranscript lines={feed.lines} partials={feed.partials} />
-      ) : null}
       <SessionsOrAgenda
         isOutlookConnected={outlook.connection?.state === "connected"}
         recent={recent}
@@ -93,6 +90,11 @@ export function Popover() {
         onOpenFolder={() => void openTranscriptsFolder()}
         onOpenSettings={openSettings}
         settingsButtonRef={settingsButton}
+        liveCaption={
+          feed.phase === "recording" ? (
+            <LiveCaption caption={feed.caption} latestLine={feed.latestLine} />
+          ) : undefined
+        }
       />
     </main>
   );

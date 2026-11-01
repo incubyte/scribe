@@ -133,4 +133,20 @@ describe("the popover's quick actions", () => {
 
     expect(onConnectClaudeDesktop).toHaveBeenCalledOnce();
   });
+
+  it("shows the live caption instead of the Claude Desktop connection while recording", () => {
+    render(
+      <PopoverActions
+        claudeStatus="connected"
+        onConnectClaudeDesktop={noop}
+        onCopyMcpConfig={noop}
+        onOpenFolder={noop}
+        onOpenSettings={noop}
+        liveCaption={<p>We should ship on Friday</p>}
+      />,
+    );
+
+    expect(screen.getByText("We should ship on Friday")).toBeInTheDocument();
+    expect(screen.queryByText("Connected to Claude Desktop")).not.toBeInTheDocument();
+  });
 });

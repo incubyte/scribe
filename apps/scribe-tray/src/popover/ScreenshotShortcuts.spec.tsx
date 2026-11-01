@@ -370,13 +370,14 @@ describe("the screenshot shortcuts in the settings view", () => {
     expect(shortcutStatus()).toHaveClass("visually-hidden");
   });
 
-  it("keeps Back as the last control in tab order, after the shortcuts", async () => {
+  it("puts Back before the Settings heading, ahead of the shortcuts", async () => {
     backend();
     render(<SettingsView isRecording={false} onBack={vi.fn()} />);
     const back = await screen.findByRole("button", { name: "Back" });
+    const heading = screen.getByRole("heading", { name: "Settings" });
     const change = await screen.findByRole("button", { name: REGION_CHANGE });
 
-    expect(change.compareDocumentPosition(back)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(back.closest("section")?.lastElementChild).toBe(back);
+    expect(back.compareDocumentPosition(heading)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(back.compareDocumentPosition(change)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 });

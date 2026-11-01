@@ -7,57 +7,55 @@ function replay(events: readonly FeedEvent[], from: FeedState = initialFeed): Fe
 
 const recordingStarted = feedEvents.started(1_000);
 
-describe("the live transcript feed", () => {
-  it("replaces a partial line with the final wording", () => {
-    const feed = replay([
-      recordingStarted,
-      feedEvents.partial("Me", "hello wor"),
-      feedEvents.segment({ speaker: "Me", startMs: 500, text: "hello world" }),
-    ]);
+describe("the live recording feed", () => {
+  it("captions the words being spoken before they are final", () => {
+    const feed = replay([recordingStarted, feedEvents.partial("hello wor")]);
 
-    expect(feed.lines).toEqual([{ speaker: "Me", startMs: 500, text: "hello world" }]);
-    expect(feed.partials).toEqual({});
+    expect(feed.caption).toBe("hello wor");
+    expect(feed.latestLine).toBeNull();
   });
 
-  it("keeps the partial lines of the two speakers apart", () => {
+  it("swaps the caption for the final wording of a line", () => {
     const feed = replay([
       recordingStarted,
-      feedEvents.partial("Me", "can you"),
-      feedEvents.partial("Them", "sure I"),
-      feedEvents.segment({ speaker: "Me", startMs: 0, text: "can you hear me" }),
+      feedEvents.partial("hello wor"),
+      feedEvents.segment({ speaker: "Me", text: "hello world" }),
     ]);
 
-    expect(feed.partials).toEqual({ Them: "sure I" });
+    expect(feed.caption).toBe("hello world");
+    expect(feed.latestLine).toEqual({ speaker: "Me", text: "hello world" });
   });
 
-  it("keeps only the newest partial wording of a speaker", () => {
+  it("captions whoever spoke most recently", () => {
     const feed = replay([
       recordingStarted,
-      feedEvents.partial("Them", "sure"),
-      feedEvents.partial("Them", "sure I can"),
+      feedEvents.segment({ speaker: "Me", text: "can you hear me" }),
+      feedEvents.partial("sure I"),
     ]);
 
-    expect(feed.partials).toEqual({ Them: "sure I can" });
+    expect(feed.caption).toBe("sure I");
+    expect(feed.latestLine).toEqual({ speaker: "Me", text: "can you hear me" });
   });
 
-  it("clears the live lines and returns to idle when the recording stops", () => {
+  it("clears the caption and returns to idle when the recording stops", () => {
     const feed = replay([
       recordingStarted,
-      feedEvents.segment({ speaker: "Them", startMs: 0, text: "hi" }),
-      feedEvents.partial("Me", "hel"),
+      feedEvents.segment({ speaker: "Them", text: "hi" }),
+      feedEvents.partial("hel"),
       feedEvents.stopped(),
     ]);
 
     expect(feed).toEqual(initialFeed);
   });
 
-  it("starts a new recording with an empty transcript and its start time", () => {
+  it("starts a new recording with no caption and its start time", () => {
     const feed = replay([recordingStarted], {
       ...initialFeed,
-      lines: [{ speaker: "Me", startMs: 0, text: "left over" }],
+      caption: "left over",
+      latestLine: { speaker: "Me", text: "left over" },
     });
 
-    expect(feed).toMatchObject({ phase: "recording", startedAt: 1_000, lines: [] });
+    expect(feed).toMatchObject({ phase: "recording", startedAt: 1_000, caption: null, latestLine: null });
   });
 
   it("catches up from a snapshot taken while recording", () => {
@@ -65,15 +63,18 @@ describe("the live transcript feed", () => {
       feedEvents.snapshot({
         state: "recording",
         started_at: "2026-10-17T09:00:00+00:00",
-        lines: [{ speaker: "Them", start_ms: 250, text: "morning" }],
+        lines: [
+          { speaker: "Me", start_ms: 0, text: "hello" },
+          { speaker: "Them", start_ms: 250, text: "morning" },
+        ],
       }),
     ]);
 
     expect(feed).toEqual({
       phase: "recording",
       startedAt: Date.parse("2026-10-17T09:00:00+00:00"),
-      lines: [{ speaker: "Them", startMs: 250, text: "morning" }],
-      partials: {},
+      caption: "morning",
+      latestLine: { speaker: "Them", text: "morning" },
       startFailure: null,
     });
   });

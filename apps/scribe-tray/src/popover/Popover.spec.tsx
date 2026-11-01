@@ -465,16 +465,27 @@ describe("the popover while recording", () => {
     expect(handler).toHaveBeenCalledWith("stop_recording", {});
   });
 
-  it("shows who said what with a text label for each speaker", async () => {
+  it("shows the latest words in place of the Claude Desktop connection", async () => {
     backend(recordingForSixtyFiveSeconds);
     render(<Popover />);
 
-    const line = await screen.findByText("Good morning");
-
-    expect(line.closest("li")).toHaveTextContent("Them");
+    expect(await screen.findByText("Good morning")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Connect to Claude Desktop" }),
+    ).not.toBeInTheDocument();
   });
 
-  it("shows a partial line as it is spoken and swaps in the final wording", async () => {
+  it("shows no transcript area while recording", async () => {
+    backend(recordingForSixtyFiveSeconds);
+    render(<Popover />);
+    await screen.findByText("Good morning");
+
+    expect(
+      screen.queryByRole("region", { name: "Live transcript" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("captions words as they are spoken and swaps in the final wording", async () => {
     backend(recordingForSixtyFiveSeconds);
     render(<Popover />);
     await screen.findByText("Good morning");
@@ -483,6 +494,7 @@ describe("the popover while recording", () => {
       emit("recording://partial", { speaker: "Me", text: "hello wor" }),
     );
     expect(await screen.findByText("hello wor")).toBeInTheDocument();
+    expect(screen.queryByText("Good morning")).not.toBeInTheDocument();
 
     await act(() =>
       emit("recording://segment", {
@@ -504,22 +516,21 @@ describe("the popover while recording", () => {
     await screen.findByText("Good morning");
 
     await act(() =>
-      emit("recording://partial", { speaker: "Me", text: "still talk" }),
-    );
-    const partialLine = await screen.findByText("still talk");
-    await act(() =>
       emit("recording://segment", {
         speaker: "Them",
         start_ms: 900,
         text: "All done",
       }),
     );
+    await act(() =>
+      emit("recording://partial", { speaker: "Me", text: "still talk" }),
+    );
+    const caption = await screen.findByText("still talk");
 
-    const transcript = screen.getByRole("region", { name: "Live transcript" });
-    const announcements = transcript.querySelector('[aria-live="polite"]');
+    const announcements = caption.parentElement?.querySelector('[aria-live="polite"]');
     expect(announcements).toHaveTextContent("Them: All done");
     expect(announcements).not.toHaveTextContent("still talk");
-    expect(partialLine.closest("li")).toHaveAttribute("aria-hidden", "true");
+    expect(caption).toHaveAttribute("aria-hidden", "true");
   });
 
   it("returns to Start and refreshes recent sessions when the recording stops", async () => {
@@ -542,22 +553,6 @@ describe("the popover while recording", () => {
       ([c]) => c === "recent_sessions",
     ).length;
     expect(callsAfter).toBeGreaterThan(callsBefore);
-  });
-
-  it("moves focus from Stop to the transcript", async () => {
-    backend(recordingForSixtyFiveSeconds);
-    render(<Popover />);
-    await screen.findByText("Good morning");
-
-    await userEvent.tab();
-    expect(
-      screen.getByRole("button", { name: "Stop recording" }),
-    ).toHaveFocus();
-
-    await userEvent.tab();
-    expect(
-      screen.getByRole("region", { name: "Live transcript" }),
-    ).toHaveFocus();
   });
 
   it("has no accessibility violations", async () => {
@@ -689,6 +684,34 @@ describe("the popover settings", () => {
     await openSettings();
 
     expect(await screen.findByText("Version 0.5.1")).toBeInTheDocument();
+  });
+
+  it("opens on the main view again after the popover was hidden", async () => {
+    backend(idle);
+    render(<Popover />);
+    await openSettings();
+    await screen.findByRole("heading", { name: "Settings" });
+
+    await act(() => emit("popover://hidden", null));
+
+    expect(
+      await screen.findByRole("button", { name: "Start recording" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Settings" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("returns to the main view from the back arrow", async () => {
+    backend(idle);
+    render(<Popover />);
+    await openSettings();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Back" }));
+
+    expect(
+      await screen.findByRole("button", { name: "Start recording" }),
+    ).toBeInTheDocument();
   });
 
   it("offers to connect Outlook while signed out", async () => {

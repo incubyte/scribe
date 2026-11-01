@@ -2,17 +2,14 @@ import type { RecorderPhase, RecorderSnapshot, Speaker } from "./types";
 
 export interface LiveLine {
   readonly speaker: Speaker;
-  readonly startMs: number;
   readonly text: string;
 }
-
-export type Partials = Readonly<Partial<Record<Speaker, string>>>;
 
 export interface FeedState {
   readonly phase: RecorderPhase;
   readonly startedAt: number | null;
-  readonly lines: readonly LiveLine[];
-  readonly partials: Partials;
+  readonly caption: string | null;
+  readonly latestLine: LiveLine | null;
   readonly startFailure: string | null;
 }
 
@@ -21,8 +18,8 @@ export type FeedEvent = (state: FeedState) => FeedState;
 export const initialFeed: FeedState = {
   phase: "idle",
   startedAt: null,
-  lines: [],
-  partials: {},
+  caption: null,
+  latestLine: null,
   startFailure: null,
 };
 
@@ -31,27 +28,19 @@ export const feedEvents = {
     (snapshot: RecorderSnapshot): FeedEvent =>
     () => ({
       ...initialFeed,
+      ...heard(lastLineOf(snapshot)),
       phase: snapshot.state,
       startedAt: snapshot.started_at === null ? null : Date.parse(snapshot.started_at),
-      lines: snapshot.lines.map((line) => ({
-        speaker: line.speaker,
-        startMs: line.start_ms,
-        text: line.text,
-      })),
     }),
   started:
     (at: number): FeedEvent =>
     () => ({ ...initialFeed, phase: "recording", startedAt: at }),
   partial:
-    (speaker: Speaker, text: string): FeedEvent =>
-    (state) => ({ ...state, partials: { ...state.partials, [speaker]: text } }),
+    (text: string): FeedEvent =>
+    (state) => ({ ...state, caption: text }),
   segment:
     (line: LiveLine): FeedEvent =>
-    (state) => ({
-      ...state,
-      lines: [...state.lines, line],
-      partials: withoutSpeaker(state.partials, line.speaker),
-    }),
+    (state) => ({ ...state, ...heard(line) }),
   stopped: (): FeedEvent => () => initialFeed,
   phaseChanged:
     (phase: RecorderPhase): FeedEvent =>
@@ -65,6 +54,11 @@ export function feedReducer(state: FeedState, event: FeedEvent): FeedState {
   return event(state);
 }
 
-function withoutSpeaker(partials: Partials, speaker: Speaker): Partials {
-  return Object.fromEntries(Object.entries(partials).filter(([key]) => key !== speaker));
+function heard(line: LiveLine | null): Pick<FeedState, "caption" | "latestLine"> {
+  return { caption: line?.text ?? null, latestLine: line };
+}
+
+function lastLineOf(snapshot: RecorderSnapshot): LiveLine | null {
+  const last = snapshot.lines.at(-1);
+  return last === undefined ? null : { speaker: last.speaker, text: last.text };
 }

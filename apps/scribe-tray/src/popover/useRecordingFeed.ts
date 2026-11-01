@@ -27,11 +27,11 @@ function listenFor<T>(
 function subscribe(dispatch: Dispatch, onStopped: () => void): () => void {
   const subscriptions: Promise<UnlistenFn>[] = [
     listen("recording://started", () => dispatch(feedEvents.started(Date.now()))),
-    listenFor("recording://partial", isPartialPayload, ({ speaker, text }) =>
-      dispatch(feedEvents.partial(speaker, text)),
+    listenFor("recording://partial", isPartialPayload, ({ text }) =>
+      dispatch(feedEvents.partial(text)),
     ),
-    listenFor("recording://segment", isSegmentPayload, ({ speaker, start_ms, text }) =>
-      dispatch(feedEvents.segment({ speaker, startMs: start_ms, text })),
+    listenFor("recording://segment", isSegmentPayload, ({ speaker, text }) =>
+      dispatch(feedEvents.segment({ speaker, text })),
     ),
     listen("recording://stopped", () => {
       dispatch(feedEvents.stopped());
