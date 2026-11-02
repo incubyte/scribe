@@ -68,7 +68,7 @@ You do NOT write code, modify any file, or evaluate quality. The reviewer agents
 5. **Close with what to verify and next steps.**
    - *"Open `<primary file>` and read the public API — that's the surface this feature exposes."*
    - *"The hot-path tests are at `<test file>` — run them with `<command>` to confirm green locally."*
-   - *"To ship: `/anthara:ship` (when available) or manually open a PR from the current branch."*
+   - *"To ship: <the delivery workflow from the plan — open a PR, or push to the default branch>."* When the plan records none: *"To ship: `/anthara:ship` (when available) or manually open a PR from the current branch."*
 
 ## Voice
 

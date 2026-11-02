@@ -53,6 +53,9 @@ A markdown file at `docs/specs/<stem>-context.md`, where the stem is the spec's 
 11. **Note open uncertainties resolved during orientation.** If exploring revealed an answer to one of the spec's §8 Open questions (e.g., "build vs integrate" — confirmed integrating with existing `dispatch.service.ts`), capture that.
 12. **Extract the existing design system — only when the spec has UI-touching slices** (a slice with a UI mockup, an index `Entry` that is a screen or control, or a `user_facing` signal). Run design-craft's Path A: locate the visual source of truth and record it in §8a. Find the design tokens / theme (e.g., `tailwind.config.*`, CSS custom properties, a theme module), the component library and where reusable UI primitives live (`Button`, `Card`, `Modal`, etc.) so slice-builder reuses them instead of re-creating, and the typography / spacing / color and dark-mode conventions in use. Cite by file + symbol; aggregate over enumerate. If a `design.md` exists, name it as the authority and summarize — do not duplicate it. If the project has **no** detectable design system (greenfield / no-system), say so explicitly in §8a and do not invent one. Skip this step and omit §8a entirely for specs with no UI slices.
 13. **Ground destructive surfaces.** For each slice that deletes, archives, revokes, or otherwise irreversibly mutates data, find this codebase's established convention for two things and surface them as §4c traps for that slice: (a) the **confirmation pattern** the project uses before a destructive action (e.g., a typed-confirmation token, a `confirm-delete` guard, a two-step soft-delete) and (b) the **impact-count query** the project runs to show the blast radius (e.g., a `count(*)` of dependent rows). Cite by file + symbol. If the slice has no destructive surface, omit. If the project has no established convention yet, say so explicitly rather than inventing one.
+14. **Record the project's own rules and its CI gates (§6a).**
+   - **Project rules.** Read the repo's decision records and agent instructions (`docs/adr/`, `ARCHITECTURE.md`, `CLAUDE.md` / `AGENTS.md`, `CONTRIBUTING.md`). Record each rule on how work is built or lands — always the delivery workflow (pull request or direct push) — citing its source. When a newer record supersedes an older one, record only the one in force.
+   - **CI gates.** Read the CI definitions (e.g. `.github/workflows/`, `azure-pipelines.yml`, `.gitlab-ci.yml`). For each job that can block a change, record what it checks, its threshold, when it fires, and **Local**: `yes` with the command to run it here (scoped to the changed files where the tool supports it), or `no` with the reason — it needs secrets, a hosted service, a runner OS this machine cannot check, a manual approval, or a tool that is not installed (check read-only, e.g. `command -v <tool>`). A gate that fires only on an event the delivery workflow never produces is **dormant**; mark it so.
 
 ## Reference rules
 
@@ -101,6 +104,14 @@ A markdown file at `docs/specs/<stem>-context.md`, where the stem is the spec's 
 - Unit: <framework>, co-located `*.spec.ts`. Run: `<command>`.
 - Integration: `<framework>`, `<location>`. Run: `<command>`.
 - Fixtures: `<location>` (`<setup function>`).
+
+## 6a. Project rules and CI gates
+- **Delivery:** <pull request | direct push | none recorded> — `<source file>`.
+- **<Rule>:** <one line> — `<source file>`.
+
+| Gate | Checks | Threshold | Fires on | Local |
+|------|--------|-----------|----------|-------|
+| `<job name>` | <what it checks> | <threshold, or none> | <event>; **dormant** when the delivery workflow never produces it | yes: `<command>` — or — no: <reason> |
 
 ## 7. Hot paths and performance landmines
 - `<endpoint or function>` — <constraint>.

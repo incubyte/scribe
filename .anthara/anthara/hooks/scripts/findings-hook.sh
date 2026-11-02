@@ -48,7 +48,16 @@ incident_path() {
   esac
 }
 
-modified_since() { [ -n "$(find "$1" -maxdepth 0 -newermt "$2" 2>/dev/null)" ]; }
+touch_stamp() {
+  local digits="${1//[-:]/}"
+  printf '%s%s.%s' "${digits:0:8}" "${digits:9:4}" "${digits:13:2}"
+}
+
+modified_since() {
+  local reference="$WORK_DIR/seen-at"
+  TZ=UTC touch -t "$(touch_stamp "$2")" "$reference" 2>/dev/null &&
+    [ -n "$(find "$1" -maxdepth 0 -newer "$reference" 2>/dev/null)" ]
+}
 
 note_changed_files() {
   local id seen file path
