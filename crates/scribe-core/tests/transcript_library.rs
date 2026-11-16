@@ -1,3 +1,6 @@
+#![allow(clippy::assert_is_empty)]
+
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -6,8 +9,10 @@ use scribe_core::capture::SessionMoment;
 use scribe_core::library::{
     LibraryError, Limit, ListQuery, SearchHit, SearchQuery, TranscriptLibrary,
 };
-use scribe_core::ports::{ScreenshotStore, TranscriptStore};
-use scribe_core::recording::{Segment, SessionHeader, SessionId, SessionStatus, Speaker};
+use scribe_core::ports::{ScreenshotStore, StoreError, TranscriptStore};
+use scribe_core::recording::{
+    Segment, SessionDocument, SessionHeader, SessionId, SessionStatus, SessionSummary, Speaker,
+};
 use scribe_core::testing::{InMemoryScreenshotStore, InMemoryTranscriptStore, frame_filled};
 
 fn moment(text: &str) -> DateTime<FixedOffset> {
@@ -343,4 +348,232 @@ fn a_malformed_screenshot_reference_is_rejected_by_name() {
         failure.to_string(),
         "Invalid screenshot name: ../escape.png"
     );
+}
+
+struct FailingReadTranscriptStore {
+    inner: InMemoryTranscriptStore,
+    failing_id: SessionId,
+    make_error: fn(&SessionId) -> StoreError,
+}
+
+impl FailingReadTranscriptStore {
+    fn malformed(inner: InMemoryTranscriptStore, failing_id: SessionId) -> Self {
+        Self {
+            inner,
+            failing_id,
+            make_error: |id| StoreError::Malformed {
+                file_name: format!("{id}.md"),
+            },
+        }
+    }
+
+    fn io(inner: InMemoryTranscriptStore, failing_id: SessionId) -> Self {
+        Self {
+            inner,
+            failing_id,
+            make_error: |id| StoreError::Io {
+                path: PathBuf::from(format!("/transcripts/{id}.md")),
+                source: std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "permission denied",
+                ),
+            },
+        }
+    }
+
+    fn not_found(inner: InMemoryTranscriptStore, failing_id: SessionId) -> Self {
+        Self {
+            inner,
+            failing_id,
+            make_error: |id| StoreError::NotFound { id: id.clone() },
+        }
+    }
+}
+
+impl TranscriptStore for FailingReadTranscriptStore {
+    fn create(&self, header: &SessionHeader) -> Result<SessionId, StoreError> {
+        self.inner.create(header)
+    }
+
+    fn append(&self, id: &SessionId, segment: &Segment) -> Result<(), StoreError> {
+        self.inner.append(id, segment)
+    }
+
+    fn finalise(&self, id: &SessionId, ended_at: DateTime<FixedOffset>) -> Result<(), StoreError> {
+        self.inner.finalise(id, ended_at)
+    }
+
+    fn mark_abandoned_incomplete(&self) -> Result<usize, StoreError> {
+        self.inner.mark_abandoned_incomplete()
+    }
+
+    fn list(&self, limit: usize) -> Result<Vec<SessionSummary>, StoreError> {
+        self.inner.list(limit)
+    }
+
+    fn list_all(&self) -> Result<Vec<SessionSummary>, StoreError> {
+        self.inner.list_all()
+    }
+
+    fn read(&self, id: &SessionId) -> Result<SessionDocument, StoreError> {
+        if id == &self.failing_id {
+            Err((self.make_error)(id))
+        } else {
+            self.inner.read(id)
+        }
+    }
+}
+
+struct FailingListTranscriptStore;
+
+impl TranscriptStore for FailingListTranscriptStore {
+    fn create(&self, _header: &SessionHeader) -> Result<SessionId, StoreError> {
+        Err(StoreError::DocumentsFolderUnavailable)
+    }
+
+    fn append(&self, _id: &SessionId, _segment: &Segment) -> Result<(), StoreError> {
+        Err(StoreError::DocumentsFolderUnavailable)
+    }
+
+    fn finalise(
+        &self,
+        _id: &SessionId,
+        _ended_at: DateTime<FixedOffset>,
+    ) -> Result<(), StoreError> {
+        Err(StoreError::DocumentsFolderUnavailable)
+    }
+
+    fn mark_abandoned_incomplete(&self) -> Result<usize, StoreError> {
+        Err(StoreError::DocumentsFolderUnavailable)
+    }
+
+    fn list(&self, _limit: usize) -> Result<Vec<SessionSummary>, StoreError> {
+        Err(StoreError::DocumentsFolderUnavailable)
+    }
+
+    fn list_all(&self) -> Result<Vec<SessionSummary>, StoreError> {
+        Err(StoreError::DocumentsFolderUnavailable)
+    }
+
+    fn read(&self, _id: &SessionId) -> Result<SessionDocument, StoreError> {
+        Err(StoreError::DocumentsFolderUnavailable)
+    }
+}
+
+fn three_transcripts(inner: &InMemoryTranscriptStore) -> (SessionId, SessionId, SessionId) {
+    let id_a = finished_call(inner, "2026-10-17T09:00:00+00:00");
+    inner
+        .append(&id_a, &said(Speaker::Them, 10, "Discuss the budget"))
+        .unwrap();
+
+    let id_b = finished_call(inner, "2026-10-16T09:00:00+00:00");
+    inner
+        .append(&id_b, &said(Speaker::Them, 10, "Any content"))
+        .unwrap();
+
+    let id_c = finished_call(inner, "2026-10-15T09:00:00+00:00");
+    inner
+        .append(&id_c, &said(Speaker::Them, 10, "Budget approved"))
+        .unwrap();
+
+    (id_a, id_b, id_c)
+}
+
+#[test]
+fn search_skips_unreadable_transcript_and_returns_other_matches() {
+    let inner = InMemoryTranscriptStore::default();
+    let (id_a, id_b, id_c) = three_transcripts(&inner);
+
+    let store = Arc::new(FailingReadTranscriptStore::malformed(inner, id_b.clone()));
+    let library = TranscriptLibrary::new(store, Arc::new(InMemoryScreenshotStore::default()));
+
+    let query = SearchQuery::parse("budget").unwrap();
+    let hits = library
+        .search(&query, Limit::clamped(10))
+        .expect("search should succeed and skip unreadable transcripts");
+
+    let matched_ids: Vec<String> = hits.iter().map(|hit| hit.id.to_string()).collect();
+    assert_eq!(hits.len(), 2);
+    assert_eq!(matched_ids, vec![id_a.to_string(), id_c.to_string()]);
+    assert!(!matched_ids.contains(&id_b.to_string()));
+}
+
+#[test]
+fn search_skipped_unreadable_transcript_does_not_consume_limit() {
+    let inner = InMemoryTranscriptStore::default();
+
+    // Meeting A: newer, but unreadable
+    let id_a = finished_call(&inner, "2026-10-17T09:00:00+00:00");
+    inner
+        .append(&id_a, &said(Speaker::Them, 10, "Discuss the budget"))
+        .unwrap();
+
+    // Meeting B: older, readable, matches "budget"
+    let id_b = finished_call(&inner, "2026-10-16T09:00:00+00:00");
+    inner
+        .append(&id_b, &said(Speaker::Them, 10, "Discuss the budget"))
+        .unwrap();
+
+    let store = Arc::new(FailingReadTranscriptStore::malformed(inner, id_a));
+    let library = TranscriptLibrary::new(store, Arc::new(InMemoryScreenshotStore::default()));
+
+    let query = SearchQuery::parse("budget").unwrap();
+    let hits = library
+        .search(&query, Limit::clamped(1))
+        .expect("search should succeed and skip unreadable transcript");
+
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0].id, id_b);
+}
+
+#[test]
+fn search_fails_when_store_enumeration_fails() {
+    let store = Arc::new(FailingListTranscriptStore);
+    let library = TranscriptLibrary::new(store, Arc::new(InMemoryScreenshotStore::default()));
+
+    let query = SearchQuery::parse("budget").unwrap();
+    let result = library.search(&query, Limit::clamped(10));
+
+    assert!(matches!(
+        result,
+        Err(LibraryError::Store(StoreError::DocumentsFolderUnavailable))
+    ));
+}
+
+#[test]
+fn search_skips_transcript_with_io_read_error_and_returns_other_matches() {
+    let inner = InMemoryTranscriptStore::default();
+    let (id_a, id_b, id_c) = three_transcripts(&inner);
+
+    let store = Arc::new(FailingReadTranscriptStore::io(inner, id_b.clone()));
+    let library = TranscriptLibrary::new(store, Arc::new(InMemoryScreenshotStore::default()));
+
+    let query = SearchQuery::parse("budget").unwrap();
+    let hits = library
+        .search(&query, Limit::clamped(10))
+        .expect("search should succeed and skip I/O failed transcript");
+
+    let matched_ids: Vec<String> = hits.iter().map(|hit| hit.id.to_string()).collect();
+    assert_eq!(hits.len(), 2);
+    assert_eq!(matched_ids, vec![id_a.to_string(), id_c.to_string()]);
+    assert!(!matched_ids.contains(&id_b.to_string()));
+}
+
+#[test]
+fn search_skips_transcript_not_found_on_read_and_returns_other_matches() {
+    let inner = InMemoryTranscriptStore::default();
+    let (id_a, id_b, id_c) = three_transcripts(&inner);
+
+    let store = Arc::new(FailingReadTranscriptStore::not_found(inner, id_b.clone()));
+    let library = TranscriptLibrary::new(store, Arc::new(InMemoryScreenshotStore::default()));
+
+    let query = SearchQuery::parse("budget").unwrap();
+    let hits = library
+        .search(&query, Limit::clamped(10))
+        .expect("search should succeed and skip missing transcript");
+
+    let matched_ids: Vec<String> = hits.iter().map(|hit| hit.id.to_string()).collect();
+    assert_eq!(hits.len(), 2);
+    assert_eq!(matched_ids, vec![id_a.to_string(), id_c.to_string()]);
+    assert!(!matched_ids.contains(&id_b.to_string()));
 }
