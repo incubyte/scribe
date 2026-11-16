@@ -89,7 +89,18 @@ impl TranscriptLibrary {
     ) -> Result<Vec<SearchHit>, LibraryError> {
         self.readable_newest_first()?
             .into_iter()
-            .filter_map(|summary| self.hit_for(summary, query).transpose())
+            .filter_map(|summary| {
+                let id = summary.id.clone();
+                match self.hit_for(summary, query) {
+                    Ok(Some(hit)) => Some(Ok(hit)),
+                    Ok(None) => None,
+                    Err(error) if is_recoverable_read_error(&error) => {
+                        tracing::warn!(%id, "skipping unreadable transcript during search");
+                        None
+                    }
+                    Err(error) => Some(Err(error)),
+                }
+            })
             .take(limit.get())
             .collect()
     }
@@ -123,4 +134,12 @@ impl TranscriptLibrary {
 
 fn is_readable(status: SessionStatus) -> bool {
     status != SessionStatus::Recording
+}
+
+fn is_recoverable_read_error(error: &LibraryError) -> bool {
+    matches!(
+        error,
+        LibraryError::Store(StoreError::Malformed { .. } | StoreError::Io { .. })
+            | LibraryError::NotFound(_)
+    )
 }
